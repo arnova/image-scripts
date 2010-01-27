@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="2.01b"
+MY_VERSION="2.01c"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Restore Script with network support
-# Last update: September 1, 2009
-# (C) Copyright 2004-2009 by Arno van Amersfoort
+# Last update: January 27, 2010
+# (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -303,9 +303,6 @@ if ! mount -t $MOUNT_TYPE $MOUNT_OPTIONS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   exit 6
 fi
 
-# Save current directory
-SAVE_DIR=`pwd`
-
 # Use default or argument specified image name
 if [ -z "$IMAGE_NAME" ]; then
   IMAGE_NAME="$DEFAULT_DIR"
@@ -321,19 +318,18 @@ if [ ! -d "$MOUNT_POINT/$DIR_NAME" ]; then
 fi
 
 # Goto the directory where the image('s) are
-cd "$MOUNT_POINT/$DIR_NAME"
-pwd
+IMAGE_DIR="$MOUNT_POINT/$DIR_NAME"
 
-if [ -e description.txt ]; then
+if [ -e "$IMAGE_DIR/description.txt" ]; then
   echo "--------------------------------------------------------------------------------"
-  cat description.txt
+  cat "$IMAGE_DIR/description.txt"
   echo "--------------------------------------------------------------------------------"
   echo "Press any key to continue"
   read -n 1
 fi
 
 # Check whether any image(s) exist
-if [ -z "$(find -maxdepth 1 -name "*.img.gz.000")" ]; then
+if [ -z "$(find "$IMAGE_DIR/" -maxdepth 1 -name "*.img.gz.000")" ]; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Unable to locate any image files (*.img.gz.000). Network error or empty directory? Quitting...\n\033[0m"
   echo ""
@@ -343,8 +339,8 @@ fi
 # Restore MBR/track0/partitions
 TARGET_NODEV=""
 unset IFS
-for HDD in track0.*; do
-  HDD_NAME="$(echo "$HDD" |sed 's/^track0\.//')"
+for track0 in "$IMAGE_DIR"/track0.*; do
+  HDD_NAME="$(basename "$track0" |sed 's/^track0\.//')"
 
   # If no target drive specified use default drive from image:
   if [ -n "$USER_TARGET_NODEV" ]; then
@@ -391,10 +387,10 @@ for HDD in track0.*; do
       read -n1
     fi
 
-    if [ -f track0.$HDD_NAME ]; then
+    if [ -f "$IMAGE_DIR"/track0.$HDD_NAME ]; then
       echo "Updating track0(MBR) on /dev/$TARGET_NODEV"
       # NOTE: Without partition table use bs=446 (mbr loader only)
-      if ! dd if=track0.$HDD_NAME of=/dev/$TARGET_NODEV bs=32768 count=1; then
+      if ! dd if="$IMAGE_DIR"/track0.$HDD_NAME of=/dev/$TARGET_NODEV bs=32768 count=1; then
         printf "\033[40m\033[1;31mERROR: Track0(MBR) restore failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
         read -n1
       fi
@@ -406,8 +402,8 @@ for HDD in track0.*; do
       fi
     fi
 
-    if [ -f partitions.$HDD_NAME ]; then
-      if ! sfdisk --force /dev/$TARGET_NODEV < partitions.$HDD_NAME; then
+    if [ -f "$IMAGE_DIR"/partitions.$HDD_NAME ]; then
+      if ! sfdisk --force /dev/$TARGET_NODEV < "$IMAGE_DIR"/partitions.$HDD_NAME; then
         printf "\033[40m\033[1;31mPartition table restore failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
         read -n1
       fi
@@ -422,9 +418,9 @@ done
 
 # Test whether the target partition(s) exist:
 unset IFS
-for IMAGE_FILE in *.img.gz.000; do
+for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   # Strip extension so we get the actual device name
-  PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+  PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
   # We want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
@@ -444,9 +440,9 @@ done
 
 # Restore the actual image(s):
 unset IFS
-for IMAGE_FILE in *.img.gz.000; do
+for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   # Strip extension so we get the actual device name
-  PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+  PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
   # We want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
@@ -477,7 +473,7 @@ TARGET_DEVICE="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
 unset IFS
-for script in *.sh; do
+for script in "$IMAGE_DIR"/*.sh; do
   if [ -f "$script" ]; then
     # Source script:
     . "$script"
@@ -486,7 +482,6 @@ done
 
 # Unmount?
 if [ "$AUTO_UNMOUNT" = "1" ]; then
-  cd "$SAVE_DIR"
   umount -v "$MOUNT_POINT"
 fi
 

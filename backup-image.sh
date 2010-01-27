@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="2.01b"
+MY_VERSION="2.01c"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Backup Script with network support
-# Last update: September 1, 2009
-# (C) Copyright 2004-2009 by Arno van Amersfoort
+# Last update: January 27, 2010
+# (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -307,9 +307,6 @@ if ! mount -t $MOUNT_TYPE $MOUNT_OPTIONS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   exit 6
 fi
 
-# Save current directory
-SAVE_DIR=`pwd`
-
 if ! mkdir -p "$MOUNT_POINT/$TARGET_DIR"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($MOUNT_POINT/$TARGET_DIR)! Quitting...\n\033[0m"
@@ -317,26 +314,31 @@ if ! mkdir -p "$MOUNT_POINT/$TARGET_DIR"; then
   exit 7
 fi
 
-cd "$MOUNT_POINT/$TARGET_DIR"
+IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR"
 
 if [ -n "$IMAGE_NAME" ]; then
 #  if [ -d "$IMAGE_NAME" ]; then
 #    printf "\033[40m\033[1;31mERROR: Image target directory already exists! Quitting...\n\033[0m"
 #    exit 5
 #  fi
-  mkdir -p "$IMAGE_NAME" && cd "$IMAGE_NAME" || exit 8
+  IMAGE_DIR="$IMAGE_DIR/$IMAGE_IMAGE"
+  mkdir -p "$IMAGE_DIR" || exit 8
 fi
-pwd
+
+if [ ! -d "$IMAGE_DIR" ]; then
+  printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist! Quitting...\n\033[0m"
+  exit 5
+fi
 
 # Make sure target directory is empty
-if [ -n "$(find -maxdepth 1 -type f)" ]; then
-  find -maxdepth 1 -type f -exec ls -l {} \;
+if [ -n "$(find "$IMAGE_DIR/" -maxdepth 1 -type f)" ]; then
+  find "$IMAGE_DIR/" -maxdepth 1 -type f -exec ls -l {} \;
   printf "Current directory is NOT empty. PURGE directory before continuing (Y/N)?"
   read answer
   echo ""
 
   if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
-    find -maxdepth 1 -type f -exec rm -vf {} \;
+    find "$IMAGE_DIR/" -maxdepth 1 -type f -exec rm -vf {} \;
   fi
 fi
 
@@ -346,9 +348,9 @@ IGNORE_PARTITIONS=""
 unset IFS
 for PART in $PARTITIONS; do
   if grep -E -q "^/dev/""$PART""[[:blank:]]" /proc/mounts; then
-    IGNORE_PARTITIONS="$IGNORE_PARTITIONS$PART "
+    IGNORE_PARTITIONS="$IGNORE_PARTITIONS${IGNORE_PARTITIONS:+ }$PART"
   else
-    BACKUP_PARTITIONS="$BACKUP_PARTITIONS$PART "
+    BACKUP_PARTITIONS="$BACKUP_PARTITIONS${BACKUP_PARTITIONS:+ }$PART"
   fi
 done
 
@@ -362,7 +364,7 @@ echo ""
 
 read -p "Please enter description: " DESCRIPTION
 if [ -n "$DESCRIPTION" ]; then
-  echo "$DESCRIPTION" >|description.txt
+  echo "$DESCRIPTION" >"$IMAGE_DIR"/description.txt
 fi
 
 # Scan all devices/HDDs
@@ -382,18 +384,18 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
           check_dma /dev/$HDD
 
           # Dump hdd info for all disks in the current system
-          if ! dd if=/dev/$HDD of=track0.$HDD bs=32768 count=1; then
+          if ! dd if=/dev/$HDD of="$IMAGE_DIR/track0.$HDD" bs=32768 count=1; then
             printf "\033[40m\033[1;31mERROR: Track0(MBR) backup failed!\n\033[0m"
             exit 8
           fi
 
-          if ! sfdisk -d /dev/$HDD > partitions.$HDD; then
+          if ! sfdisk -d /dev/$HDD > "$IMAGE_DIR/partitions.$HDD"; then
             printf "\033[40m\033[1;31mERROR: Partition table backup failed!\n\033[0m"
             exit 9
           fi
 
           # Dump fdisk info to file
-          fdisk -l /dev/$HDD >fdisk.$HDD
+          fdisk -l /dev/$HDD >"$IMAGE_DIR/fdisk.$HDD"
 
           # Mark HDD as done
           HDD=""
@@ -406,15 +408,15 @@ done
 # Backup all specified partitions:
 unset IFS
 for PART in $BACKUP_PARTITIONS; do
-  partimage -z1 -b -d save /dev/$PART $PART.img.gz
+  partimage -z1 -b -d save /dev/$PART "$IMAGE_DIR/$PART.img.gz"
   ret_val="$?"
   if [ "$ret_val" != "0" ]; then
     FAILED="$FAILED $PART"
-    printf "\033[40m\033[1;31mERROR: Image backup failed($ret_val) for $PART.img.gz.* from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+    printf "\033[40m\033[1;31mERROR: Image backup failed($ret_val) for $IMAGE_DIR/$PART.img.gz.* from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
   else
     SUCCESS="$SUCCESS $PART"
-    echo "Backuped up /dev/$PART to $PART.img.gz.*"
+    echo "Backuped /dev/$PART to $IMAGE_DIR/$PART.img.gz.*"
   fi
 done
 
@@ -422,11 +424,11 @@ done
 #reset
 
 # Set correct permissions on all files
-find -maxdepth 1 -type f -exec chmod 664 {} \;
+find "$IMAGE_DIR"/ -maxdepth 1 -type f -exec chmod 664 {} \;
 
 # Show current image directory
 echo "Target directory contents($(pwd))"
-ls -l
+ls -l "$IMAGE_DIR"/
 
 # Run custom script, if specified
 if [ -n "$CUSTOM_POST_SCRIPT" ]; then
@@ -436,7 +438,6 @@ fi
 
 # Unmount?
 if [ "$AUTO_UNMOUNT" = "1" ]; then
-  cd "$SAVE_DIR"
   umount -v "$MOUNT_POINT"
 fi
 
