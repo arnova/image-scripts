@@ -29,9 +29,9 @@ EOL='
 
 exit_handler()
 {
+  echo ""
   # Auto unmount?
-  if [ "$AUTO_UNMOUNT" = "1" ]; then
-    cd "$SAVE_DIR"
+  if [ "$AUTO_UNMOUNT" = "1" ] && grep -q " $MOUNT_POINT " /etc/mtab; then
     umount -v "$MOUNT_POINT"
   fi
 
@@ -51,15 +51,15 @@ configure_network()
     if echo "$LINE" |grep -q -i 'Link encap'; then
       CUR_IF="$(echo "$LINE" |grep -i 'Link encap:ethernet' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' |cut -f1 -d' ')"
     elif echo "$LINE" |grep -q -i 'inet addr:.*Bcast.*Mask.*'; then
-      IP_SET="$LINE"
+      IP_SET="$(echo "$LINE" |sed 's/^ *//g')"
     elif echo "$LINE" |grep -q -i '.*RX packets.*'; then
       if [ -n "$CUR_IF" ]; then
         if [ -z "$IP_SET" ] || ! ifconfig 2>/dev/null |grep -q -e "^$CUR_IF[[:blank:]]"; then
-          echo "Network interface $CUR_IF is not active (yet)"
+          echo "* Network interface $CUR_IF is not active (yet)"
           
           if echo "$NETWORK" |grep -q -e 'dhcp'; then
             if which dhcpcd >/dev/null 2>&1; then
-              printf "Trying DHCP IP (with dhcpcd) for interface $CUR_IF..."
+              printf "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF..."
               # Run dhcpcd to get a dynamic IP
               if ! dhcpcd -L $CUR_IF; then
                 echo "FAILED!"
@@ -69,7 +69,7 @@ configure_network()
               fi
             elif which dhclient >/dev/null 2>&1; then
               # FIXME: NOT tested!
-              printf "Trying DHCP IP (with dhclient) for interface $CUR_IF..."
+              printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF..."
               if ! dhclient -1 $CUR_IF; then
                 echo "FAILED!"
               else
@@ -93,7 +93,7 @@ configure_network()
             if [ -z "$USER_IPADDRESS" ]; then
               USER_IPADDRESS="$IPADDRESS"
               if [ -z "$USER_IPADDRESS" ]; then
-                echo "Skipping configuration of $CUR_IF"
+                echo "* Skipping configuration of $CUR_IF"
                 continue
               fi
             fi
@@ -110,7 +110,7 @@ configure_network()
               USER_GATEWAY="$GATEWAY"
             fi
 
-            echo "Configuring static IP: $USER_IPADDRESS / $USER_NETMASK"
+            echo "* Configuring static IP: $USER_IPADDRESS / $USER_NETMASK"
             ifconfig $CUR_IF down
             ifconfig $CUR_IF inet $USER_IPADDRESS netmask $USER_NETMASK up
             if [ -n "$USER_GATEWAY" ]; then
@@ -118,8 +118,8 @@ configure_network()
             fi
           fi
         else
-          echo "Using already configured IP for interface $CUR_IF: "
-          echo " $IP_SET"
+          echo "* Using already configured IP for interface $CUR_IF: "
+          echo "  $IP_SET"
         fi
       fi
       CUR_IF=""
@@ -252,15 +252,15 @@ if [ -n "$USER_SOURCE_NODEV" ]; then
     else
       # Does the device contain partitions?
       if get_partitions |grep -E -q -x "$DEVICE""p?[0-9]+"; then
-        PARTITIONS="$PARTITIONS$(sfdisk -d /dev/$DEVICE 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+        PARTITIONS="${PARTITIONS}$(sfdisk -d /dev/$DEVICE 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
       else
-        PARTITIONS="$PARTITIONS$DEVICE "
+        PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${DEVICE}"
       fi
     fi
   done
 else
   # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-  PARTITIONS="$PARTITIONS$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+  PARTITIONS="${PARTITIONS}$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
 fi
 
 if [ "$NETWORK" != "none" ]; then
@@ -284,7 +284,6 @@ if ! mkdir -p "$MOUNT_POINT"; then
   exit 7
 fi
 
-
 # Unmount mount point to be used
 umount "$MOUNT_POINT" 2>/dev/null
 
@@ -294,24 +293,18 @@ if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; 
     USERNAME="$DEFAULT_USERNAME"
   fi
 
-  echo "Using network username $USERNAME"
+  echo "* Using network username $USERNAME"
   
   # Replace username in our mount arguments (it's a little nasty, I know ;-))
   MOUNT_OPTIONS="-o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
 fi
 
+echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with options \"-t $MOUNT_TYPE $MOUNT_OPTIONS\""
 if ! mount -t $MOUNT_TYPE $MOUNT_OPTIONS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m"
   echo ""
   exit 6
-fi
-
-if ! mkdir -p "$MOUNT_POINT/$TARGET_DIR"; then
-  echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($MOUNT_POINT/$TARGET_DIR)! Quitting...\n\033[0m"
-  echo ""
-  exit 7
 fi
 
 IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR"
@@ -321,14 +314,24 @@ if [ -n "$IMAGE_NAME" ]; then
 #    printf "\033[40m\033[1;31mERROR: Image target directory already exists! Quitting...\n\033[0m"
 #    exit 5
 #  fi
-  IMAGE_DIR="$IMAGE_DIR/$IMAGE_IMAGE"
-  mkdir -p "$IMAGE_DIR" || exit 8
+  IMAGE_DIR="$IMAGE_DIR/$IMAGE_NAME"
+fi
+
+if ! mkdir -p "$IMAGE_DIR"; then
+  echo ""
+  printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($IMAGE_DIR)! Quitting...\n\033[0m"
+  echo ""
+  exit 7
 fi
 
 if [ ! -d "$IMAGE_DIR" ]; then
+  echo ""
   printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist! Quitting...\n\033[0m"
+  echo ""
   exit 5
 fi
+
+echo "* Using image directory: $IMAGE_DIR"
 
 # Make sure target directory is empty
 if [ -n "$(find "$IMAGE_DIR/" -maxdepth 1 -type f)" ]; then
@@ -348,16 +351,16 @@ IGNORE_PARTITIONS=""
 unset IFS
 for PART in $PARTITIONS; do
   if grep -E -q "^/dev/""$PART""[[:blank:]]" /proc/mounts; then
-    IGNORE_PARTITIONS="$IGNORE_PARTITIONS${IGNORE_PARTITIONS:+ }$PART"
+    IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }$PART"
   else
-    BACKUP_PARTITIONS="$BACKUP_PARTITIONS${BACKUP_PARTITIONS:+ }$PART"
+    BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }$PART"
   fi
 done
 
-echo "Partitions to backup: $BACKUP_PARTITIONS"
+echo "* Partitions to backup: $BACKUP_PARTITIONS"
 
 if [ -n "$IGNORE_PARTITIONS" ]; then
-  echo "Partitions to ignore: $IGNORE_PARTITIONS"
+  echo "* Partitions to ignore: $IGNORE_PARTITIONS"
 fi
 
 echo ""
@@ -378,7 +381,7 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
       unset IFS
       for PART in $BACKUP_PARTITIONS; do
         if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
-          echo "Including /dev/$HDD for backup..."
+          echo "* Including /dev/$HDD for backup..."
 
           # Check if DMA is enabled for HDD
           check_dma /dev/$HDD
@@ -409,14 +412,14 @@ done
 unset IFS
 for PART in $BACKUP_PARTITIONS; do
   partimage -z1 -b -d save /dev/$PART "$IMAGE_DIR/$PART.img.gz"
-  ret_val="$?"
-  if [ "$ret_val" != "0" ]; then
-    FAILED="$FAILED $PART"
-    printf "\033[40m\033[1;31mERROR: Image backup failed($ret_val) for $IMAGE_DIR/$PART.img.gz.* from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+  retval="$?"
+  if [ "$retval" != "0" ]; then
+    FAILED="${FAILED}${FAILED:+ }$PART"
+    printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $IMAGE_DIR/$PART.img.gz.* from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
   else
-    SUCCESS="$SUCCESS $PART"
-    echo "Backuped /dev/$PART to $IMAGE_DIR/$PART.img.gz.*"
+    SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
+    echo "* Backuped /dev/$PART to $IMAGE_DIR/$PART.img.gz.*"
   fi
 done
 
@@ -427,7 +430,7 @@ done
 find "$IMAGE_DIR"/ -maxdepth 1 -type f -exec chmod 664 {} \;
 
 # Show current image directory
-echo "Target directory contents($(pwd))"
+echo "Target directory contents($IMAGE_DIR)"
 ls -l "$IMAGE_DIR"/
 
 # Run custom script, if specified
@@ -443,9 +446,9 @@ fi
 
 # Show result to user
 if [ -n "$SUCCESS" ]; then
-  echo "Partitions backuped successfully: $SUCCESS"
+  echo "* Partitions backuped successfully: $SUCCESS"
 fi
 
 if [ -n "$FAILED" ]; then
-  echo "Partitions FAILED to backup: $FAILED"
+  echo "* Partitions FAILED to backup: $FAILED"
 fi

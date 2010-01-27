@@ -29,9 +29,9 @@ EOL='
 
 exit_handler()
 {
+  echo ""
   # Auto unmount?
-  if [ "$AUTO_UNMOUNT" = "1" ]; then
-    cd "$SAVE_DIR"
+  if [ "$AUTO_UNMOUNT" = "1" ] && grep -q " $MOUNT_POINT " /etc/mtab; then
     umount -v "$MOUNT_POINT"
   fi
 
@@ -51,15 +51,15 @@ configure_network()
     if echo "$LINE" |grep -q -i 'Link encap'; then
       CUR_IF="$(echo "$LINE" |grep -i 'Link encap:ethernet' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' |cut -f1 -d' ')"
     elif echo "$LINE" |grep -q -i 'inet addr:.*Bcast.*Mask.*'; then
-      IP_SET="$LINE"
+      IP_SET="$(echo "$LINE" |sed 's/^ *//g')"
     elif echo "$LINE" |grep -q -i '.*RX packets.*'; then
       if [ -n "$CUR_IF" ]; then
         if [ -z "$IP_SET" ] || ! ifconfig 2>/dev/null |grep -q -e "^$CUR_IF[[:blank:]]"; then
-          echo "Network interface $CUR_IF is not active (yet)"
+          echo "* Network interface $CUR_IF is not active (yet)"
           
           if echo "$NETWORK" |grep -q -e 'dhcp'; then
             if which dhcpcd >/dev/null 2>&1; then
-              printf "Trying DHCP IP (with dhcpcd) for interface $CUR_IF..."
+              printf "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF..."
               # Run dhcpcd to get a dynamic IP
               if ! dhcpcd -L $CUR_IF; then
                 echo "FAILED!"
@@ -69,7 +69,7 @@ configure_network()
               fi
             elif which dhclient >/dev/null 2>&1; then
               # FIXME: NOT tested!
-              printf "Trying DHCP IP (with dhclient) for interface $CUR_IF..."
+              printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF..."
               if ! dhclient -1 $CUR_IF; then
                 echo "FAILED!"
               else
@@ -93,7 +93,7 @@ configure_network()
             if [ -z "$USER_IPADDRESS" ]; then
               USER_IPADDRESS="$IPADDRESS"
               if [ -z "$USER_IPADDRESS" ]; then
-                echo "Skipping configuration of $CUR_IF"
+                echo "* Skipping configuration of $CUR_IF"
                 continue
               fi
             fi
@@ -110,7 +110,7 @@ configure_network()
               USER_GATEWAY="$GATEWAY"
             fi
 
-            echo "Configuring static IP: $USER_IPADDRESS / $USER_NETMASK"
+            echo "* Configuring static IP: $USER_IPADDRESS / $USER_NETMASK"
             ifconfig $CUR_IF down
             ifconfig $CUR_IF inet $USER_IPADDRESS netmask $USER_NETMASK up
             if [ -n "$USER_GATEWAY" ]; then
@@ -118,8 +118,8 @@ configure_network()
             fi
           fi
         else
-          echo "Using already configured IP for interface $CUR_IF: "
-          echo " $IP_SET"
+          echo "* Using already configured IP for interface $CUR_IF: "
+          echo "  $IP_SET"
         fi
       fi
       CUR_IF=""
@@ -178,7 +178,6 @@ sanity_check()
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in rimage.conf! Quitting...\033[0m\n" >&2
     exit 2
   fi
-
 }
 
 
@@ -274,9 +273,9 @@ fi
 trap 'exit_handler' 2
 
 # Create mount point
-if ! mkdir -p "$MOUNT_POINT/$TARGET_DIR"; then
+if ! mkdir -p "$MOUNT_POINT"; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($MOUNT_POINT/$TARGET_DIR)! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $MOUNT_POINT! Quitting...\n\033[0m"
   echo ""
   exit 7
 fi
@@ -290,12 +289,13 @@ if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; 
     USERNAME="$DEFAULT_USERNAME"
   fi
 
-  echo "Using network username $USERNAME"
+  echo "* Using network username $USERNAME"
   
   # Replace username in our mount arguments (it's a little nasty, I know ;-))
   MOUNT_OPTIONS="-o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
 fi
 
+echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with options \"-t $MOUNT_TYPE $MOUNT_OPTIONS\""
 if ! mount -t $MOUNT_TYPE $MOUNT_OPTIONS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m"
@@ -310,15 +310,17 @@ fi
 
 DIR_NAME=`echo "$IMAGE_NAME" |tr 'A-Z' 'a-z'`
 
-if [ ! -d "$MOUNT_POINT/$DIR_NAME" ]; then
+# Set the directory where the image('s) are
+IMAGE_DIR="$MOUNT_POINT/$DIR_NAME"
+
+if [ ! -d "$IMAGE_DIR" ]; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Image directory ($MOUNT_POINT/$DIR_NAME) does NOT exist! Quitting...\n\033[0m"
   echo ""
   exit 7
 fi
 
-# Goto the directory where the image('s) are
-IMAGE_DIR="$MOUNT_POINT/$DIR_NAME"
+echo "* Using image directory: $IMAGE_DIR"
 
 if [ -e "$IMAGE_DIR/description.txt" ]; then
   echo "--------------------------------------------------------------------------------"
@@ -381,14 +383,14 @@ for track0 in "$IMAGE_DIR"/track0.*; do
 
   # Only restore track0 (MBR) / partition table if they don't exist already on device
   if ! get_partitions |grep -E -q -x "$TARGET_NODEV""p?[0-9]+" || [ "$CLEAN" = "1" ]; then
-    echo "Resetting partition table on /dev/$TARGET_NODEV"
+    echo "* Resetting partition table on /dev/$TARGET_NODEV"
     if ! printf "o\nw\n" |fdisk /dev/$TARGET_NODEV; then
       printf "\033[40m\033[1;31mERROR: Clearing partition table on /dev/$TARGET_NODEV failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
       read -n1
     fi
 
     if [ -f "$IMAGE_DIR"/track0.$HDD_NAME ]; then
-      echo "Updating track0(MBR) on /dev/$TARGET_NODEV"
+      echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
       # NOTE: Without partition table use bs=446 (mbr loader only)
       if ! dd if="$IMAGE_DIR"/track0.$HDD_NAME of=/dev/$TARGET_NODEV bs=32768 count=1; then
         printf "\033[40m\033[1;31mERROR: Track0(MBR) restore failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
@@ -452,16 +454,16 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
     TARGET_PARTITION="$PARTITION"
   fi
 
-  echo "Selected partition: /dev/$TARGET_PARTITION. Using image file: $IMAGE_FILE"
+  echo "* Selected partition: /dev/$TARGET_PARTITION. Using image file: $IMAGE_FILE"
   partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
-  ret_val="$?"
-  if [ "$ret_val" != "0" ]; then
-    FAILED="$FAILED $TARGET_PARTITION"
-    printf "\033[40m\033[1;31mERROR: Image restore failed($ret_val) for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+  retval="$?"
+  if [ "$retval" != "0" ]; then
+    FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
+    printf "\033[40m\033[1;31mERROR: Image restore failed($retval) for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
   else
-    SUCCESS="$SUCCESS $TARGET_PARTITION"
-    echo "$IMAGE_FILE restored to /dev/$TARGET_PARTITION"
+    SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
+    echo "* $IMAGE_FILE restored to /dev/$TARGET_PARTITION"
   fi
 done
 
@@ -490,9 +492,10 @@ fdisk -l
 
 # Show result to user
 if [ -n "$SUCCESS" ]; then
-  echo "Partitions restored successfully: $SUCCESS"
+  echo "* Partitions restored successfully: $SUCCESS"
 fi
 
 if [ -n "$FAILED" ]; then
-  echo "Partitions FAILED to restore: $FAILED"
+  echo "* Partitions FAILED to restore: $FAILED"
 fi
+
