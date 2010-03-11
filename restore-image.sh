@@ -413,8 +413,8 @@ for track0 in "$IMAGE_DIR"/track0.*; do
 
     # Create swap on swap partitions
     IFS=$EOL
-    fdisk -l /dev/$TARGET_NODEV |grep -i -E "82.*linux.*swap" |while read LINE; do
-      mkswap /dev/"$(echo "$LINE" |awk '{ print $1 }')"
+    fdisk -l /dev/$TARGET_NODEV |grep -i "82.*linux.*swap" |while read LINE; do
+      mkswap "$(echo "$LINE" |awk '{ print $1 }')"
     done
   else
     printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m"
