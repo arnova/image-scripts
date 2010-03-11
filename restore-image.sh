@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="2.01c"
+MY_VERSION="2.01d"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Restore Script with network support
-# Last update: January 27, 2010
+# Last update: March 11, 2010
 # (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -410,6 +410,12 @@ for track0 in "$IMAGE_DIR"/track0.*; do
         read -n1
       fi
     fi
+
+    # Create swap on swap partitions
+    IFS=$EOL
+    fdisk -l /dev/$TARGET_NODEV |grep -i -E "82.*linux.*swap" |while read LINE; do
+      mkswap /dev/"$(echo "$LINE" |awk '{ print $1 }')"
+    done
   else
     printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m"
     echo "To override this you must specify --clean. Press any key to continue or CTRL-C to abort..."
