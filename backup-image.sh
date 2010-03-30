@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="2.01c"
+MY_VERSION="2.01e"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Backup Script with network support
 # Last update: January 27, 2010
@@ -287,6 +287,8 @@ fi
 # Unmount mount point to be used
 umount "$MOUNT_POINT" 2>/dev/null
 
+MOUNT_ARGS="-t $MOUNT_TYPE"
+
 if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
   read -p "Network username ($DEFAULT_USERNAME): " USERNAME
   if [ -z "$USERNAME" ]; then
@@ -295,12 +297,13 @@ if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; 
 
   echo "* Using network username $USERNAME"
   
-  # Replace username in our mount arguments (it's a little nasty, I know ;-))
-  MOUNT_OPTIONS="-o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
+  # Replace username in our mount arguments (it's a little dirty, I know ;-))
+  MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
 fi
 
-echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with options \"-t $MOUNT_TYPE $MOUNT_OPTIONS\""
-if ! mount -t $MOUNT_TYPE $MOUNT_OPTIONS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
+echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with arguments \"$MOUNT_ARGS\""
+IFS=' '
+if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m"
   echo ""
