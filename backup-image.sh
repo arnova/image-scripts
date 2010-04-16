@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="2.01e"
+MY_VERSION="2.01f"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Backup Script with network support
-# Last update: January 27, 2010
+# Last update: April 16, 2010
 # (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -27,16 +27,22 @@ DEFAULT_CONF="$(dirname $0)/bimage.cnf"
 EOL='
 '
 
-exit_handler()
+do_exit()
 {
   echo ""
+  
   # Auto unmount?
   if [ "$AUTO_UNMOUNT" = "1" ] && grep -q " $MOUNT_POINT " /etc/mtab; then
     umount -v "$MOUNT_POINT"
   fi
+  exit $1
+}
 
-  stty intr ^C # Back to normal
-  exit 1       # Yep, I meant to do that... Kill/hang the shell.
+
+ctrlc_handler()
+{
+  stty intr ^C    # Back to normal
+  do_exit 1       # Yep, I meant to do that... Kill/hang the shell.
 }
 
 
@@ -273,8 +279,8 @@ if [ "$NETWORK" != "none" ]; then
   fi
 fi
 
-# Setup CTRL-break handler
-trap 'exit_handler' 2
+# Setup CTRL-C handler
+trap 'ctrlc_handler' 2
 
 # Create mount point
 if ! mkdir -p "$MOUNT_POINT"; then
@@ -324,14 +330,14 @@ if ! mkdir -p "$IMAGE_DIR"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($IMAGE_DIR)! Quitting...\n\033[0m"
   echo ""
-  exit 7
+  do_exit 7
 fi
 
 if [ ! -d "$IMAGE_DIR" ]; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist! Quitting...\n\033[0m"
   echo ""
-  exit 5
+  do_exit 5
 fi
 
 echo "* Using image directory: $IMAGE_DIR"
@@ -392,12 +398,12 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
           # Dump hdd info for all disks in the current system
           if ! dd if=/dev/$HDD of="$IMAGE_DIR/track0.$HDD" bs=32768 count=1; then
             printf "\033[40m\033[1;31mERROR: Track0(MBR) backup failed!\n\033[0m"
-            exit 8
+            do_exit 8
           fi
 
           if ! sfdisk -d /dev/$HDD > "$IMAGE_DIR/partitions.$HDD"; then
             printf "\033[40m\033[1;31mERROR: Partition table backup failed!\n\033[0m"
-            exit 9
+            do_exit 9
           fi
 
           # Dump fdisk info to file
@@ -442,11 +448,6 @@ if [ -n "$CUSTOM_POST_SCRIPT" ]; then
   . "$CUSTOM_POST_SCRIPT"
 fi
 
-# Unmount?
-if [ "$AUTO_UNMOUNT" = "1" ]; then
-  umount -v "$MOUNT_POINT"
-fi
-
 # Show result to user
 if [ -n "$SUCCESS" ]; then
   echo "* Partitions backuped successfully: $SUCCESS"
@@ -455,3 +456,6 @@ fi
 if [ -n "$FAILED" ]; then
   echo "* Partitions FAILED to backup: $FAILED"
 fi
+
+# Exit (+unmount)
+do_exit 0

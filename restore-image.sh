@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="2.01e"
+MY_VERSION="2.01f"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Restore Script with network support
-# Last update: March 11, 2010
+# Last update: April 16, 2010
 # (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -27,16 +27,22 @@ DEFAULT_CONF="$(dirname $0)/rimage.cnf"
 EOL='
 '
 
-exit_handler()
+do_exit()
 {
   echo ""
+  
   # Auto unmount?
   if [ "$AUTO_UNMOUNT" = "1" ] && grep -q " $MOUNT_POINT " /etc/mtab; then
     umount -v "$MOUNT_POINT"
   fi
+  exit $1
+}
 
-  stty intr ^C # Back to normal
-  exit 1       # Yep, I meant to do that... Kill/hang the shell.
+
+ctrlc_handler()
+{
+  stty intr ^C    # Back to normal
+  do_exit 1       # Yep, I meant to do that... Kill/hang the shell.
 }
 
 
@@ -269,8 +275,8 @@ if [ "$NETWORK" != "none" ]; then
   fi
 fi
 
-# Setup CTRL-break handler
-trap 'exit_handler' 2
+# Setup CTRL-C handler
+trap 'ctrlc_handler' 2
 
 # Create mount point
 if ! mkdir -p "$MOUNT_POINT"; then
@@ -317,10 +323,11 @@ DIR_NAME=`echo "$IMAGE_NAME" |tr 'A-Z' 'a-z'`
 IMAGE_DIR="$MOUNT_POINT/$DIR_NAME"
 
 if [ ! -d "$IMAGE_DIR" ]; then
-  echo ""
-  printf "\033[40m\033[1;31mERROR: Image directory ($MOUNT_POINT/$DIR_NAME) does NOT exist! Quitting...\n\033[0m"
-  echo ""
-  exit 7
+  printf "\033[40m\033[1;31m\nERROR: Image directory ($MOUNT_POINT/$DIR_NAME) does NOT exist!\n"
+  printf "Showing image directory contents:\n"
+  find "$MOUNT_POINT" -type d -mindepth 1 -maxdepth 1
+  printf "\nQuitting...\n\n\033[0m"
+  do_exit 7
 fi
 
 echo "* Using image directory: $IMAGE_DIR"
@@ -338,7 +345,7 @@ if [ -z "$(find "$IMAGE_DIR/" -maxdepth 1 -name "*.img.gz.000")" ]; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Unable to locate any image files (*.img.gz.000). Network error or empty directory? Quitting...\n\033[0m"
   echo ""
-  exit 7
+  do_exit 7
 fi
 
 # Restore MBR/track0/partitions
@@ -362,7 +369,7 @@ for track0 in "$IMAGE_DIR"/track0.*; do
     echo ""
     printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist! Quitting...\n\033[0m"
     echo ""
-    exit 5
+    do_exit 5
   fi
 
   # Check if DMA is enabled for device
@@ -438,12 +445,12 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
     NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
     if ! get_partitions |grep -E -q -x "$USER_TARGET_NODEV""p?""$NUM"; then
       printf "\033[40m\033[1;31mERROR: Unable to find a proper target partition ($NUM on $USER_TARGET_NODEV)! Quitting...\n\033[0m"
-      exit 9
+      do_exit 9
     fi
   else
     if ! get_partitions |grep -q -x "$PARTITION"; then
       printf "\033[40m\033[1;31mERROR: Target partition /dev/$PARTITION does NOT exist or is invalid! Quitting...\n\033[0m"
-      exit 9
+      do_exit 9
     fi
   fi
 done
@@ -491,11 +498,6 @@ for script in "$IMAGE_DIR"/*.sh; do
   fi
 done
 
-# Unmount?
-if [ "$AUTO_UNMOUNT" = "1" ]; then
-  umount -v "$MOUNT_POINT"
-fi
-
 # Show current partition status
 fdisk -l
 
@@ -508,3 +510,5 @@ if [ -n "$FAILED" ]; then
   echo "* Partitions FAILED to restore: $FAILED"
 fi
 
+# Exit (+unmount)
+do_exit 0
