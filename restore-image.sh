@@ -314,7 +314,17 @@ fi
 
 # Use default or argument specified image name
 if [ -z "$IMAGE_NAME" ]; then
-  IMAGE_NAME="$DEFAULT_DIR"
+  echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
+  IFS=$'\n'
+  find "$MOUNT_POINT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+    echo "$(basename "$ITEM")"
+  done
+  
+  printf "\nImage to use ($DEFAULT_DIR): "
+  read IMAGE_NAME
+  if [ -z "$IMAGE_NAME" ]; then
+    IMAGE_NAME="$DEFAULT_DIR"
+  fi
 fi
 
 DIR_NAME=`echo "$IMAGE_NAME" |tr 'A-Z' 'a-z'`
@@ -323,10 +333,7 @@ DIR_NAME=`echo "$IMAGE_NAME" |tr 'A-Z' 'a-z'`
 IMAGE_DIR="$MOUNT_POINT/$DIR_NAME"
 
 if [ ! -d "$IMAGE_DIR" ]; then
-  printf "\033[40m\033[1;31m\nERROR: Image directory ($MOUNT_POINT/$DIR_NAME) does NOT exist!\n"
-  printf "Showing image directory contents:\n"
-  find "$MOUNT_POINT" -type d -mindepth 1 -maxdepth 1
-  printf "\nQuitting...\n\n\033[0m"
+  printf "\033[40m\033[1;31m\nERROR: Image directory ($MOUNT_POINT/$DIR_NAME) does NOT exist! Quitting...\n\n\033[0m"
   do_exit 7
 fi
 
@@ -342,9 +349,7 @@ fi
 
 # Check whether any image(s) exist
 if [ -z "$(find "$IMAGE_DIR/" -maxdepth 1 -name "*.img.gz.000")" ]; then
-  echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to locate any image files (*.img.gz.000). Network error or empty directory? Quitting...\n\033[0m"
-  echo ""
+  printf "\033[40m\033[1;31m\nERROR: Unable to locate any image files (*.img.gz.000) in \"$IMAGE_DIR\"! Quitting...\n\n\033[0m"
   do_exit 7
 fi
 
