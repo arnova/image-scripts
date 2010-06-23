@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="2.01f"
+MY_VERSION="2.01g"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Backup Script with network support
-# Last update: April 16, 2010
+# Last update: May 17, 2010
 # (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -345,7 +345,7 @@ echo "* Using image directory: $IMAGE_DIR"
 # Make sure target directory is empty
 if [ -n "$(find "$IMAGE_DIR/" -maxdepth 1 -type f)" ]; then
   find "$IMAGE_DIR/" -maxdepth 1 -type f -exec ls -l {} \;
-  printf "Current directory is NOT empty. PURGE directory before continuing (Y/N)?"
+  printf "Current directory is NOT empty. PURGE directory before continuing (Y/N)? "
   read answer
   echo ""
 
