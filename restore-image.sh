@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="2.01f"
+MY_VERSION="2.02"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Restore Script with network support
-# Last update: April 16, 2010
+# Last update: November 15, 2010
 # (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -163,7 +163,7 @@ check_binary()
 sanity_check()
 {
   # root check
-  if [ "$(id -u)" != "0" ]; then
+  if [ $UID -ne 0 ]; then
     printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
     exit 1
   fi
@@ -356,8 +356,8 @@ fi
 # Restore MBR/track0/partitions
 TARGET_NODEV=""
 unset IFS
-for track0 in "$IMAGE_DIR"/track0.*; do
-  HDD_NAME="$(basename "$track0" |sed 's/^track0\.//')"
+for FN in "$IMAGE_DIR"/partitions.*; do
+  HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
 
   # If no target drive specified use default drive from image:
   if [ -n "$USER_TARGET_NODEV" ]; then
@@ -445,18 +445,29 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   # Strip extension so we get the actual device name
   PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
-  # We want another target device than specified in the image name?:
+  # Do we want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
     NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-    if ! get_partitions |grep -E -q -x "$USER_TARGET_NODEV""p?""$NUM"; then
-      printf "\033[40m\033[1;31mERROR: Unable to find a proper target partition ($NUM on $USER_TARGET_NODEV)! Quitting...\n\033[0m"
-      do_exit 9
+    FDISK_TARGET_PART=`fdisk -l 2>/dev/null |grep -E "^/dev/${USER_TARGET_NODEV}p?${NUM}[[:blank:]]"`
+    if [ -z "$FDISK_TARGET_PART" ]; then
+      printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\n\033[0m"
+      do_exit 5
     fi
   else
-    if ! get_partitions |grep -q -x "$PARTITION"; then
-      printf "\033[40m\033[1;31mERROR: Target partition /dev/$PARTITION does NOT exist or is invalid! Quitting...\n\033[0m"
-      do_exit 9
+    FDISK_TARGET_PART=`fdisk -l 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
+    if [ -z "$FDISK_TARGET_PART" ]; then
+      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\n\033[0m"
+      do_exit 5
     fi
+  fi
+
+  ## Match partition with what we have stored in our partitions file
+  FDISK_SOURCE=`cat "${IMAGE_DIR}"/fdisk.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
+  FDISK_TARGET=`echo "$FDISK_TARGET_PART" |sed s,"^/dev/.*[[:blank:]]*/",,`
+  
+  if ! echo "$FDISK_SOURCE" |grep -q "$FDISK_TARGET"; then
+    printf "\033[40m\033[1;31mERROR: Target partition differs from source:\nSource: $FDISK_SOURCE\nTarget: $FDISK_TARGET\nQuitting...\n\n\033[0m"
+    do_exit 5
   fi
 done
 
@@ -478,9 +489,9 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   echo "* Selected partition: /dev/$TARGET_PARTITION. Using image file: $IMAGE_FILE"
   partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
   retval="$?"
-  if [ "$retval" != "0" ]; then
+  if [ $retval -ne 0 ]; then
     FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
-    printf "\033[40m\033[1;31mERROR: Image restore failed($retval) for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+    printf "\033[40m\033[1;31m\n\nERROR: Image restore failed($retval) for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
