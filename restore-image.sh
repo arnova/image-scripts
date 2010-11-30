@@ -466,14 +466,13 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   fi
 
   ## Match partition with what we have stored in our partitions file
-  SFDISK_SOURCE=`cat "${IMAGE_DIR}"/partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
-  SFDISK_TARGET=`echo "$SFDISK_TARGET_PART" |sed s,"^/dev/.*[[:blank:]]*/",,`
-  #FIXME:
-  echo "*Source partition: $FDISK_SOURCE"
-  echo "*Target partition: $FDISK_TARGET"
+  SFDISK_SOURCE_PART=`cat "${IMAGE_DIR}"/partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
 
-  if ! echo "$SFDISK_SOURCE" |grep -q "$SFDISK_TARGET$"; then
-    printf "\033[40m\033[1;31mERROR: Target partition mismatches with source:\nQuitting...\n\n\033[0m"
+  echo "*Source partition: $SFDISK_SOURCE_PART"
+  echo "*Target partition: $SFDISK_TARGET_PART"
+
+  if ! echo "$SFDISK_SOURCE" |grep -q "$(echo "$SFDISK_TARGET_PART" |sed s,"^/dev/.*[[:blank:]]*/","",)$"; then
+    printf "\033[40m\033[1;31m\nERROR: Target partition mismatches with source!\nQuitting...\n\n\033[0m"
     do_exit 5
   fi
 done
@@ -534,4 +533,3 @@ fi
 
 # Exit (+unmount)
 do_exit 0
-
