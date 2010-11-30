@@ -400,8 +400,8 @@ for FN in "$IMAGE_DIR"/partitions.*; do
   if ! get_partitions |grep -E -q -x "${TARGET_NODEV}p?[0-9]+" || [ "$CLEAN" = "1" ]; then
 #    echo "* Resetting partition table on /dev/$TARGET_NODEV"
 #    if ! printf "o\nw\n" |fdisk /dev/$TARGET_NODEV; then
-#      printf "\033[40m\033[1;31mERROR: Clearing partition table on /dev/$TARGET_NODEV failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
-#      read -n1
+#      printf "\033[40m\033[1;31mERROR: Clearing partition table on /dev/$TARGET_NODEV failed. Quitting...\n\033[0m"
+#      do_exit 5
 #    fi
 
     if [ -f "$IMAGE_DIR/track0.$HDD_NAME" ]; then
@@ -413,20 +413,20 @@ for FN in "$IMAGE_DIR"/partitions.*; do
     echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
     # NOTE: Without partition table use bs=446 (mbr loader only)
     if ! dd if=$DD_SOURCE of=/dev/$TARGET_NODEV bs=32768 count=1; then
-      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore from $DD_SOURCE failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
-      read -n1
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore from $DD_SOURCE failed. Quitting...\n\033[0m"
+      do_exit 5
     fi
 
     # Re-read partition table
     if ! sfdisk -R /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mERROR: (Re)reading the partition table failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
-      read -n1
+      printf "\033[40m\033[1;31mERROR: (Re)reading the partition table failed. Quitting...\n\033[0m"
+      do_exit 5
     fi
 
     if [ -f "$IMAGE_DIR/partitions.$HDD_NAME" ]; then
       if ! sfdisk --force /dev/$TARGET_NODEV < "$IMAGE_DIR/partitions.$HDD_NAME"; then
-        printf "\033[40m\033[1;31mPartition table restore failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
-        read -n1
+        printf "\033[40m\033[1;31mPartition table restore failed. Quitting...\n\033[0m"
+        do_exit 5
       fi
     fi
 
