@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="2.02"
+MY_VERSION="2.10"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Restore Script with network support
-# Last update: November 15, 2010
+# Last update: November 30, 2010
 # (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -179,7 +179,7 @@ sanity_check()
   check_binary mount
   check_binary umount
   check_binary partimage
-  
+
   if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in rimage.conf! Quitting...\033[0m\n" >&2
     exit 2
@@ -361,7 +361,7 @@ for FN in "$IMAGE_DIR"/partitions.*; do
 
   # If no target drive specified use default drive from image:
   if [ -n "$USER_TARGET_NODEV" ]; then
-    TARGET_NODEV="$USER_TARGET_NODEV";
+    TARGET_NODEV="$USER_TARGET_NODEV"
   else
     if [ -z "$TARGET_NODEV" ]; then
       # Extract drive name from file
@@ -384,43 +384,47 @@ for FN in "$IMAGE_DIR"/partitions.*; do
 #  disable_write_cache "/dev/$TARGET_NODEV"
 
   IFS=$EOL
-  for PART in `get_partitions |grep -E -x "$TARGET_NODEV""p?[0-9]+"`; do
+  for PART in `get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`; do
     # (Try) to unmount all partitions on this device
-    if grep -E -q "^/dev/""$PART""[[:blank:]]" /proc/mounts; then
+    if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/mounts; then
       umount /dev/$PART >/dev/null
     fi
 
     # Disable all swaps on this device
-    if grep -E -q "^/dev/""$PART""[[:blank:]]" /proc/swaps; then
+    if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
       swapoff /dev/$PART >/dev/null
     fi
   done
 
   # Only restore track0 (MBR) / partition table if they don't exist already on device
-  if ! get_partitions |grep -E -q -x "$TARGET_NODEV""p?[0-9]+" || [ "$CLEAN" = "1" ]; then
-    echo "* Resetting partition table on /dev/$TARGET_NODEV"
-    if ! printf "o\nw\n" |fdisk /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mERROR: Clearing partition table on /dev/$TARGET_NODEV failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
+  if ! get_partitions |grep -E -q -x "${TARGET_NODEV}p?[0-9]+" || [ "$CLEAN" = "1" ]; then
+#    echo "* Resetting partition table on /dev/$TARGET_NODEV"
+#    if ! printf "o\nw\n" |fdisk /dev/$TARGET_NODEV; then
+#      printf "\033[40m\033[1;31mERROR: Clearing partition table on /dev/$TARGET_NODEV failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
+#      read -n1
+#    fi
+
+    if [ -f "$IMAGE_DIR/track0.$HDD_NAME" ]; then
+      DD_SOURCE="$IMAGE_DIR/track0.$HDD_NAME"
+    else
+      DD_SOURCE="/dev/zero"
+    fi
+
+    echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
+    # NOTE: Without partition table use bs=446 (mbr loader only)
+    if ! dd if=$DD_SOURCE of=/dev/$TARGET_NODEV bs=32768 count=1; then
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore from $DD_SOURCE failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
       read -n1
     fi
 
-    if [ -f "$IMAGE_DIR"/track0.$HDD_NAME ]; then
-      echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
-      # NOTE: Without partition table use bs=446 (mbr loader only)
-      if ! dd if="$IMAGE_DIR"/track0.$HDD_NAME of=/dev/$TARGET_NODEV bs=32768 count=1; then
-        printf "\033[40m\033[1;31mERROR: Track0(MBR) restore failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
-        read -n1
-      fi
-
-      # Call fdisk to re-read partition table
-      if ! printf "w\n" |fdisk /dev/$TARGET_NODEV; then
-        printf "\033[40m\033[1;31mERROR: (Re)reading the partition table failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
-        read -n1
-      fi
+    # Re-read partition table
+    if ! sfdisk -R /dev/$TARGET_NODEV; then
+      printf "\033[40m\033[1;31mERROR: (Re)reading the partition table failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
+      read -n1
     fi
 
-    if [ -f "$IMAGE_DIR"/partitions.$HDD_NAME ]; then
-      if ! sfdisk --force /dev/$TARGET_NODEV < "$IMAGE_DIR"/partitions.$HDD_NAME; then
+    if [ -f "$IMAGE_DIR/partitions.$HDD_NAME" ]; then
+      if ! sfdisk --force /dev/$TARGET_NODEV < "$IMAGE_DIR/partitions.$HDD_NAME"; then
         printf "\033[40m\033[1;31mPartition table restore failed. Press any key to continue or CTRL-C to abort...\n\033[0m"
         read -n1
       fi
@@ -428,7 +432,7 @@ for FN in "$IMAGE_DIR"/partitions.*; do
 
     # Create swap on swap partitions
     IFS=$EOL
-    fdisk -l /dev/$TARGET_NODEV |grep -i "82.*linux.*swap" |while read LINE; do
+    sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
       mkswap "$(echo "$LINE" |awk '{ print $1 }')"
     done
   else
@@ -448,29 +452,31 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   # Do we want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
     NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-    FDISK_TARGET_PART=`fdisk -l 2>/dev/null |grep -E "^/dev/${USER_TARGET_NODEV}p?${NUM}[[:blank:]]"`
-    if [ -z "$FDISK_TARGET_PART" ]; then
+    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${USER_TARGET_NODEV}p?${NUM}[[:blank:]]"`
+    if [ -z "$SFDISK_TARGET_PART" ]; then
       printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\n\033[0m"
       do_exit 5
     fi
   else
-    FDISK_TARGET_PART=`fdisk -l 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
-    if [ -z "$FDISK_TARGET_PART" ]; then
+    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
+    if [ -z "$SFDISK_TARGET_PART" ]; then
       printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\n\033[0m"
       do_exit 5
     fi
   fi
 
   ## Match partition with what we have stored in our partitions file
-  FDISK_SOURCE=`cat "${IMAGE_DIR}"/fdisk.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
-  FDISK_TARGET=`echo "$FDISK_TARGET_PART" |sed s,"^/dev/.*[[:blank:]]*/",,`
-  
-  if ! echo "$FDISK_SOURCE" |grep -q "$FDISK_TARGET"; then
-    printf "\033[40m\033[1;31mERROR: Target partition differs from source:\nSource: $FDISK_SOURCE\nTarget: $FDISK_TARGET\nQuitting...\n\n\033[0m"
+  SFDISK_SOURCE=`cat "${IMAGE_DIR}"/partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
+  SFDISK_TARGET=`echo "$SFDISK_TARGET_PART" |sed s,"^/dev/.*[[:blank:]]*/",,`
+  #FIXME:
+  echo "*Source partition: $FDISK_SOURCE"
+  echo "*Target partition: $FDISK_TARGET"
+
+  if ! echo "$SFDISK_SOURCE" |grep -q "$SFDISK_TARGET$"; then
+    printf "\033[40m\033[1;31mERROR: Target partition mismatches with source:\nQuitting...\n\n\033[0m"
     do_exit 5
   fi
 done
-
 
 # Restore the actual image(s):
 unset IFS
@@ -491,7 +497,7 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   retval="$?"
   if [ $retval -ne 0 ]; then
     FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
-    printf "\033[40m\033[1;31m\n\nERROR: Image restore failed($retval) for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+    printf "\033[40m\033[1;31mERROR: Image restore failed($retval) for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
@@ -528,3 +534,4 @@ fi
 
 # Exit (+unmount)
 do_exit 0
+
