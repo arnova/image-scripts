@@ -472,7 +472,7 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   echo "*Target partition: $SFDISK_TARGET_PART"
 
   if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]*/","",)$"; then
-    printf "\033[40m\033[1;31m\nERROR: Target partition mismatches with source!\nQuitting...\n\033[0m"
+    printf "\033[40m\033[1;31m\nERROR: Target partition mismatches with source! Quitting...\n\033[0m"
     do_exit 5
   fi
 done
