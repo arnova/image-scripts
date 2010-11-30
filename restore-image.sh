@@ -467,6 +467,10 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
 
   ## Match partition with what we have stored in our partitions file
   SFDISK_SOURCE_PART=`cat "${IMAGE_DIR}"/partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
+  if [ -z "$SFDISK_SOURCE_PART" ]; then
+    printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m"
+    do_exit 5
+  fi
 
   echo "*Source partition: $SFDISK_SOURCE_PART"
   echo "*Target partition: $SFDISK_TARGET_PART"
