@@ -454,13 +454,13 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
     NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
     SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${USER_TARGET_NODEV}p?${NUM}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\n\033[0m"
+      printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m"
       do_exit 5
     fi
   else
     SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\n\033[0m"
+      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\033[0m"
       do_exit 5
     fi
   fi
@@ -471,8 +471,8 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   echo "*Source partition: $SFDISK_SOURCE_PART"
   echo "*Target partition: $SFDISK_TARGET_PART"
 
-  if ! echo "$SFDISK_SOURCE" |grep -q "$(echo "$SFDISK_TARGET_PART" |sed s,"^/dev/.*[[:blank:]]*/","",)$"; then
-    printf "\033[40m\033[1;31m\nERROR: Target partition mismatches with source!\nQuitting...\n\n\033[0m"
+  if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]*/","",)$"; then
+    printf "\033[40m\033[1;31m\nERROR: Target partition mismatches with source!\nQuitting...\n\033[0m"
     do_exit 5
   fi
 done
