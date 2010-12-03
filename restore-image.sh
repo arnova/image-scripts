@@ -424,8 +424,8 @@ for FN in "$IMAGE_DIR"/partitions.*; do
 
     # Re-read partition table
     if ! partprobe /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mERROR: (Re)reading the partition table failed. Quitting...\n\033[0m"
-      do_exit 5
+      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+      read -n1      
     fi
 
     if [ -f "$IMAGE_DIR/partitions.$HDD_NAME" ]; then
@@ -446,8 +446,8 @@ for FN in "$IMAGE_DIR"/partitions.*; do
 
     # Re-read partition table
     if ! partprobe /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mERROR: (Re)reading the partition table failed. Quitting...\n\033[0m"
-      do_exit 5
+      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+      read -n1      
     fi
 
     # Create swap on swap partitions
