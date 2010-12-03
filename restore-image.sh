@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="2.10"
+MY_VERSION="2.10a"
 # ----------------------------------------------------------------------------------------------------------------------
 # PartImage Restore Script with network support
-# Last update: November 30, 2010
+# Last update: December 3, 2010
 # (C) Copyright 2004-2010 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -173,6 +173,8 @@ sanity_check()
   check_binary ifconfig
   check_binary sed
   check_binary grep
+  check_binary partprobe
+  check_binary mkswap
   check_binary sfdisk
   check_binary fdisk
   check_binary dd
@@ -212,6 +214,7 @@ SUCCESS=""
 FAILED=""
 USER_TARGET_NODEV=""
 CLEAN=0
+FORCE=0
 
 # Check arguments
 unset IFS
@@ -224,6 +227,7 @@ for arg in $*; do
   else
     case "$ARGNAME" in
       --clean|-clean|-c) CLEAN=1;;
+      --force|-force|-f) FORCE=1;;
       --device|-device|--dev|-dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
@@ -231,6 +235,7 @@ for arg in $*; do
       echo "Options:"
       echo "-h, --help           - Print this help"
       echo "--clean              - Even write MBR/partition table if not empty"
+      echo "--force              - Force partition table update"
       echo "--device={dev}       - Restore image to device {dev} (instead of default)"
       echo "--conf={config_file} - Specify alternate configuration file"
       echo "--name={image_name}  - Use image('s) from directory named like this"
@@ -418,22 +423,41 @@ for FN in "$IMAGE_DIR"/partitions.*; do
     fi
 
     # Re-read partition table
-    if ! sfdisk -R /dev/$TARGET_NODEV; then
+    if ! partprobe /dev/$TARGET_NODEV; then
       printf "\033[40m\033[1;31mERROR: (Re)reading the partition table failed. Quitting...\n\033[0m"
       do_exit 5
     fi
 
     if [ -f "$IMAGE_DIR/partitions.$HDD_NAME" ]; then
-      if ! sfdisk --force /dev/$TARGET_NODEV < "$IMAGE_DIR/partitions.$HDD_NAME"; then
+      retval=0
+      if [ $FORCE -eq 1 ]; then
+        sfdisk --no-reread --force /dev/$TARGET_NODEV < "$IMAGE_DIR/partitions.$HDD_NAME"
+        retval=$?
+      else
+        sfdisk --no-reread /dev/$TARGET_NODEV < "$IMAGE_DIR/partitions.$HDD_NAME"
+        retval=$?
+      fi
+        
+      if [ $retval -ne 0 ]; then
         printf "\033[40m\033[1;31mPartition table restore failed. Quitting...\n\033[0m"
         do_exit 5
       fi
     fi
 
+    # Re-read partition table
+    if ! partprobe /dev/$TARGET_NODEV; then
+      printf "\033[40m\033[1;31mERROR: (Re)reading the partition table failed. Quitting...\n\033[0m"
+      do_exit 5
+    fi
+
     # Create swap on swap partitions
     IFS=$EOL
     sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
-      mkswap "$(echo "$LINE" |awk '{ print $1 }')"
+      PART="$(echo "$LINE" |awk '{ print $1 }')"
+      if ! mkswap $PART; then
+        printf "\033[40m\033[1;31mMkswap failed for $PART. Quitting...\n\033[0m"
+        do_exit 5
+      fi
     done
   else
     printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m"
