@@ -439,7 +439,7 @@ for FN in "$IMAGE_DIR"/partitions.*; do
       fi
         
       if [ $retval -ne 0 ]; then
-        printf "\033[40m\033[1;31mPartition table restore failed. Quitting...\n\033[0m"
+        printf "\033[40m\033[1;31mPartition table restore failed. Use --force to override. Quitting...\n\033[0m"
         do_exit 5
       fi
     fi
