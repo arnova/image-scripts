@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="2.10a"
+MY_VERSION="3.00"
 # ----------------------------------------------------------------------------------------------------------------------
-# PartImage Restore Script with network support
-# Last update: December 3, 2010
-# (C) Copyright 2004-2010 by Arno van Amersfoort
+# Image Restore Script with (SMB) network support
+# Last update: September 1, 2011
+# (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -180,7 +180,9 @@ sanity_check()
   check_binary dd
   check_binary mount
   check_binary umount
-  check_binary partimage
+  
+  [ "$IPROGRAM" == "partimage" ] && check_binary partimage
+  [ "$IPROGRAM" == "fsarchiver" ] && check_binary fsarchiver
 
   if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in rimage.conf! Quitting...\033[0m\n" >&2
@@ -195,17 +197,10 @@ get_partitions()
 }
 
 
-# Disable HDD write caching
-disable_write_cache()
-{
-  hdparm -W0 "$1" >/dev/null
-}
-
-
 #######################
 # Program entry point #
 #######################
-echo "Partimage RESTORE Script v$MY_VERSION - Written by Arno van Amersfoort"
+echo "Image RESTORE Script v$MY_VERSION - Written by Arno van Amersfoort"
 
 # Set environment variables to default
 CONF="$DEFAULT_CONF"
@@ -215,6 +210,8 @@ FAILED=""
 USER_TARGET_NODEV=""
 CLEAN=0
 FORCE=0
+# default to partimage:
+IPROGRAM="partimage"
 
 # Check arguments
 unset IFS
@@ -231,14 +228,16 @@ for arg in $*; do
       --device|-device|--dev|-dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
+      --iprogram|-i) IPROGRAM="$ARGVAL";;
       --help)
       echo "Options:"
-      echo "-h, --help           - Print this help"
-      echo "--clean              - Even write MBR/partition table if not empty"
-      echo "--force              - Force partition table update"
-      echo "--device={dev}       - Restore image to device {dev} (instead of default)"
-      echo "--conf={config_file} - Specify alternate configuration file"
-      echo "--name={image_name}  - Use image('s) from directory named like this"
+      echo "-h, --help                  - Print this help"
+      echo "--clean                     - Even write MBR/partition table if not empty"
+      echo "--force                     - Force partition table update"
+      echo "--device={dev}              - Restore image to device {dev} (instead of default)"
+      echo "--conf={config_file}        - Specify alternate configuration file"
+      echo "--name={image_name}         - Use image('s) from directory named like this"
+      echo "--iprogram={image_program}  - Select image program. Currently supports partimage(default) or fsarchiver"      
       exit 3 # quit
       ;;
       *) echo "Bad argument: $ARGNAME"; exit 4;;
@@ -385,9 +384,6 @@ for FN in "$IMAGE_DIR"/partitions.*; do
   # Check if DMA is enabled for device
   check_dma "/dev/$TARGET_NODEV"
 
-  # Disable write caching
-#  disable_write_cache "/dev/$TARGET_NODEV"
-
   IFS=$EOL
   for PART in `get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`; do
     # (Try) to unmount all partitions on this device
@@ -506,22 +502,30 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
 done
 
 # Restore the actual image(s):
-unset IFS
-for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
+IFS=$EOL
+find "$IMAGE_DIR" -name "*.img.gz.000" -name "*.fsa" |while read IMAGE_FILE; do
   # Strip extension so we get the actual device name
   PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
   # We want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
     NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-    TARGET_PARTITION="$(get_partitions |grep -E -x -e "$USER_TARGET_NODEV""p?""$NUM")"
+    TARGET_PARTITION="$(get_partitions |grep -E -x -e "${USER_TARGET_NODEV}p?${NUM}")"
   else
     TARGET_PARTITION="$PARTITION"
   fi
 
   echo "* Selected partition: /dev/$TARGET_PARTITION. Using image file: $IMAGE_FILE"
-  partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
-  retval="$?"
+  retval=0
+  if [ "$IPROGRAM" = "fsarchiver" ]
+    fsarchiver -v restfs "$IMAGE_FILE" "/dev/$TARGET_PARTITION"
+    retval="$?"
+  else
+    # Default to partimage
+    partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
+    retval="$?"
+  fi
+
   if [ $retval -ne 0 ]; then
     FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
     printf "\033[40m\033[1;31mERROR: Image restore failed($retval) for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"

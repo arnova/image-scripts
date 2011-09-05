@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="2.01g"
+MY_VERSION="3.00"
 # ----------------------------------------------------------------------------------------------------------------------
-# PartImage Backup Script with network support
-# Last update: May 17, 2010
-# (C) Copyright 2004-2010 by Arno van Amersfoort
+# Image Backup Script with (SMB) network support
+# Last update: September 1, 2011
+# (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -163,7 +163,7 @@ check_binary()
 sanity_check()
 {
   # root check
-  if [ "$(id -u)" != "0" ]; then
+  if [ $UID -ne 0 ]; then
     printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
     exit 1
   fi
@@ -178,7 +178,9 @@ sanity_check()
   check_binary dd
   check_binary mount
   check_binary umount
-  check_binary partimage
+
+  [ "$IPROGRAM" == "partimage" ] && check_binary partimage
+  [ "$IPROGRAM" == "fsarchiver" ] && check_binary fsarchiver
   
   if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in bimage.conf! Quitting...\033[0m\n" >&2
@@ -196,7 +198,7 @@ get_partitions()
 #######################
 # Program entry point #
 #######################
-echo "Partimage BACKUP Script v$MY_VERSION - Written by Arno van Amersfoort"
+echo "Image BACKUP Script v$MY_VERSION - Written by Arno van Amersfoort"
 
 # Set environment variables to default
 CONF="$DEFAULT_CONF"
@@ -205,6 +207,8 @@ SUCCESS=""
 FAILED=""
 USER_SOURCE_NODEV=""
 PARTITIONS=""
+# default to partimage:
+IPROGRAM="partimage"
 
 # Check arguments
 unset IFS
@@ -219,13 +223,15 @@ for arg in $*; do
       --device|-device|--dev|-dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g' |sed 's/,/ /g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
+      --iprogram|-i) IPROGRAM="$ARGVAL";;
       --help)
       echo "Options:"
-      echo "-h, --help           - Print this help"
-      echo "--clean              - Even write MBR/partition table if not empty"
-      echo "--device={dev1,dev2} - Backup only these devices (instead of all partitions)"
-      echo "--conf={config_file} - Specify alternate configuration file"
-      echo "--name={image_name}  - Create a directory named like this and put the image('s) in there"
+      echo "-h, --help                  - Print this help"
+      echo "--clean                     - Even write MBR/partition table if not empty"
+      echo "--device={dev1,dev2}        - Backup only these devices (instead of all partitions)"
+      echo "--conf={config_file}        - Specify alternate configuration file"
+      echo "--name={image_name}         - Create a directory named like this and put the image('s) in there"
+      echo "--iprogram={image_program}  - Select image program. Currently supports partimage(default) or fsarchiver"
       exit 3 # quit
       ;;
       *) echo "Bad argument: $ARGNAME"; exit 4;;
@@ -359,7 +365,7 @@ BACKUP_PARTITIONS=""
 IGNORE_PARTITIONS=""
 unset IFS
 for PART in $PARTITIONS; do
-  if grep -E -q "^/dev/""$PART""[[:blank:]]" /proc/mounts; then
+  if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/mounts; then
     IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }$PART"
   else
     BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }$PART"
@@ -420,15 +426,23 @@ done
 # Backup all specified partitions:
 unset IFS
 for PART in $BACKUP_PARTITIONS; do
-  partimage -z1 -b -d save /dev/$PART "$IMAGE_DIR/$PART.img.gz"
-  retval="$?"
+  retval=0
+  if [ "$IPROGRAM" = "fsarchiver" ]
+    fsarchiver -v savefs "$IMAGE_DIR/$PART.fsa" /dev/$PART 
+    retval="$?"
+  else
+    # Default to partimage
+    partimage -z1 -b -d save /dev/$PART "$IMAGE_DIR/$PART.img.gz"
+    retval="$?"
+  fi
+    
   if [ "$retval" != "0" ]; then
     FAILED="${FAILED}${FAILED:+ }$PART"
-    printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $IMAGE_DIR/$PART.img.gz.* from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+    printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $IMAGE_DIR/$PART.* from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
-    echo "* Backuped /dev/$PART to $IMAGE_DIR/$PART.img.gz.*"
+    echo "* Backuped /dev/$PART to $IMAGE_DIR/$PART.*"
   fi
 done
 
