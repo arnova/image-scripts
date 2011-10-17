@@ -3,7 +3,7 @@
 MY_VERSION="3.00"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: September 1, 2011
+# Last update: October 17, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -179,8 +179,11 @@ sanity_check()
   check_binary mount
   check_binary umount
 
-  [ "$IPROGRAM" == "partimage" ] && check_binary partimage
-  [ "$IPROGRAM" == "fsarchiver" ] && check_binary fsarchiver
+  if [ "$FSA" == "1" ]; then
+    check_binary fsarchiver
+  else
+    check_binary partimage
+  fi
   
   if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in bimage.conf! Quitting...\033[0m\n" >&2
@@ -231,7 +234,7 @@ for arg in $*; do
       echo "--device={dev1,dev2}        - Backup only these devices (instead of all partitions)"
       echo "--conf={config_file}        - Specify alternate configuration file"
       echo "--name={image_name}         - Create a directory named like this and put the image('s) in there"
-      echo "--iprogram={image_program}  - Select image program. Currently supports partimage(default) or fsarchiver"
+      echo "--fsa                       - Use fsarchiver instead of partimage for imaging"
       exit 3 # quit
       ;;
       *) echo "Bad argument: $ARGNAME"; exit 4;;
@@ -427,7 +430,7 @@ done
 unset IFS
 for PART in $BACKUP_PARTITIONS; do
   retval=0
-  if [ "$IPROGRAM" = "fsarchiver" ]
+  if [ "$FSA" = "1" ]
     fsarchiver -v savefs "$IMAGE_DIR/$PART.fsa" /dev/$PART 
     retval="$?"
   else
