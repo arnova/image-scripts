@@ -498,7 +498,7 @@ done
 
 # Restore the actual image(s):
 IFS=$EOL
-find "$IMAGE_DIR" -iname "*.img.gz.000" -o -iname "*.fsa" |while read IMAGE_FILE; do
+find "$IMAGE_DIR" -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
   # Strip extension so we get the actual device name
   PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
@@ -515,8 +515,11 @@ find "$IMAGE_DIR" -iname "*.img.gz.000" -o -iname "*.fsa" |while read IMAGE_FILE
   if echo "$IMAGE_FILE" |grep -q "\.fsa$"; then
     fsarchiver -v restfs "$IMAGE_FILE" "/dev/$TARGET_PARTITION"
     retval="$?"
-  else
+  elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
     partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
+    retval="$?"
+  else
+    gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PARTITION" bs=64K
     retval="$?"
   fi
 

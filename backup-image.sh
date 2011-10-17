@@ -210,7 +210,8 @@ SUCCESS=""
 FAILED=""
 USER_SOURCE_NODEV=""
 PARTITIONS=""
-FSA=1
+FSA=0
+DDGZ=0
 
 # Check arguments
 unset IFS
@@ -226,6 +227,7 @@ for arg in $*; do
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
       --fsa) FSA=1;;
+      --ddgz) DDGZ=1;;
       --help)
       echo "Options:"
       echo "-h, --help                  - Print this help"
@@ -233,7 +235,8 @@ for arg in $*; do
       echo "--device={dev1,dev2}        - Backup only these devices (instead of all partitions)"
       echo "--conf={config_file}        - Specify alternate configuration file"
       echo "--name={image_name}         - Create a directory named like this and put the image('s) in there"
-      echo "--fsa                       - Use fsarchiver instead of partimage for imaging"
+      echo "--fsa                       - Use fsarchiver for imaging (default = partimage)"
+      echo "--ddgz                      - Use dd + gzip for imaging (default = partimage)"
       exit 3 # quit
       ;;
       *) echo "Bad argument: $ARGNAME"; exit 4;;
@@ -434,6 +437,10 @@ for PART in $BACKUP_PARTITIONS; do
     TARGET_FILE="$IMAGE_DIR/$PART.fsa"
     fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
     retval="$?"
+  elif [ "$DDGZ" = "1" ]; then
+    TARGET_FILE="$IMAGE_DIR/$PART.gz"
+    dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE" 
+    retval="$?"  
   else
     # Default to partimage
     TARGET_FILE="$IMAGE_DIR/$PART.img.gz"
