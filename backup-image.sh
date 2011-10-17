@@ -210,8 +210,7 @@ SUCCESS=""
 FAILED=""
 USER_SOURCE_NODEV=""
 PARTITIONS=""
-FSA=0
-DDGZ=0
+IMAGE_PROGRAM="fsa"
 
 # Check arguments
 unset IFS
@@ -226,8 +225,9 @@ for arg in $*; do
       --device|-device|--dev|-dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g' |sed 's/,/ /g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
-      --fsa) FSA=1;;
-      --ddgz) DDGZ=1;;
+      --fsa) IMAGE_PROGRAM="fsa";;
+      --ddgz) IMAGE_PROGRAM="ddgz";;
+      --pi) IMAGE_PROGRAM="pi";;
       --help)
       echo "Options:"
       echo "-h, --help                  - Print this help"
@@ -235,8 +235,9 @@ for arg in $*; do
       echo "--device={dev1,dev2}        - Backup only these devices (instead of all partitions)"
       echo "--conf={config_file}        - Specify alternate configuration file"
       echo "--name={image_name}         - Create a directory named like this and put the image('s) in there"
-      echo "--fsa                       - Use fsarchiver for imaging (default = partimage)"
-      echo "--ddgz                      - Use dd + gzip for imaging (default = partimage)"
+      echo "--fsa                       - Use fsarchiver for imaging (default)"
+      echo "--pi                        - Use partimage for imaging"
+      echo "--ddgz                      - Use dd + gzip for imaging"
       exit 3 # quit
       ;;
       *) echo "Bad argument: $ARGNAME"; exit 4;;
@@ -433,20 +434,20 @@ unset IFS
 for PART in $BACKUP_PARTITIONS; do
   retval=0
   TARGET_FILE=""
-  if [ "$FSA" = "1" ]; then
-    TARGET_FILE="$IMAGE_DIR/$PART.fsa"
-    fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
-    retval="$?"
-  elif [ "$DDGZ" = "1" ]; then
-    TARGET_FILE="$IMAGE_DIR/$PART.gz"
-    dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE" 
-    retval="$?"  
-  else
-    # Default to partimage
-    TARGET_FILE="$IMAGE_DIR/$PART.img.gz"
-    partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
-    retval="$?"
-  fi
+  case "$IMAGE_PROGRAM" in
+    fsa)  TARGET_FILE="$IMAGE_DIR/$PART.fsa"
+          fsarchiver -v -s 2000 savefs "$TARGET_FILE" "/dev/$PART"
+          retval="$?"
+          ;;
+    ddgz) TARGET_FILE="$IMAGE_DIR/$PART.gz"
+          dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE"
+          retval="$?"
+          ;;
+    pi)   TARGET_FILE="$IMAGE_DIR/$PART.img.gz"
+          partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
+          retval="$?"
+          ;;
+  esac
     
   if [ "$retval" != "0" ]; then
     FAILED="${FAILED}${FAILED:+ }$PART"
