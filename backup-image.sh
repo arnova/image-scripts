@@ -210,8 +210,7 @@ SUCCESS=""
 FAILED=""
 USER_SOURCE_NODEV=""
 PARTITIONS=""
-# default to partimage:
-IPROGRAM="partimage"
+FSA=1
 
 # Check arguments
 unset IFS
@@ -226,7 +225,7 @@ for arg in $*; do
       --device|-device|--dev|-dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g' |sed 's/,/ /g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
-      --iprogram|-i) IPROGRAM="$ARGVAL";;
+      --fsa) FSA=1;;
       --help)
       echo "Options:"
       echo "-h, --help                  - Print this help"
@@ -430,22 +429,27 @@ done
 unset IFS
 for PART in $BACKUP_PARTITIONS; do
   retval=0
-  if [ "$FSA" = "1" ]
-    fsarchiver -v savefs "$IMAGE_DIR/$PART.fsa" /dev/$PART 
+  TARGET_FILE=""
+  if [ "$FSA" = "1" ]; then
+    TARGET_FILE="$IMAGE_DIR/$PART.fsa"
+    fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
     retval="$?"
   else
     # Default to partimage
-    partimage -z1 -b -d save /dev/$PART "$IMAGE_DIR/$PART.img.gz"
+    TARGET_FILE="$IMAGE_DIR/$PART.img.gz"
+    partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
     retval="$?"
   fi
     
   if [ "$retval" != "0" ]; then
     FAILED="${FAILED}${FAILED:+ }$PART"
-    printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $IMAGE_DIR/$PART.* from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+    printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
-    echo "* Backuped /dev/$PART to $IMAGE_DIR/$PART.*"
+    echo ""
+    echo "****** Backuped /dev/$PART to $TARGET_FILE ******"
+    echo ""
   fi
 done
 
