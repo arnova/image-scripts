@@ -3,7 +3,7 @@
 MY_VERSION="3.00"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: September 1, 2011
+# Last update: October 17, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -180,9 +180,8 @@ sanity_check()
   check_binary dd
   check_binary mount
   check_binary umount
-  
-  [ "$IPROGRAM" == "partimage" ] && check_binary partimage
-  [ "$IPROGRAM" == "fsarchiver" ] && check_binary fsarchiver
+#    check_binary fsarchiver
+#    check_binary partimage
 
   if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in rimage.conf! Quitting...\033[0m\n" >&2
@@ -210,8 +209,6 @@ FAILED=""
 USER_TARGET_NODEV=""
 CLEAN=0
 FORCE=0
-# default to partimage:
-IPROGRAM="partimage"
 
 # Check arguments
 unset IFS
@@ -228,7 +225,6 @@ for arg in $*; do
       --device|-device|--dev|-dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
-      --iprogram|-i) IPROGRAM="$ARGVAL";;
       --help)
       echo "Options:"
       echo "-h, --help                  - Print this help"
@@ -237,7 +233,6 @@ for arg in $*; do
       echo "--device={dev}              - Restore image to device {dev} (instead of default)"
       echo "--conf={config_file}        - Specify alternate configuration file"
       echo "--name={image_name}         - Use image('s) from directory named like this"
-      echo "--iprogram={image_program}  - Select image program. Currently supports partimage(default) or fsarchiver"      
       exit 3 # quit
       ;;
       *) echo "Bad argument: $ARGNAME"; exit 4;;
@@ -503,7 +498,7 @@ done
 
 # Restore the actual image(s):
 IFS=$EOL
-find "$IMAGE_DIR" -name "*.img.gz.000" -name "*.fsa" |while read IMAGE_FILE; do
+find "$IMAGE_DIR" -iname "*.img.gz.000" -o -iname "*.fsa" |while read IMAGE_FILE; do
   # Strip extension so we get the actual device name
   PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
@@ -517,11 +512,10 @@ find "$IMAGE_DIR" -name "*.img.gz.000" -name "*.fsa" |while read IMAGE_FILE; do
 
   echo "* Selected partition: /dev/$TARGET_PARTITION. Using image file: $IMAGE_FILE"
   retval=0
-  if [ "$IPROGRAM" = "fsarchiver" ]
+  if echo "$IMAGE_FILE" |grep -q "\.fsa$"; then
     fsarchiver -v restfs "$IMAGE_FILE" "/dev/$TARGET_PARTITION"
     retval="$?"
   else
-    # Default to partimage
     partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
     retval="$?"
   fi
@@ -532,7 +526,9 @@ find "$IMAGE_DIR" -name "*.img.gz.000" -name "*.fsa" |while read IMAGE_FILE; do
     read -n1
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
-    echo "* $IMAGE_FILE restored to /dev/$TARGET_PARTITION"
+    echo ""
+    echo "****** $IMAGE_FILE restored to /dev/$TARGET_PARTITION ******"
+    echo ""
   fi
 done
 
