@@ -179,11 +179,9 @@ sanity_check()
   check_binary mount
   check_binary umount
 
-  if [ "$FSA" == "1" ]; then
-    check_binary fsarchiver
-  else
-    check_binary partimage
-  fi
+  [ "$IMAGE_PROGRAM" == "fsarchiver" ] && check_binary fsarchiver
+  [ "$IMAGE_PROGRAM" == "partimage" ] && check_binary partimage
+  [ "$IMAGE_PROGRAM" == "ddgz" ] && check_binary gzip
   
   if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in bimage.conf! Quitting...\033[0m\n" >&2
@@ -210,7 +208,7 @@ SUCCESS=""
 FAILED=""
 USER_SOURCE_NODEV=""
 PARTITIONS=""
-IMAGE_PROGRAM="fsa"
+IMAGE_PROGRAM="pi"
 
 # Check arguments
 unset IFS
