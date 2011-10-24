@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00"
+MY_VERSION="3.00a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 17, 2011
+# Last update: October 24, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -221,7 +221,6 @@ for arg in $*; do
   else
     case "$ARGNAME" in
       --clean|-clean|-c) CLEAN=1;;
-      --force|-force|-f) FORCE=1;;
       --device|-device|--dev|-dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
@@ -229,7 +228,6 @@ for arg in $*; do
       echo "Options:"
       echo "-h, --help                  - Print this help"
       echo "--clean                     - Even write MBR/partition table if not empty"
-      echo "--force                     - Force partition table update"
       echo "--device={dev}              - Restore image to device {dev} (instead of default)"
       echo "--conf={config_file}        - Specify alternate configuration file"
       echo "--name={image_name}         - Use image('s) from directory named like this"
@@ -347,8 +345,9 @@ if [ -e "$IMAGE_DIR/description.txt" ]; then
 fi
 
 # Check whether any image(s) exist
-if [ -z "$(find "$IMAGE_DIR/" -maxdepth 1 -name "*.img.gz.000")" ]; then
-  printf "\033[40m\033[1;31m\nERROR: Unable to locate any image files (*.img.gz.000) in \"$IMAGE_DIR\"! Quitting...\n\n\033[0m"
+IFS=$EOL
+if [ -z "$(find "$IMAGE_DIR" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz")" ]; then
+  printf "\033[40m\033[1;31m\nERROR: Unable to locate any image files in \"$IMAGE_DIR\"! Quitting...\n\n\033[0m"
   do_exit 7
 fi
 
@@ -421,13 +420,8 @@ for FN in "$IMAGE_DIR"/partitions.*; do
 
     if [ -f "$IMAGE_DIR/partitions.$HDD_NAME" ]; then
       retval=0
-      if [ $FORCE -eq 1 ]; then
         sfdisk --no-reread --force /dev/$TARGET_NODEV < "$IMAGE_DIR/partitions.$HDD_NAME"
         retval=$?
-      else
-        sfdisk --no-reread /dev/$TARGET_NODEV < "$IMAGE_DIR/partitions.$HDD_NAME"
-        retval=$?
-      fi
         
       if [ $retval -ne 0 ]; then
         printf "\033[40m\033[1;31mPartition table restore failed. Use --force to override. Quitting...\n\033[0m"
@@ -459,8 +453,8 @@ done
 
 
 # Test whether the target partition(s) exist:
-unset IFS
-for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
+IFS=$EOL
+find "$IMAGE_DIR" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
   # Strip extension so we get the actual device name
   PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
@@ -491,14 +485,14 @@ for IMAGE_FILE in "$IMAGE_DIR"/*.img.gz.000; do
   echo "*Target partition: $SFDISK_TARGET_PART"
 
   if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]*/","",)$"; then
-    printf "\033[40m\033[1;31m\nERROR: Target partition mismatches with source! Quitting...\n\033[0m"
-    do_exit 5
+    printf "\033[40m\033[1;31m\nWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m"
+    read -n1
   fi
 done
 
 # Restore the actual image(s):
 IFS=$EOL
-find "$IMAGE_DIR" -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
+find "$IMAGE_DIR" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
   # Strip extension so we get the actual device name
   PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
@@ -564,3 +558,4 @@ fi
 
 # Exit (+unmount)
 do_exit 0
+
