@@ -33,6 +33,10 @@ do_exit()
   
   # Auto unmount?
   if [ "$AUTO_UNMOUNT" = "1" ] && grep -q " $MOUNT_POINT " /etc/mtab; then
+    # Go to root else we can't umount
+    cd /
+    
+    # Umount our image repo
     umount -v "$MOUNT_POINT"
   fi
   exit $1
