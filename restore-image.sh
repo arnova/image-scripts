@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.00c"
+MY_VERSION="3.00d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: October 31, 2011
@@ -331,10 +331,8 @@ if [ -z "$IMAGE_NAME" ]; then
   fi
 fi
 
-DIR_NAME=`echo "$IMAGE_NAME" |tr 'A-Z' 'a-z'`
-
 # Set the directory where the image(s) are
-IMAGE_DIR="$MOUNT_POINT/$DIR_NAME"
+IMAGE_DIR="$MOUNT_POINT/$IMAGE_NAME"
 
 if [ ! -d "$IMAGE_DIR" ]; then
   printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\n\033[0m"
