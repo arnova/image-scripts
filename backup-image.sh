@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00a"
+MY_VERSION="3.00b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: October 18, 2011
+# Last update: October 28, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -352,15 +352,22 @@ fi
 
 echo "* Using image directory: $IMAGE_DIR"
 
+if ! cd "$IMAGE_DIR"; then
+  echo ""
+  printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m"
+  echo ""
+  do_exit 5
+fi
+
 # Make sure target directory is empty
-if [ -n "$(find "$IMAGE_DIR/" -maxdepth 1 -type f)" ]; then
-  find "$IMAGE_DIR/" -maxdepth 1 -type f -exec ls -l {} \;
+if [ -n "$(find . -maxdepth 1 -type f)" ]; then
+  find . -maxdepth 1 -type f -exec ls -l {} \;
   printf "Current directory is NOT empty. PURGE directory before continuing (Y/N)? "
   read answer
   echo ""
 
   if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
-    find "$IMAGE_DIR/" -maxdepth 1 -type f -exec rm -vf {} \;
+    find . -maxdepth 1 -type f -exec rm -vf {} \;
   fi
 fi
 
@@ -386,7 +393,7 @@ echo ""
 
 read -p "Please enter description: " DESCRIPTION
 if [ -n "$DESCRIPTION" ]; then
-  echo "$DESCRIPTION" >"$IMAGE_DIR"/description.txt
+  echo "$DESCRIPTION" >"description.txt"
 fi
 
 # Scan all devices/HDDs
@@ -406,18 +413,18 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
           check_dma /dev/$HDD
 
           # Dump hdd info for all disks in the current system
-          if ! dd if=/dev/$HDD of="$IMAGE_DIR/track0.$HDD" bs=32768 count=1; then
+          if ! dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1; then
             printf "\033[40m\033[1;31mERROR: Track0(MBR) backup failed!\n\033[0m"
             do_exit 8
           fi
 
-          if ! sfdisk -d /dev/$HDD > "$IMAGE_DIR/partitions.$HDD"; then
+          if ! sfdisk -d /dev/$HDD > "partitions.$HDD"; then
             printf "\033[40m\033[1;31mERROR: Partition table backup failed!\n\033[0m"
             do_exit 9
           fi
 
           # Dump fdisk info to file
-          fdisk -l /dev/$HDD >"$IMAGE_DIR/fdisk.$HDD"
+          fdisk -l /dev/$HDD >"fdisk.$HDD"
 
           # Mark HDD as done
           HDD=""
@@ -433,15 +440,15 @@ for PART in $BACKUP_PARTITIONS; do
   retval=0
   TARGET_FILE=""
   case "$IMAGE_PROGRAM" in
-    fsa)  TARGET_FILE="$IMAGE_DIR/$PART.fsa"
+    fsa)  TARGET_FILE="$PART.fsa"
           fsarchiver -v -s 2000 savefs "$TARGET_FILE" "/dev/$PART"
           retval="$?"
           ;;
-    ddgz) TARGET_FILE="$IMAGE_DIR/$PART.gz"
+    ddgz) TARGET_FILE="$PART.gz"
           dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE"
           retval="$?"
           ;;
-    pi)   TARGET_FILE="$IMAGE_DIR/$PART.img.gz"
+    pi)   TARGET_FILE="$PART.img.gz"
           partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
           retval="$?"
           ;;
@@ -463,11 +470,11 @@ done
 #reset
 
 # Set correct permissions on all files
-find "$IMAGE_DIR"/ -maxdepth 1 -type f -exec chmod 664 {} \;
+find . -maxdepth 1 -type f -exec chmod 664 {} \;
 
 # Show current image directory
 echo "Target directory contents($IMAGE_DIR)"
-ls -l "$IMAGE_DIR"/
+ls -l
 
 # Run custom script, if specified
 if [ -n "$CUSTOM_POST_SCRIPT" ]; then

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00a"
+MY_VERSION="3.00b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 24, 2011
+# Last update: October 28, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -330,15 +330,23 @@ DIR_NAME=`echo "$IMAGE_NAME" |tr 'A-Z' 'a-z'`
 IMAGE_DIR="$MOUNT_POINT/$DIR_NAME"
 
 if [ ! -d "$IMAGE_DIR" ]; then
-  printf "\033[40m\033[1;31m\nERROR: Image directory ($MOUNT_POINT/$DIR_NAME) does NOT exist! Quitting...\n\n\033[0m"
+  printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\n\033[0m"
   do_exit 7
 fi
 
 echo "* Using image directory: $IMAGE_DIR"
 
-if [ -e "$IMAGE_DIR/description.txt" ]; then
+# Make the image dir our working directory
+if ! cd "$IMAGE_DIR"; then
+  echo ""
+  printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m"
+  echo ""
+  do_exit 5
+fi
+
+if [ -e "description.txt" ]; then
   echo "--------------------------------------------------------------------------------"
-  cat "$IMAGE_DIR/description.txt"
+  cat "description.txt"
   echo "--------------------------------------------------------------------------------"
   echo "Press any key to continue"
   read -n 1
@@ -346,7 +354,7 @@ fi
 
 # Check whether any image(s) exist
 IFS=$EOL
-if [ -z "$(find "$IMAGE_DIR" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz")" ]; then
+if [ -z "$(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz")" ]; then
   printf "\033[40m\033[1;31m\nERROR: Unable to locate any image files in \"$IMAGE_DIR\"! Quitting...\n\n\033[0m"
   do_exit 7
 fi
@@ -354,7 +362,7 @@ fi
 # Restore MBR/track0/partitions
 TARGET_NODEV=""
 unset IFS
-for FN in "$IMAGE_DIR"/partitions.*; do
+for FN in partitions.*; do
   HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
 
   # If no target drive specified use default drive from image:
@@ -399,8 +407,8 @@ for FN in "$IMAGE_DIR"/partitions.*; do
 #      do_exit 5
 #    fi
 
-    if [ -f "$IMAGE_DIR/track0.$HDD_NAME" ]; then
-      DD_SOURCE="$IMAGE_DIR/track0.$HDD_NAME"
+    if [ -f "track0.$HDD_NAME" ]; then
+      DD_SOURCE="track0.$HDD_NAME"
     else
       DD_SOURCE="/dev/zero"
     fi
@@ -418,9 +426,9 @@ for FN in "$IMAGE_DIR"/partitions.*; do
       read -n1      
     fi
 
-    if [ -f "$IMAGE_DIR/partitions.$HDD_NAME" ]; then
+    if [ -f "partitions.$HDD_NAME" ]; then
       retval=0
-        sfdisk --no-reread --force /dev/$TARGET_NODEV < "$IMAGE_DIR/partitions.$HDD_NAME"
+        sfdisk --no-reread --force /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
         retval=$?
         
       if [ $retval -ne 0 ]; then
@@ -454,7 +462,7 @@ done
 
 # Test whether the target partition(s) exist:
 IFS=$EOL
-find "$IMAGE_DIR" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
+find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
   # Strip extension so we get the actual device name
   PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
@@ -475,7 +483,7 @@ find "$IMAGE_DIR" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o
   fi
 
   ## Match partition with what we have stored in our partitions file
-  SFDISK_SOURCE_PART=`cat "${IMAGE_DIR}"/partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
+  SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
   if [ -z "$SFDISK_SOURCE_PART" ]; then
     printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m"
     do_exit 5
@@ -492,7 +500,7 @@ done
 
 # Restore the actual image(s):
 IFS=$EOL
-find "$IMAGE_DIR" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
+find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
   # Strip extension so we get the actual device name
   PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
 
@@ -537,7 +545,7 @@ TARGET_DEVICE="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
 unset IFS
-for script in "$IMAGE_DIR"/*.sh; do
+for script in *.sh; do
   if [ -f "$script" ]; then
     # Source script:
     . "$script"
