@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00b"
+MY_VERSION="3.00c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 28, 2011
+# Last update: October 31, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -312,7 +312,7 @@ fi
 # Use default or argument specified image name
 if [ -z "$IMAGE_NAME" ]; then
   echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
-  IFS=$'\n'
+  IFS=$EOL
   find "$MOUNT_POINT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
     echo "$(basename "$ITEM")"
   done
@@ -462,9 +462,11 @@ done
 
 # Test whether the target partition(s) exist:
 IFS=$EOL
-find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
+find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read ITEM; do
+  IMAGE_FILE="$(basename "$ITEM")"
+  
   # Strip extension so we get the actual device name
-  PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
+  PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
 
   # Do we want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
@@ -500,9 +502,11 @@ done
 
 # Restore the actual image(s):
 IFS=$EOL
-find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read IMAGE_FILE; do
+find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read ITEM; do
+  IMAGE_FILE="$(basename "$ITEM")"
+  
   # Strip extension so we get the actual device name
-  PARTITION="$(basename "$IMAGE_FILE" |sed 's/\..*//')"
+  PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
 
   # We want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
