@@ -211,6 +211,7 @@ IMAGE_NAME=""
 SUCCESS=""
 FAILED=""
 USER_TARGET_NODEV=""
+PARTITIONS_NODEV=""
 CLEAN=0
 FORCE=0
 
@@ -224,15 +225,17 @@ for arg in $*; do
     IMAGE_NAME="$ARGVAL"
   else
     case "$ARGNAME" in
-      --clean|-clean|-c) CLEAN=1;;
-      --device|-device|--dev|-dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
+      --clean|-c) CLEAN=1;;
+      --targetdev) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
+      --device|--dev|-d) PARTITIONS_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
       --help)
       echo "Options:"
       echo "-h, --help                  - Print this help"
       echo "--clean                     - Even write MBR/partition table if not empty"
-      echo "--device={dev}              - Restore image to device {dev} (instead of default)"
+      echo "--device={dev1,dev2}        - Restore only these partitions (instead of all partitions)"
+      echo "--targetdev={dev}           - Restore image to target device {dev} (instead of default)"
       echo "--conf={config_file}        - Specify alternate configuration file"
       echo "--name={image_name}         - Use image('s) from directory named like this"
       exit 3 # quit

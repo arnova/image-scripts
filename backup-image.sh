@@ -224,7 +224,7 @@ for arg in $*; do
     IMAGE_NAME="$ARGVAL"
   else
     case "$ARGNAME" in
-      --device|-device|--dev|-dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g' |sed 's/,/ /g'`;;
+      --device|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g' |sed 's/,/ /g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
       --fsa) IMAGE_PROGRAM="fsa";;
@@ -234,7 +234,7 @@ for arg in $*; do
       echo "Options:"
       echo "-h, --help                  - Print this help"
       echo "--clean                     - Even write MBR/partition table if not empty"
-      echo "--device={dev1,dev2}        - Backup only these devices (instead of all partitions)"
+      echo "--device={dev1,dev2}        - Backup only these partitions (instead of all partitions)"
       echo "--conf={config_file}        - Specify alternate configuration file"
       echo "--name={image_name}         - Create a directory named like this and put the image('s) in there"
       echo "--fsa                       - Use fsarchiver for imaging (default)"
