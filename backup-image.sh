@@ -224,7 +224,7 @@ for arg in $*; do
     IMAGE_NAME="$ARGVAL"
   else
     case "$ARGNAME" in
-      --partitions|--partition|--part|-p) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g' |sed 's/,/ /g'`;;
+      --partitions|--partition|--part|-p) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e sed 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
       --fsa) IMAGE_PROGRAM="fsa";;

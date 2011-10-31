@@ -226,8 +226,8 @@ for arg in $*; do
   else
     case "$ARGNAME" in
       --clean|-c) CLEAN=1;;
-      --targetdev) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
-      --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
+      --targetdev) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
+      --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e sed 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
       --help|-h)
@@ -481,7 +481,7 @@ find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.
   
   if [ -n "$PARTITIONS_NODEV" ]; then
     # Only check partitions requested
-    if ! echo "$PARTITIONS_NODEV" |grep -q -e ",${PARTITION}," -e ",${PARTITION}$" -e "^${PARTITION}," -e "^${PARTITION}$"; then
+    if ! echo "$PARTITIONS_NODEV" |grep -q -e " ${PARTITION} " -e " ${PARTITION}$" -e "^${PARTITION} " -e "^${PARTITION}$"; then
       continue;
     fi
   fi    
