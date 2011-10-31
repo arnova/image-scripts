@@ -359,11 +359,30 @@ if [ -e "description.txt" ]; then
   read -n 1
 fi
 
-# Check whether any image(s) exist
-IFS=$EOL
-if [ -z "$(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz")" ]; then
-  printf "\033[40m\033[1;31m\nERROR: Unable to locate any image files in \"$IMAGE_DIR\"! Quitting...\n\n\033[0m"
-  do_exit 7
+IMAGES_FILES=""
+if [ -n "$PARTITIONS_NODEV" ]; then
+  IFS=' '
+  for PART in $PARTITIONS_NODEV; do
+    IFS=$EOL
+    ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.gz")"
+    if [ -z "$ITEM" ]; then
+      printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m"
+      do_exit 5
+    fi
+    
+    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
+  done
+else
+  IFS=$EOL
+  find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read ITEM; do
+    # Add item to list
+    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
+  done
+fi
+
+if [ -z "$IMAGE_FILES" ]; then
+  printf "\033[40m\033[1;31m\nERROR: No matching image files to restore! Quitting...\n\033[0m"
+  do_exit 5
 fi
 
 # Restore MBR/track0/partitions
@@ -469,32 +488,6 @@ for FN in partitions.*; do
   fi
 done
 
-
-IMAGES_FILES=""
-if [ -n "$PARTITIONS_NODEV" ]; then
-  IFS=' '
-  for PART in $PARTITIONS_NODEV; do
-    IFS=$EOL
-    ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.gz")"
-    if [ -z "$ITEM" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART does NOT exist! Quitting...\n\033[0m"
-      do_exit 5
-    fi
-    
-    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
-  done
-else
-  IFS=$EOL
-  find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read ITEM; do
-    # Add item to list
-    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
-  done
-fi
-
-if [ -z "$IMAGE_FILES" ]; then
-  printf "\033[40m\033[1;31m\nERROR: No matching image files to restore! Quitting...\n\033[0m"
-  do_exit 5
-fi
 
 # Test whether the target partition(s) exist:  
 IFS=$EOL
