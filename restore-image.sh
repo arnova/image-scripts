@@ -227,7 +227,7 @@ for arg in $*; do
     case "$ARGNAME" in
       --clean|-c) CLEAN=1;;
       --targetdev) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
-      --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e sed 's|,| |g' -e 's|^/dev/||g'`;;
+      --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
       --help|-h)
