@@ -471,21 +471,37 @@ done
 
 
 IMAGES_FILES=""
+if [ -n "$PARTITIONS_NODEV" ]; then
+  IFS=' '
+  for PART in $PARTITIONS_NODEV; do
+    IFS=$EOL
+    ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.gz")"
+    if [ -z "$ITEM" ]; then
+      printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART does NOT exist! Quitting...\n\033[0m"
+      do_exit 5
+    fi
+    
+    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
+  done
+else
+  IFS=$EOL
+  find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read ITEM; do
+    # Add item to list
+    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
+  done
+fi
+
+if [ -z "$IMAGE_FILES" ]; then
+  printf "\033[40m\033[1;31m\nERROR: No matching image files to restore! Quitting...\n\033[0m"
+  do_exit 5
+fi
+
+# Test whether the target partition(s) exist:  
 IFS=$EOL
-# Test whether the target partition(s) exist:
-find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read ITEM; do
-  IMAGE_FILE="$(basename "$ITEM")"
-  
+for IMAGE_FILE in $IMAGE_FILES; do
   # Strip extension so we get the actual device name
   PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
   
-  if [ -n "$PARTITIONS_NODEV" ]; then
-    # Only check partitions requested
-    if ! echo "$PARTITIONS_NODEV" |grep -q -e " ${PARTITION} " -e " ${PARTITION}$" -e "^${PARTITION} " -e "^${PARTITION}$"; then
-      continue;
-    fi
-  fi    
-
   # Do we want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
     NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
@@ -517,9 +533,6 @@ find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.
     read -n1
     echo ""
   fi
-  
-  # Add item to list
-  IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
 done
 
 # Restore the actual image(s):
