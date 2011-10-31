@@ -227,14 +227,14 @@ for arg in $*; do
     case "$ARGNAME" in
       --clean|-c) CLEAN=1;;
       --targetdev) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
-      --device|--dev|-d) PARTITIONS_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
+      --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed 's,^/dev/,,g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --name|-n) IMAGE_NAME="$ARGVAL";;
-      --help)
+      --help|-h)
       echo "Options:"
-      echo "-h, --help                  - Print this help"
+      echo "--help                      - Print this help"
       echo "--clean                     - Even write MBR/partition table if not empty"
-      echo "--device={dev1,dev2}        - Restore only these partitions (instead of all partitions)"
+      echo "--partitions={dev1,dev2}    - Restore only these partitions (instead of all partitions)"
       echo "--targetdev={dev}           - Restore image to target device {dev} (instead of default)"
       echo "--conf={config_file}        - Specify alternate configuration file"
       echo "--name={image_name}         - Use image('s) from directory named like this"
@@ -430,7 +430,8 @@ for FN in partitions.*; do
     # Re-read partition table
     if ! partprobe /dev/$TARGET_NODEV; then
       printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m"
-      read -n1      
+      read -n1
+      echo ""
     fi
 
     if [ -f "partitions.$HDD_NAME" ]; then
@@ -447,7 +448,8 @@ for FN in partitions.*; do
     # Re-read partition table
     if ! partprobe /dev/$TARGET_NODEV; then
       printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m"
-      read -n1      
+      read -n1
+      echo ""      
     fi
 
     # Create swap on swap partitions
@@ -463,6 +465,7 @@ for FN in partitions.*; do
     printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m"
     echo "To override this you must specify --clean. Press any key to continue or CTRL-C to abort..."
     read -n1
+    echo ""
   fi
 done
 
@@ -512,6 +515,7 @@ find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.
   if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]*/","",)$"; then
     printf "\033[40m\033[1;31m\nWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m"
     read -n1
+    echo ""
   fi
   
   # Add item to list
@@ -549,6 +553,7 @@ for IMAGE_FILE in $IMAGE_FILES; do
     FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
     printf "\033[40m\033[1;31mERROR: Image restore failed($retval) for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
+    echo ""
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
     echo ""
