@@ -1,0 +1,13 @@
+DEFAULT_USERNAME="image"
+NETWORK=dhcp
+IP_ADDRESS=""
+NET_MASK="255.255.255.0"
+#GATEWAY=""
+SERVER="myserver"
+MOUNT_TYPE="cifs" 
+MOUNT_OPTIONS="iocharset=iso8859-15,username=$DEFAULT_USERNAME"
+MOUNT_DEVICE="//$SERVER/images"
+MOUNT_POINT="/mnt/images"
+AUTO_UNMOUNT=1
+DEFAULT_DIR="winxp"
+
