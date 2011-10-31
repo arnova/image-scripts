@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00b"
+MY_VERSION="3.00c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: October 28, 2011
+# Last update: October 31, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -212,7 +212,7 @@ SUCCESS=""
 FAILED=""
 USER_SOURCE_NODEV=""
 PARTITIONS=""
-IMAGE_PROGRAM="pi"
+IMAGE_PROGRAM="fsa"
 
 # Check arguments
 unset IFS
@@ -233,11 +233,10 @@ for arg in $*; do
       --help)
       echo "Options:"
       echo "-h, --help                  - Print this help"
-      echo "--clean                     - Even write MBR/partition table if not empty"
       echo "--partitions={dev1,dev2}    - Backup only these partitions (instead of all partitions)"
       echo "--conf={config_file}        - Specify alternate configuration file"
-      echo "--name={image_name}         - Create a directory named like this and put the image('s) in there"
-      echo "--fsa                       - Use fsarchiver for imaging (default)"
+      echo "--name={image_name}         - Create a directory named like this and put the image(s) in there"
+      echo "--fsa                       - Use fsarchiver for imaging"
       echo "--pi                        - Use partimage for imaging"
       echo "--ddgz                      - Use dd + gzip for imaging"
       exit 3 # quit
