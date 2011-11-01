@@ -584,13 +584,13 @@ done
 # Show current partition status
 fdisk -l
 
+if [ -n "$FAILED" ]; then
+  echo "* Partitions FAILED to restore: $FAILED"
+fi
+
 # Show result to user
 if [ -n "$SUCCESS" ]; then
   echo "* Partitions restored successfully: $SUCCESS"
-fi
-
-if [ -n "$FAILED" ]; then
-  echo "* Partitions FAILED to restore: $FAILED"
 fi
 
 # Exit (+unmount)

@@ -486,13 +486,21 @@ if [ -n "$CUSTOM_POST_SCRIPT" ]; then
   . "$CUSTOM_POST_SCRIPT"
 fi
 
+if [ -n "$FAILED" ]; then
+  echo "* Partitions FAILED to backup: $FAILED"
+fi
+
 # Show result to user
 if [ -n "$SUCCESS" ]; then
   echo "* Partitions backuped successfully: $SUCCESS"
-fi
-
-if [ -n "$FAILED" ]; then
-  echo "* Partitions FAILED to backup: $FAILED"
+     
+  if [ "$IMAGE_PROGRAM" = "pi" ]; then
+    echo "Verifying partimage images (CTRL-C to break)"
+    unset IFS
+    for PART in $SUCCESS; do
+      gzip -dtc ${PART}.img.gz.*
+    done
+  fi
 fi
 
 # Exit (+unmount)
