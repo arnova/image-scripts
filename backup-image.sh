@@ -495,7 +495,7 @@ if [ -n "$SUCCESS" ]; then
   echo "* Partitions backuped successfully: $SUCCESS"
      
   if [ "$IMAGE_PROGRAM" = "pi" ]; then
-    echo "Verifying partimage images (CTRL-C to break)"
+    echo "Verifying partimage images (CTRL-C to break):"
     unset IFS
     for PART in $SUCCESS; do
       gzip -dtcv ${PART}.img.gz.*
