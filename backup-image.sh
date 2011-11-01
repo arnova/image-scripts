@@ -498,7 +498,7 @@ if [ -n "$SUCCESS" ]; then
     echo "Verifying partimage images (CTRL-C to break)"
     unset IFS
     for PART in $SUCCESS; do
-      gzip -dtc ${PART}.img.gz.*
+      gzip -dtcv ${PART}.img.gz.*
     done
   fi
 fi
