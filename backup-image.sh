@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00c"
+MY_VERSION="3.00e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: October 31, 2011
+# Last update: November 1, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
