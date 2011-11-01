@@ -477,8 +477,9 @@ done
 find . -maxdepth 1 -type f -exec chmod 664 {} \;
 
 # Show current image directory
-echo "Target directory contents($IMAGE_DIR)"
+echo "Target directory contents($IMAGE_DIR):"
 ls -l
+echo ""
 
 # Run custom script, if specified
 if [ -n "$CUSTOM_POST_SCRIPT" ]; then
@@ -498,7 +499,7 @@ if [ -n "$SUCCESS" ]; then
     echo "Verifying partimage images (CTRL-C to break):"
     unset IFS
     for PART in $SUCCESS; do
-      gzip -dtcv ${PART}.img.gz.*
+      gzip -tv ${PART}.img.gz.*
     done
   fi
 fi
