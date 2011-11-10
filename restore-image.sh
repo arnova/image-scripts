@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00e"
+MY_VERSION="3.00f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 1, 2011
+# Last update: November 10, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -357,7 +357,7 @@ if [ -e "description.txt" ]; then
   read -n 1
 fi
 
-IMAGES_FILES=""
+IMAGE_FILES=""
 if [ -n "$PARTITIONS_NODEV" ]; then
   IFS=' '
   for PART in $PARTITIONS_NODEV; do
@@ -372,14 +372,14 @@ if [ -n "$PARTITIONS_NODEV" ]; then
   done
 else
   IFS=$EOL
-  find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz" |while read ITEM; do
+  for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.gz"`; do
     # Add item to list
     IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
   done
 fi
 
 if [ -z "$IMAGE_FILES" ]; then
-  printf "\033[40m\033[1;31m\nERROR: No matching image files to restore! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m"
   do_exit 5
 fi
 
