@@ -5,7 +5,7 @@ NET_MASK=""
 #GATEWAY=""
 SERVER="myserver"
 MOUNT_TYPE="cifs"
-MOUNT_OPTIONS="iocharset=iso8859-15,username=$DEFAULT_USERNAME"
+MOUNT_OPTIONS="iocharset=utf-8,username=$DEFAULT_USERNAME"
 MOUNT_DEVICE="//$SERVER/images"
 MOUNT_POINT="/mnt/images"
 AUTO_UNMOUNT=1
