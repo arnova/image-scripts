@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00f"
+MY_VERSION="3.00g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 10, 2011
+# Last update: November 11, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -577,7 +577,7 @@ unset IFS
 for script in *.sh; do
   if [ -f "$script" ]; then
     # Source script:
-    . "$script"
+    . ./"$script"
   fi
 done
 
