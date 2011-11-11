@@ -213,7 +213,6 @@ FAILED=""
 USER_TARGET_NODEV=""
 PARTITIONS_NODEV=""
 CLEAN=0
-FORCE=0
 
 # Check arguments
 unset IFS
@@ -425,12 +424,6 @@ for FN in partitions.*; do
 
   # Only restore track0 (MBR) / partition table if they don't exist already on device
   if ! get_partitions |grep -E -q -x "${TARGET_NODEV}p?[0-9]+" || [ "$CLEAN" = "1" ]; then
-#    echo "* Resetting partition table on /dev/$TARGET_NODEV"
-#    if ! printf "o\nw\n" |fdisk /dev/$TARGET_NODEV; then
-#      printf "\033[40m\033[1;31mERROR: Clearing partition table on /dev/$TARGET_NODEV failed. Quitting...\n\033[0m"
-#      do_exit 5
-#    fi
-
     if [ -f "track0.$HDD_NAME" ]; then
       DD_SOURCE="track0.$HDD_NAME"
     else
@@ -452,12 +445,11 @@ for FN in partitions.*; do
     fi
 
     if [ -f "partitions.$HDD_NAME" ]; then
-      retval=0
-        sfdisk --no-reread --force /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
-        retval=$?
+      sfdisk --no-reread --force /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
+      retval=$?
         
       if [ $retval -ne 0 ]; then
-        printf "\033[40m\033[1;31mPartition table restore failed. Use --force to override. Quitting...\n\033[0m"
+        printf "\033[40m\033[1;31mPartition table restore failed. Quitting...\n\033[0m"
         do_exit 5
       fi
     fi
@@ -595,4 +587,3 @@ fi
 
 # Exit (+unmount)
 do_exit 0
-
