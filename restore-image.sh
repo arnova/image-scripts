@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00g"
+MY_VERSION="3.00h"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 11, 2011
+# Last update: November 17, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -519,7 +519,7 @@ for IMAGE_FILE in $IMAGE_FILES; do
 done
 
 # Restore the actual image(s):
-IFS=$EOL
+unset IFS
 for IMAGE_FILE in $IMAGE_FILES; do
   # Strip extension so we get the actual device name
   PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
@@ -535,14 +535,14 @@ for IMAGE_FILE in $IMAGE_FILES; do
   echo "* Selected partition: /dev/$TARGET_PARTITION. Using image file: $IMAGE_FILE"
   retval=0
   if echo "$IMAGE_FILE" |grep -q "\.fsa$"; then
-    fsarchiver -v restfs "$IMAGE_FILE" "/dev/$TARGET_PARTITION"
-    retval="$?"
+    fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PARTITION"
+    retval=$?
   elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
     partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
-    retval="$?"
+    retval=$?
   else
     gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PARTITION" bs=64K
-    retval="$?"
+    retval=$?
   fi
 
   if [ $retval -ne 0 ]; then
