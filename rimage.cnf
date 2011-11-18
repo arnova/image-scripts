@@ -9,5 +9,5 @@ MOUNT_OPTIONS="iocharset=utf8,username=$DEFAULT_USERNAME"
 MOUNT_DEVICE="//$SERVER/images"
 MOUNT_POINT="/mnt/images"
 AUTO_UNMOUNT=1
-DEFAULT_DIR="winxp"
+DEFAULT_DIR="win7-x64"
 

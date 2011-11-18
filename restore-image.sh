@@ -576,7 +576,7 @@ for script in *.sh; do
 done
 
 # Show current partition status
-fdisk -l
+fdisk -l |grep "^/"
 
 if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
