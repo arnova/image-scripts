@@ -452,23 +452,22 @@ done
 unset IFS
 for PART in $BACKUP_PARTITIONS; do
   retval=0
-  TARGET_FILE=""
   case "$IMAGE_PROGRAM" in
     fsa)  TARGET_FILE="$PART.fsa"
           fsarchiver -v -s 2000 savefs "$TARGET_FILE" "/dev/$PART"
-          retval="$?"
+          retval=$?
           ;;
     ddgz) TARGET_FILE="$PART.gz"
           dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE"
-          retval="$?"
+          retval=$?
           ;;
     pi)   TARGET_FILE="$PART.img.gz"
           partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
-          retval="$?"
+          retval=$?
           ;;
   esac
     
-  if [ "$retval" != "0" ]; then
+  if [ $retval -ne 0 ]; then
     FAILED="${FAILED}${FAILED:+ }$PART"
     printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
