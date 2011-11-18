@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00h"
+MY_VERSION="3.00i"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 17, 2011
+# Last update: November 18, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -269,7 +269,6 @@ if [ -n "$USER_TARGET_NODEV" ]; then
     exit 5
   fi
 fi
-
 
 if [ "$NETWORK" != "none" ]; then
   # Setup network (interface)
