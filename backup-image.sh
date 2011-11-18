@@ -215,7 +215,7 @@ SUCCESS=""
 FAILED=""
 USER_SOURCE_NODEV=""
 PARTITIONS=""
-IMAGE_PROGRAM="fsa"
+IMAGE_PROGRAM=""
 
 # Check arguments
 unset IFS
@@ -257,6 +257,14 @@ else
   echo "ERROR: Missing configuration file ($CONF)!"
   echo "Program aborted"
   exit 1
+fi
+
+if [ -z "$IMAGE_PROGRAM" ]; then
+  if [ -n "$DEFAULT_IMAGE_PROGRAM" ]; then
+    IMAGE_PROGRAM="$DEFAULT_IMAGE_PROGRAM"
+  else
+    IMAGE_PROGRAM="pi"
+  fi  
 fi
 
 # Sanity check environment
