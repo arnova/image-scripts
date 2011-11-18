@@ -53,13 +53,15 @@ ctrlc_handler()
 # Setup the ethernet interface
 configure_network()
 {
-  CUR_IF=""
-  IP_SET=""
+  local CUR_IF=""
+  local IP_SET=""
+  local MAC_ADDR=""
 
   IFS=$EOL
   for LINE in $(ifconfig -a 2>/dev/null); do
     if echo "$LINE" |grep -q -i 'Link encap'; then
-      CUR_IF="$(echo "$LINE" |grep -i 'Link encap:ethernet' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' |cut -f1 -d' ')"
+      CUR_IF="$(echo "$LINE" |grep -i 'link encap:ethernet' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' |cut -f1 -d' ')"
+      MAC_ADDR="$(echo "$LINE" |awk '{ print $NF }')"
     elif echo "$LINE" |grep -q -i 'inet addr:.*Bcast.*Mask.*'; then
       IP_SET="$(echo "$LINE" |sed 's/^ *//g')"
     elif echo "$LINE" |grep -q -i '.*RX packets.*'; then
@@ -69,7 +71,7 @@ configure_network()
           
           if echo "$NETWORK" |grep -q -e 'dhcp'; then
             if which dhcpcd >/dev/null 2>&1; then
-              printf "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF..."
+              printf "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
               # Run dhcpcd to get a dynamic IP
               if ! dhcpcd -L $CUR_IF; then
                 echo "FAILED!"
@@ -79,7 +81,7 @@ configure_network()
               fi
             elif which dhclient >/dev/null 2>&1; then
               # FIXME: NOT tested!
-              printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF..."
+              printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
               if ! dhclient -1 $CUR_IF; then
                 echo "FAILED!"
               else
@@ -97,7 +99,7 @@ configure_network()
               continue
             fi
             
-            echo "* Static configuration for interface $CUR_IF"
+            echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
             printf "IP address ($IPADDRESS)?: "
             read USER_IPADDRESS
             if [ -z "$USER_IPADDRESS" ]; then
@@ -128,12 +130,13 @@ configure_network()
             fi
           fi
         else
-          echo "* Using already configured IP for interface $CUR_IF: "
+          echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
           echo "  $IP_SET"
         fi
       fi
       CUR_IF=""
       IP_SET=""
+      MAC_ADDR=""
     fi
   done
 }
