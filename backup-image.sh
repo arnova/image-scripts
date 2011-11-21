@@ -82,7 +82,7 @@ configure_network()
             elif which dhclient >/dev/null 2>&1; then
               # FIXME: NOT tested!
               printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
-              if ! dhclient -d -1 $CUR_IF; then
+              if ! dhclient -v -1 $CUR_IF; then
                 echo "FAILED!"
               else
                 echo "OK"
