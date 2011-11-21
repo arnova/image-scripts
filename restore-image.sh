@@ -80,7 +80,6 @@ configure_network()
                 continue
               fi
             elif which dhclient >/dev/null 2>&1; then
-              # FIXME: NOT tested!
               printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
               if ! dhclient -v -1 $CUR_IF; then
                 echo "FAILED!"
@@ -95,7 +94,7 @@ configure_network()
             printf "Setup interface $CUR_IF statically (Y/N)? "
             
             read answer
-            if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+            if [ "$answer" = "n" ] || [ "$answer" = "N" ]; then
               continue
             fi
             
