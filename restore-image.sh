@@ -98,6 +98,7 @@ configure_network()
               continue
             fi
             
+            echo ""
             echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
             printf "IP address ($IPADDRESS)?: "
             read USER_IPADDRESS
