@@ -148,10 +148,11 @@ partclone_detect()
   local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
   
   case $TYPE in
-  fd|83)                          echo "partclone.extfs";;
-  7|27)                           echo "partclone.ntfs";;
-  1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
-  *)                              echo "partclone.dd";;
+    fd|83)                          echo "partclone.extfs";;
+    7|27)                           echo "partclone.ntfs";;
+    1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
+    *)                              echo "partclone.dd";;
+  esac
 }
 
 
@@ -481,7 +482,7 @@ for PART in $BACKUP_PARTITIONS; do
           retval=$?
           ;;
     pc)   TARGET_FILE="$PART.img"
-          PARTCLONE=`partclone_detect /dev/$PART"`
+          PARTCLONE=`partclone_detect "/dev/$PART"`
           $PARTCLONE -N -c -s "/dev/$PART" -o "$TARGET_FILE"
           retval=$?
           ;;
