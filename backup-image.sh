@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00i"
+MY_VERSION="3.01"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 18, 2011
+# Last update: November 22, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -142,6 +142,19 @@ configure_network()
 }
 
 
+# Wrapper for partclone to autodetect filesystem and select the proper partclone.*
+partclone_detect()
+{
+  local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
+  
+  case $TYPE in
+  fd|83)                          echo "partclone.extfs";;
+  7|27)                           echo "partclone.ntfs";;
+  1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
+  *)                              echo "partclone.dd";;
+}
+
+
 # Check if DMA is enabled for HDD
 check_dma()
 {
@@ -233,6 +246,7 @@ for arg in $*; do
       --fsa) IMAGE_PROGRAM="fsa";;
       --ddgz) IMAGE_PROGRAM="ddgz";;
       --pi) IMAGE_PROGRAM="pi";;
+      --pc) IMAGE_PROGRAM="pc";;
       --help)
       echo "Options:"
       echo "-h, --help                  - Print this help"
@@ -241,6 +255,7 @@ for arg in $*; do
       echo "--name={image_name}         - Create a directory named like this and put the image(s) in there"
       echo "--fsa                       - Use fsarchiver for imaging"
       echo "--pi                        - Use partimage for imaging"
+      echo "--pc                        - Use partclone for imaging"
       echo "--ddgz                      - Use dd + gzip for imaging"
       exit 3 # quit
       ;;
@@ -463,6 +478,11 @@ for PART in $BACKUP_PARTITIONS; do
           ;;
     pi)   TARGET_FILE="$PART.img.gz"
           partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
+          retval=$?
+          ;;
+    pc)   TARGET_FILE="$PART.img"
+          PARTCLONE=`partclone_detect /dev/$PART"`
+          $PARTCLONE -N -c -s "/dev/$PART" -o "$TARGET_FILE"
           retval=$?
           ;;
   esac

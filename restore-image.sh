@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.00i"
+MY_VERSION="3.01"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 18, 2011
+# Last update: November 22, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -363,7 +363,7 @@ if [ -n "$PARTITIONS_NODEV" ]; then
   IFS=' '
   for PART in $PARTITIONS_NODEV; do
     IFS=$EOL
-    ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.gz")"
+    ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.gz" -o -iname "$PART.img")"
     if [ -z "$ITEM" ]; then
       printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m"
       do_exit 5
@@ -542,6 +542,8 @@ for IMAGE_FILE in $IMAGE_FILES; do
   elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
     partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
     retval=$?
+  elif echo "$IMAGE_FILE" |grep -q ".img$"; then
+    partclone.restore -N -s "$IMAGE_FILE" -o "/dev/$TARGET_PARTITION"
   else
     gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PARTITION" bs=64K
     retval=$?
