@@ -542,7 +542,7 @@ for IMAGE_FILE in $IMAGE_FILES; do
   elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
     partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
     retval=$?
-  elif echo "$IMAGE_FILE" |grep -q ".img$"; then
+  elif echo "$IMAGE_FILE" |grep -q "\.img$"; then
     partclone.restore -N -s "$IMAGE_FILE" -o "/dev/$TARGET_PARTITION"
   else
     gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PARTITION" bs=64K
