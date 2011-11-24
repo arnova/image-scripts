@@ -146,8 +146,8 @@ configure_network()
 partclone_detect()
 {
   local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
-  
   case $TYPE in
+    # TODO: On Linux we only support ext2/3/4 for now. For eg. btrfs we may need to probe using "fsck -N" or "file -s -b"
     fd|83)                          echo "partclone.extfs";;
     7|17)                           echo "partclone.ntfs";;
     1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
