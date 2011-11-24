@@ -149,7 +149,7 @@ partclone_detect()
   
   case $TYPE in
     fd|83)                          echo "partclone.extfs";;
-    7|27)                           echo "partclone.ntfs";;
+    7|17)                           echo "partclone.ntfs";;
     1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
     *)                              echo "partclone.dd";;
   esac
