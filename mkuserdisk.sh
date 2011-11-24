@@ -30,7 +30,8 @@ else
       ntfs-3g "/dev/$USER_PART" /mnt/windows &&
       mkdir "/mnt/windows/temp" &&
       mkdir "/mnt/windows/My Documents" &&
-      mkdir "/mnt/windows/Program Files"
+      mkdir "/mnt/windows/Program Files" &&
+      mkdir "/mnt/windows/Downloads"
       
       umount /mnt/windows
     else
