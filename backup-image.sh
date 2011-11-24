@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.01"
+MY_VERSION="3.01a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 22, 2011
+# Last update: November 24, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -286,6 +286,11 @@ fi
 # Sanity check environment
 sanity_check;
 
+if [ -z "$IMAGE_NAME" ]; then
+   printf "\033[40m\033[1;31mERROR: You must specify the image name using --name= ! Quitting...\n\033[0m"
+   exit 5
+fi
+
 # Check if target device exists
 if [ -n "$USER_SOURCE_NODEV" ]; then
   unset IFS
@@ -356,15 +361,7 @@ if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   exit 6
 fi
 
-IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR"
-
-if [ -n "$IMAGE_NAME" ]; then
-#  if [ -d "$IMAGE_NAME" ]; then
-#    printf "\033[40m\033[1;31mERROR: Image target directory already exists! Quitting...\n\033[0m"
-#    exit 5
-#  fi
-  IMAGE_DIR="$IMAGE_DIR/$IMAGE_NAME"
-fi
+IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
 
 if ! mkdir -p "$IMAGE_DIR"; then
   echo ""
