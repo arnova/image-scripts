@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.02"
+MY_VERSION="3.02a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: November 28, 2011
@@ -482,7 +482,7 @@ for FN in partitions.*; do
 done
 
 
-# Test whether the target partition(s) exist:  
+# Test whether the target partition(s) exist and have the correct geometry:
 IFS=$EOL
 for IMAGE_FILE in $IMAGE_FILES; do
   # Strip extension so we get the actual device name
@@ -517,8 +517,8 @@ for IMAGE_FILE in $IMAGE_FILES; do
   if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]*/","",)$"; then
     printf "\033[40m\033[1;31m\nWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m"
     read -n1
-    echo ""
   fi
+  echo ""
 done
 
 # Restore the actual image(s):
