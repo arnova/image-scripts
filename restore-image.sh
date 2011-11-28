@@ -544,7 +544,8 @@ for IMAGE_FILE in $IMAGE_FILES; do
     partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
     retval=$?
   elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
-    zcat "$IMAGE_FILE" |partclone.restore -r -s - -o "/dev/$TARGET_PARTITION"
+    zcat "$IMAGE_FILE" |partclone.restore -s - -o "/dev/$TARGET_PARTITION"
+    retval=$?
   else
     gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PARTITION" bs=64K
     retval=$?
