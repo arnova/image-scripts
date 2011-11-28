@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.01"
+MY_VERSION="3.01a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: November 22, 2011
@@ -187,8 +187,9 @@ sanity_check()
   check_binary dd
   check_binary mount
   check_binary umount
-#    check_binary fsarchiver
-#    check_binary partimage
+#  check_binary fsarchiver
+#  check_binary partimage
+#  check_binary partclone.restore
 
   if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in rimage.conf! Quitting...\033[0m\n" >&2
