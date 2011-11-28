@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.01b"
+MY_VERSION="3.02"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 24, 2011
+# Last update: November 28, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -148,9 +148,9 @@ partclone_detect()
   local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
   case $TYPE in
     # TODO: On Linux we only support ext2/3/4 for now. For eg. btrfs we may need to probe using "fsck -N" or "file -s -b"
-    fd|83)                          echo "partclone.extfs";;
     7|17)                           echo "partclone.ntfs";;
     1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
+    fd|83)                          echo "partclone.extfs";;
     *)                              echo "partclone.dd";;
   esac
 }
@@ -467,21 +467,21 @@ unset IFS
 for PART in $BACKUP_PARTITIONS; do
   retval=0
   case "$IMAGE_PROGRAM" in
-    fsa)  TARGET_FILE="$PART.fsa"
-          fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
-          retval=$?
-          ;;
-    ddgz) TARGET_FILE="$PART.gz"
-          dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE"
-          retval=$?
-          ;;
     pi)   TARGET_FILE="$PART.img.gz"
           partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
           retval=$?
           ;;
-    pc)   TARGET_FILE="$PART.img"
+    pc)   TARGET_FILE="$PART.pc.gz"
           PARTCLONE=`partclone_detect "/dev/$PART"`
-          $PARTCLONE -N -c -s "/dev/$PART" -o "$TARGET_FILE"
+          $PARTCLONE -c -s "/dev/$PART" |gzip -c >"$TARGET_FILE"
+          retval=$?
+          ;;
+    fsa)  TARGET_FILE="$PART.fsa"
+          fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
+          retval=$?
+          ;;
+    ddgz) TARGET_FILE="$PART.dd.gz"
+          dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE"
           retval=$?
           ;;
   esac
