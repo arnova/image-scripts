@@ -200,9 +200,10 @@ sanity_check()
   check_binary mount
   check_binary umount
 
-  [ "$IMAGE_PROGRAM" == "fsarchiver" ] && check_binary fsarchiver
-  [ "$IMAGE_PROGRAM" == "partimage" ] && check_binary partimage
-  [ "$IMAGE_PROGRAM" == "ddgz" ] && check_binary gzip
+  [ "$IMAGE_PROGRAM" = "fsa" ] && check_binary fsarchiver
+  [ "$IMAGE_PROGRAM" = "pi" ] && check_binary partimage
+  [ "$IMAGE_PROGRAM" = "pc" ] && check_binary partclone.dd
+  [ "$IMAGE_PROGRAM" = "ddgz" ] && check_binary gzip
   
   if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
     printf "\033[40m\033[1;31mERROR: One or more mount options missing in bimage.conf! Quitting...\033[0m\n" >&2
@@ -467,7 +468,7 @@ for PART in $BACKUP_PARTITIONS; do
   retval=0
   case "$IMAGE_PROGRAM" in
     fsa)  TARGET_FILE="$PART.fsa"
-          fsarchiver -v -s 2000 savefs "$TARGET_FILE" "/dev/$PART"
+          fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
           retval=$?
           ;;
     ddgz) TARGET_FILE="$PART.gz"
