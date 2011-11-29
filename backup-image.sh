@@ -526,7 +526,10 @@ fi
 # Show result to user
 if [ -n "$SUCCESS" ]; then
   echo "* Partitions backuped successfully: $SUCCESS"
-     
+fi
+
+# Check integrity of gzip-files:
+if [ -n "$(find . -maxdepth 1 -type f -iname "*.gz" >/dev/null 2>&1)" ]; then
   echo "Verifying gzip images (CTRL-C to break):"
   gzip -tv *.gz
 fi
