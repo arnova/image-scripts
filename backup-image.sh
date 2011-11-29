@@ -465,25 +465,26 @@ done
 # Backup all specified partitions:
 unset IFS
 for PART in $BACKUP_PARTITIONS; do
-  echo "****** Backing up /dev/$PART to $TARGET_FILE ******"
-  echo ""
-  
   retval=0
   case "$IMAGE_PROGRAM" in
     pi)   TARGET_FILE="$PART.img.gz"
+          printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
           partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
           retval=$?
           ;;
     pc)   TARGET_FILE="$PART.pc.gz"
           PARTCLONE=`partclone_detect "/dev/$PART"`
+          printf "****** Using $PARTCLONE (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
           $PARTCLONE -c -s "/dev/$PART" |gzip -c >"$TARGET_FILE"
           retval=$?
           ;;
     fsa)  TARGET_FILE="$PART.fsa"
+          printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
           fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
           retval=$?
           ;;
     ddgz) TARGET_FILE="$PART.dd.gz"
+          printf "****** Using dd (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
           dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE"
           retval=$?
           ;;
