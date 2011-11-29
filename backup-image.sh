@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.02"
+MY_VERSION="3.02a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: November 28, 2011
@@ -435,13 +435,11 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
       unset IFS
       for PART in $BACKUP_PARTITIONS; do
         if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
-          echo "* Including /dev/$HDD for backup..."
-
           # Check if DMA is enabled for HDD
           check_dma /dev/$HDD
 
           # Dump hdd info for all disks in the current system
-          if ! dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1; then
+          if ! dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 >/dev/null; then
             printf "\033[40m\033[1;31mERROR: Track0(MBR) backup failed!\n\033[0m"
             do_exit 8
           fi
@@ -465,6 +463,9 @@ done
 # Backup all specified partitions:
 unset IFS
 for PART in $BACKUP_PARTITIONS; do
+  echo "****** Backing up /dev/$PART to $TARGET_FILE ******"
+  echo ""
+  
   retval=0
   case "$IMAGE_PROGRAM" in
     pi)   TARGET_FILE="$PART.img.gz"
@@ -486,17 +487,16 @@ for PART in $BACKUP_PARTITIONS; do
           ;;
   esac
     
+  echo ""
   if [ $retval -ne 0 ]; then
     FAILED="${FAILED}${FAILED:+ }$PART"
     printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
     read -n1
-    echo ""
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
-    echo ""
     echo "****** Backuped /dev/$PART to $TARGET_FILE ******"
-    echo ""
   fi
+  echo ""
 done
 
 # Reset terminal
