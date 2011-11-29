@@ -416,13 +416,13 @@ echo "* Partitions to backup: $BACKUP_PARTITIONS"
 if [ -n "$IGNORE_PARTITIONS" ]; then
   echo "* Partitions to ignore: $IGNORE_PARTITIONS"
 fi
-
 echo ""
 
 read -p "Please enter description: " DESCRIPTION
 if [ -n "$DESCRIPTION" ]; then
   echo "$DESCRIPTION" >"description.txt"
 fi
+echo ""
 
 # Scan all devices/HDDs
 HDD=""
@@ -435,6 +435,8 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
       unset IFS
       for PART in $BACKUP_PARTITIONS; do
         if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
+          echo "* Including /dev/$HDD for backup *"    
+          
           # Check if DMA is enabled for HDD
           check_dma /dev/$HDD
 
