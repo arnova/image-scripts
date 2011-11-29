@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.02a"
+MY_VERSION="3.02b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 28, 2011
+# Last update: November 29, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -527,13 +527,8 @@ fi
 if [ -n "$SUCCESS" ]; then
   echo "* Partitions backuped successfully: $SUCCESS"
      
-  if [ "$IMAGE_PROGRAM" = "pi" ]; then
-    echo "Verifying partimage images (CTRL-C to break):"
-    unset IFS
-    for PART in $SUCCESS; do
-      gzip -tv ${PART}.img.gz.*
-    done
-  fi
+  echo "Verifying gzip images (CTRL-C to break):"
+  gzip -tv *.gz
 fi
 
 # Exit (+unmount)
