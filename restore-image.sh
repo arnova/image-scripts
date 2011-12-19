@@ -209,11 +209,11 @@ show_help()
   echo "Usage: restore-image.sh [options] [image-name]"
   echo ""
   echo "Options:"
-  echo "-h, --help                  - Print this help"
-  echo "--partitions={dev1,dev2}    - Restore only these partitions (instead of all partitions)"
-  echo "--conf={config_file}        - Specify alternate configuration file"
+  echo "--help|-h                   - Print this help"
+  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions)"
+  echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--clean                     - Even write MBR/partition table if not empty"
-  echo "--targetdev={dev}           - Restore image to target device {dev} (instead of default)"
+  echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
 }
 
 
@@ -242,7 +242,7 @@ for arg in $*; do
   else
     case "$ARGNAME" in
       --clean|-c) CLEAN=1;;
-      --targetdev) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
+      --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
       --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --help|-h) show_help; exit 3;;
