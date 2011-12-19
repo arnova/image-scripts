@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.03"
+MY_VERSION="3.03a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: December 19, 2011
