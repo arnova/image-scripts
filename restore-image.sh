@@ -256,8 +256,8 @@ if [ -e "$CONF" ]; then
   # Source the configuration
   . "$CONF"
 else
-  echo "ERROR: Missing configuration file ($CONF)!"
-  echo "Program aborted"
+  echo "ERROR: Missing configuration file ($CONF)!" >&2
+  echo "Program aborted" >&2
   exit 1
 fi
 
@@ -268,7 +268,7 @@ sanity_check;
 if [ -n "$USER_TARGET_NODEV" ]; then
   if ! get_partitions |grep -q -x "$USER_TARGET_NODEV"; then
     echo ""
-    printf "\033[40m\033[1;31mERROR: Specified target device $USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m"
+    printf "\033[40m\033[1;31mERROR: Specified target device $USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
     echo ""
     exit 5
   fi
@@ -290,7 +290,7 @@ trap 'ctrlc_handler' 2
 # Create mount point
 if ! mkdir -p "$MOUNT_POINT"; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $MOUNT_POINT! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $MOUNT_POINT! Quitting...\n\033[0m" >&2
   echo ""
   exit 7
 fi
@@ -316,7 +316,7 @@ echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with arguments \"$MOUNT_ARGS\""
 IFS=' '
 if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m" >&2
   echo ""
   exit 6
 fi
@@ -340,7 +340,7 @@ fi
 IMAGE_DIR="$MOUNT_POINT/$IMAGE_NAME"
 
 if [ ! -d "$IMAGE_DIR" ]; then
-  printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\n\033[0m"
+  printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\n\033[0m" >&2
   do_exit 7
 fi
 
@@ -349,7 +349,7 @@ echo "* Using image directory: $IMAGE_DIR"
 # Make the image dir our working directory
 if ! cd "$IMAGE_DIR"; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m" >&2
   echo ""
   do_exit 5
 fi
@@ -360,6 +360,7 @@ if [ -e "description.txt" ]; then
   echo "--------------------------------------------------------------------------------"
   echo "Press any key to continue"
   read -n 1
+  echo ""
 fi
 
 IMAGE_FILES=""
@@ -369,7 +370,7 @@ if [ -n "$PARTITIONS_NODEV" ]; then
     IFS=$EOL
     ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.dd.gz" -o -iname "$PART.pc.gz")"
     if [ -z "$ITEM" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m"
+      printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m" >&2
       do_exit 5
     fi
     
@@ -384,7 +385,7 @@ else
 fi
 
 if [ -z "$IMAGE_FILES" ]; then
-  printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m" >&2
   do_exit 5
 fi
 
@@ -407,7 +408,7 @@ for FN in partitions.*; do
   # Check if target device exists
   if ! get_partitions |grep -q -x "$TARGET_NODEV"; then
     echo ""
-    printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist! Quitting...\n\033[0m"
+    printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
     echo ""
     do_exit 5
   fi
@@ -439,13 +440,13 @@ for FN in partitions.*; do
     echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
     # NOTE: Without partition table use bs=446 (mbr loader only)
     if ! dd if=$DD_SOURCE of=/dev/$TARGET_NODEV bs=32768 count=1; then
-      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore from $DD_SOURCE failed. Quitting...\n\033[0m"
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore from $DD_SOURCE failed. Quitting...\n\033[0m" >&2
       do_exit 5
     fi
 
     # Re-read partition table
     if ! partprobe /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
       read -n1
       echo ""
     fi
@@ -462,9 +463,9 @@ for FN in partitions.*; do
 
     # Re-read partition table
     if ! partprobe /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
       read -n1
-      echo ""      
+      echo ""
     fi
 
     # Create swap on swap partitions
@@ -477,8 +478,8 @@ for FN in partitions.*; do
       fi
     done
   else
-    printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m"
-    echo "To override this you must specify --clean. Press any key to continue or CTRL-C to abort..."
+    printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
+    echo "To override this you must specify --clean. Press any key to continue or CTRL-C to abort..." >&2
     read -n1
     echo ""
   fi
@@ -496,13 +497,13 @@ for IMAGE_FILE in $IMAGE_FILES; do
     NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
     SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${USER_TARGET_NODEV}p?${NUM}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m"
+      printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
       do_exit 5
     fi
   else
     SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\033[0m"
+      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\033[0m" >&2
       do_exit 5
     fi
   fi
@@ -510,7 +511,7 @@ for IMAGE_FILE in $IMAGE_FILES; do
   ## Match partition with what we have stored in our partitions file
   SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
   if [ -z "$SFDISK_SOURCE_PART" ]; then
-    printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m"
+    printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m" >&2
     do_exit 5
   fi
 
@@ -518,7 +519,7 @@ for IMAGE_FILE in $IMAGE_FILES; do
   echo "*Target partition: $SFDISK_TARGET_PART"
 
   if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]*/","",)$"; then
-    printf "\033[40m\033[1;31m\nWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m"
+    printf "\033[40m\033[1;31m\nWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m" >&2
     read -n1
   fi
   echo ""
@@ -557,7 +558,7 @@ for IMAGE_FILE in $IMAGE_FILES; do
   echo ""
   if [ $retval -ne 0 ]; then
     FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
-    printf "\033[40m\033[1;31mWARNING: Error($reval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+    printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
     read -n1
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"

@@ -274,8 +274,8 @@ if [ -e "$CONF" ]; then
   # Source the configuration
   . "$CONF"
 else
-  echo "ERROR: Missing configuration file ($CONF)!"
-  echo "Program aborted"
+  echo "ERROR: Missing configuration file ($CONF)!" >&2
+  echo "Program aborted" >&2
   exit 1
 fi
 
@@ -291,7 +291,7 @@ fi
 sanity_check;
 
 if [ -z "$IMAGE_NAME" ]; then
-   printf "\033[40m\033[1;31mERROR: You must specify the image-name to be used!\n\033[0m"
+   printf "\033[40m\033[1;31mERROR: You must specify the image-name to be used!\n\033[0m" >&2
    show_help;
    exit 5
 fi
@@ -302,7 +302,7 @@ if [ -n "$USER_SOURCE_NODEV" ]; then
   for DEVICE in $USER_SOURCE_NODEV; do
     if ! get_partitions |grep -q -x "$DEVICE"; then
       echo ""
-      printf "\033[40m\033[1;31mERROR: Specified source device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m"
+      printf "\033[40m\033[1;31mERROR: Specified source device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
       echo ""
       exit 5
     else
@@ -335,7 +335,7 @@ trap 'ctrlc_handler' 2
 # Create mount point
 if ! mkdir -p "$MOUNT_POINT"; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $MOUNT_POINT! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $MOUNT_POINT! Quitting...\n\033[0m" >&2
   echo ""
   exit 7
 fi
@@ -361,7 +361,7 @@ echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with arguments \"$MOUNT_ARGS\""
 IFS=' '
 if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m" >&2
   echo ""
   exit 6
 fi
@@ -370,14 +370,14 @@ IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
 
 if ! mkdir -p "$IMAGE_DIR"; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($IMAGE_DIR)! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($IMAGE_DIR)! Quitting...\n\033[0m" >&2
   echo ""
   do_exit 7
 fi
 
 if [ ! -d "$IMAGE_DIR" ]; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist! Quitting...\n\033[0m" >&2
   echo ""
   do_exit 5
 fi
@@ -386,7 +386,7 @@ echo "* Using image directory: $IMAGE_DIR"
 
 if ! cd "$IMAGE_DIR"; then
   echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m"
+  printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m" >&2
   echo ""
   do_exit 5
 fi
@@ -446,12 +446,12 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
 
           # Dump hdd info for all disks in the current system
           if ! dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 >/dev/null 2>&1; then
-            printf "\033[40m\033[1;31mERROR: Track0(MBR) backup failed!\n\033[0m"
+            printf "\033[40m\033[1;31mERROR: Track0(MBR) backup failed!\n\033[0m" >&2
             do_exit 8
           fi
 
           if ! sfdisk -d /dev/$HDD > "partitions.$HDD"; then
-            printf "\033[40m\033[1;31mERROR: Partition table backup failed!\n\033[0m"
+            printf "\033[40m\033[1;31mERROR: Partition table backup failed!\n\033[0m" >&2
             do_exit 9
           fi
 
@@ -499,7 +499,7 @@ for PART in $BACKUP_PARTITIONS; do
   echo ""
   if [ $retval -ne 0 ]; then
     FAILED="${FAILED}${FAILED:+ }$PART"
-    printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m"
+    printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
     read -n1
   else
     SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
