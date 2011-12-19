@@ -535,7 +535,7 @@ if [ -n "$SUCCESS" ]; then
 fi
 
 # Check integrity of gzip-files:
-if [ -n "$(find . -maxdepth 1 -type f -iname "*.gz" >/dev/null 2>&1)" ]; then
+if [ -n "$(find . -maxdepth 1 -type f -iname "*.gz" 2>/dev/null)" ]; then
   echo "Verifying gzip images (CTRL-C to break):"
   gzip -tv *.gz
 fi
