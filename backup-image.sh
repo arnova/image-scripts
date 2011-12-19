@@ -445,7 +445,7 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
           check_dma /dev/$HDD
 
           # Dump hdd info for all disks in the current system
-          if ! dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 >/dev/null; then
+          if ! dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 >/dev/null 2>&1; then
             printf "\033[40m\033[1;31mERROR: Track0(MBR) backup failed!\n\033[0m"
             do_exit 8
           fi
@@ -465,6 +465,8 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
     fi
   fi
 done
+
+echo ""
 
 # Backup all specified partitions:
 unset IFS
