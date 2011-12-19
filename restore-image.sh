@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.02a"
+MY_VERSION="3.03"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 28, 2011
+# Last update: December 19, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -204,6 +204,19 @@ get_partitions()
 }
 
 
+show_help()
+{
+  echo "Usage: restore-image.sh [options] [image-name]"
+  echo ""
+  echo "Options:"
+  echo "-h, --help                  - Print this help"
+  echo "--partitions={dev1,dev2}    - Restore only these partitions (instead of all partitions)"
+  echo "--conf={config_file}        - Specify alternate configuration file"
+  echo "--clean                     - Even write MBR/partition table if not empty"
+  echo "--targetdev={dev}           - Restore image to target device {dev} (instead of default)"
+}
+
+
 #######################
 # Program entry point #
 #######################
@@ -232,18 +245,8 @@ for arg in $*; do
       --targetdev) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
       --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
-      --name|-n) IMAGE_NAME="$ARGVAL";;
-      --help|-h)
-      echo "Options:"
-      echo "--help                      - Print this help"
-      echo "--clean                     - Even write MBR/partition table if not empty"
-      echo "--partitions={dev1,dev2}    - Restore only these partitions (instead of all partitions)"
-      echo "--targetdev={dev}           - Restore image to target device {dev} (instead of default)"
-      echo "--conf={config_file}        - Specify alternate configuration file"
-      echo "--name={image_name}         - Use image('s) from directory named like this"
-      exit 3 # quit
-      ;;
-      *) echo "Bad argument: $ARGNAME"; exit 4;;
+      --help|-h) show_help; exit 3;;
+      *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
     esac
   fi
 done

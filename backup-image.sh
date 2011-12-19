@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.02b"
+MY_VERSION="3.03"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 29, 2011
+# Last update: December 19, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -218,6 +218,21 @@ get_partitions()
 }
 
 
+show_help()
+{
+  echo "Usage: backup-image.sh [options] [image-name]"
+  echo ""
+  echo "Options:"
+  echo "-h, --help                  - Print this help"
+  echo "--partitions={dev1,dev2}    - Backup only these partitions (instead of all partitions)"
+  echo "--conf={config_file}        - Specify alternate configuration file"
+  echo "--fsa                       - Use fsarchiver for imaging"
+  echo "--pi                        - Use partimage for imaging"
+  echo "--pc                        - Use partclone for imaging"
+  echo "--ddgz                      - Use dd + gzip for imaging"
+}
+
+
 #######################
 # Program entry point #
 #######################
@@ -242,26 +257,14 @@ for arg in $*; do
     IMAGE_NAME="$ARGVAL"
   else
     case "$ARGNAME" in
-      --partitions|--partition|--part|-p) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e sed 's|,| |g' -e 's|^/dev/||g'`;;
+      --partitions|--partition|--part|-p) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
-      --name|-n) IMAGE_NAME="$ARGVAL";;
       --fsa) IMAGE_PROGRAM="fsa";;
       --ddgz) IMAGE_PROGRAM="ddgz";;
       --pi) IMAGE_PROGRAM="pi";;
       --pc) IMAGE_PROGRAM="pc";;
-      --help)
-      echo "Options:"
-      echo "-h, --help                  - Print this help"
-      echo "--partitions={dev1,dev2}    - Backup only these partitions (instead of all partitions)"
-      echo "--conf={config_file}        - Specify alternate configuration file"
-      echo "--name={image_name}         - Create a directory named like this and put the image(s) in there"
-      echo "--fsa                       - Use fsarchiver for imaging"
-      echo "--pi                        - Use partimage for imaging"
-      echo "--pc                        - Use partclone for imaging"
-      echo "--ddgz                      - Use dd + gzip for imaging"
-      exit 3 # quit
-      ;;
-      *) echo "Bad argument: $ARGNAME"; exit 4;;
+      --help) show_help; exit 3;;
+      *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
     esac
   fi
 done
@@ -280,7 +283,7 @@ if [ -z "$IMAGE_PROGRAM" ]; then
   if [ -n "$DEFAULT_IMAGE_PROGRAM" ]; then
     IMAGE_PROGRAM="$DEFAULT_IMAGE_PROGRAM"
   else
-    IMAGE_PROGRAM="pi"
+    IMAGE_PROGRAM="pc"
   fi  
 fi
 
@@ -288,7 +291,8 @@ fi
 sanity_check;
 
 if [ -z "$IMAGE_NAME" ]; then
-   printf "\033[40m\033[1;31mERROR: You must specify the image name using --name= ! Quitting...\n\033[0m"
+   printf "\033[40m\033[1;31mERROR: You must specify the image-name to be used!\n\033[0m"
+   show_help;
    exit 5
 fi
 
