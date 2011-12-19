@@ -515,7 +515,7 @@ done
 find . -maxdepth 1 -type f -exec chmod 664 {} \;
 
 # Show current image directory
-echo "Target directory contents($IMAGE_DIR):"
+echo "* Target directory contents($IMAGE_DIR):"
 ls -l
 echo ""
 
@@ -536,6 +536,7 @@ fi
 
 # Check integrity of gzip-files:
 if [ -n "$(find . -maxdepth 1 -type f -iname "*.gz" 2>/dev/null)" ]; then
+  echo ""
   echo "Verifying gzip images (CTRL-C to break):"
   gzip -tv *.gz
 fi
