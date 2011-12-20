@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.03a"
+MY_VERSION="3.03b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: December 19, 2011
+# Last update: December 20, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -372,10 +372,21 @@ while [ -z "$IMAGE_NAME" ]; do
   
   if [ -z "$IMAGE_NAME" ]; then
     printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
+    continue;
+  fi
+  
+  IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
+  if [ -d "$IMAGE_DIR" ]; then
+    echo ""
+    printf "Image target directory $IMAGE_DIR already exists! Continue (Y/N)? "
+    read answer
+    echo ""
+    if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+      continue;
+    fi
   fi
 fi
 
-IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
 
 if ! mkdir -p "$IMAGE_DIR"; then
   echo ""
@@ -388,15 +399,14 @@ if [ ! -d "$IMAGE_DIR" ]; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist! Quitting...\n\033[0m" >&2
   echo ""
-  do_exit 5
+  do_exit 7
 fi
-
 
 if ! cd "$IMAGE_DIR"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m" >&2
   echo ""
-  do_exit 5
+  do_exit 7
 fi
 
 echo "* Using image directory: $IMAGE_DIR"
