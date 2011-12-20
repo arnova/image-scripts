@@ -382,6 +382,7 @@ while [ -z "$IMAGE_NAME" ]; do
     read answer
     echo ""
     if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+      IMAGE_NAME=""
       continue;
     fi
   fi
