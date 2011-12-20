@@ -321,37 +321,54 @@ if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   exit 6
 fi
 
-if [ -z "$IMAGE_NAME" ]; then
-  echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
-  IFS=$EOL
-  find "$MOUNT_POINT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
-    echo "$(basename "$ITEM")"
-  done
-  
-  printf "\nImage to use ($DEFAULT_DIR): "
-  read IMAGE_NAME
-  if [ -z "$IMAGE_NAME" ]; then
-    IMAGE_NAME="$DEFAULT_DIR"
+# The IMAGE_NAME was set from the commandline:
+if [ -n "$IMAGE_NAME" ]; then
+  IMAGE_DIR="$MOUNT_POINT/$IMAGE_NAME"
+  if [ ! -d "$IMAGE_DIR" ]; then
+    printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\n\033[0m" >&2
+    do_exit 7
+  fi
+else
+  # Ask user for IMAGE_NAME:
+  while [ -z "$IMAGE_NAME" ]; do
+    echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
+    IFS=$EOL
+    find "$MOUNT_POINT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+      echo "$(basename "$ITEM")"
+    done
+    
+    printf "\nImage to use ($DEFAULT_DIR): "
+    read IMAGE_NAME
+    
+    if [ -z "$IMAGE_NAME" ]; then
+      IMAGE_NAME="$DEFAULT_DIR"
+    fi
+    
+    if [ -z "$IMAGE_NAME" ]; then
+      printf "\033[40m\033[1;31m\nERROR: No image directory specified!\n\n\033[0m" >&2
+      continue;
+    fi
+
+    # Set the directory where the image(s) are
+    IMAGE_DIR="$MOUNT_POINT/$IMAGE_NAME"
+
+    if [ ! -d "$IMAGE_DIR" ]; then
+      printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
+      IMAGE_NAME=""
+      continue;
+    fi
   fi
 fi
-
-# Set the directory where the image(s) are
-IMAGE_DIR="$MOUNT_POINT/$IMAGE_NAME"
-
-if [ ! -d "$IMAGE_DIR" ]; then
-  printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\n\033[0m" >&2
-  do_exit 7
-fi
-
-echo "* Using image directory: $IMAGE_DIR"
 
 # Make the image dir our working directory
 if ! cd "$IMAGE_DIR"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m" >&2
   echo ""
-  do_exit 5
+  do_exit 7
 fi
+
+echo "* Using image directory: $IMAGE_DIR"
 
 if [ -e "description.txt" ]; then
   echo "--------------------------------------------------------------------------------"
