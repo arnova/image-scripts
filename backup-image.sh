@@ -184,7 +184,7 @@ check_binary()
 sanity_check()
 {
   # root check
-  if [ $UID -ne 0 ]; then
+  if [ "$(id -u)" != "0" ]; then 
     printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
     exit 1
   fi
