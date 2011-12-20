@@ -360,34 +360,20 @@ if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   exit 6
 fi
 
-while [ -z "$IMAGE_NAME" ]; do
-  printf "\nImage target directory to use: "
-  read IMAGE_NAME
-  
-  if [ -z "$IMAGE_NAME" ]; then
-    printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
-    continue;
-  fi
-  
-  IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
-  if [ -d "$IMAGE_DIR" ]; then
-    echo ""
-    echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
-    IFS=$EOL
-    find "$MOUNT_POINT/$TARGET_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
-      echo "$(basename "$ITEM")"
-    done
-
-    printf "Image target directory $IMAGE_DIR already exists! Continue (Y/N)? "
-    read answer
-    echo ""
-    if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
-      IMAGE_NAME=""
-      continue;
-    fi
-  fi
+if [ -z "$IMAGE_NAME" ]; then
+  while true; do
+    printf "\nImage target directory to use: "
+    read IMAGE_NAME
+    
+    if [ -z "$IMAGE_NAME" ]; then
+      printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
+    else
+      break;
+    fi    
+  done
 fi
 
+IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
 
 if ! mkdir -p "$IMAGE_DIR"; then
   echo ""
@@ -415,7 +401,7 @@ echo "* Using image directory: $IMAGE_DIR"
 # Make sure target directory is empty
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   find . -maxdepth 1 -type f -exec ls -l {} \;
-  printf "Current directory is NOT empty. PURGE directory before continuing (Y/N)? "
+  printf "Current directory is NOT empty. PURGE directory before continueing (Y/N) (CTRL-C to abort)? "
   read answer
   echo ""
 
