@@ -361,12 +361,6 @@ if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
 fi
 
 while [ -z "$IMAGE_NAME" ]; do
-  echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
-  IFS=$EOL
-  find "$MOUNT_POINT/$TARGET_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
-    echo "$(basename "$ITEM")"
-  done
-  
   printf "\nImage target directory to use: "
   read IMAGE_NAME
   
@@ -378,6 +372,12 @@ while [ -z "$IMAGE_NAME" ]; do
   IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
   if [ -d "$IMAGE_DIR" ]; then
     echo ""
+    echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
+    IFS=$EOL
+    find "$MOUNT_POINT/$TARGET_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+      echo "$(basename "$ITEM")"
+    done
+
     printf "Image target directory $IMAGE_DIR already exists! Continue (Y/N)? "
     read answer
     echo ""
