@@ -321,7 +321,6 @@ if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   exit 6
 fi
 
-# Use default or argument specified image name
 if [ -z "$IMAGE_NAME" ]; then
   echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
   IFS=$EOL

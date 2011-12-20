@@ -290,12 +290,6 @@ fi
 # Sanity check environment
 sanity_check;
 
-if [ -z "$IMAGE_NAME" ]; then
-   printf "\033[40m\033[1;31mERROR: You must specify the image-name to be used!\n\033[0m" >&2
-   show_help;
-   exit 5
-fi
-
 # Check if target device exists
 if [ -n "$USER_SOURCE_NODEV" ]; then
   unset IFS
@@ -366,6 +360,21 @@ if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
   exit 6
 fi
 
+while [ -z "$IMAGE_NAME" ]; do
+  echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
+  IFS=$EOL
+  find "$MOUNT_POINT/$TARGET_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+    echo "$(basename "$ITEM")"
+  done
+  
+  printf "\nImage target directory to use: "
+  read IMAGE_NAME
+  
+  if [ -z "$IMAGE_NAME" ]; then
+    printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
+  fi
+fi
+
 IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
 
 if ! mkdir -p "$IMAGE_DIR"; then
@@ -382,7 +391,6 @@ if [ ! -d "$IMAGE_DIR" ]; then
   do_exit 5
 fi
 
-echo "* Using image directory: $IMAGE_DIR"
 
 if ! cd "$IMAGE_DIR"; then
   echo ""
@@ -390,6 +398,8 @@ if ! cd "$IMAGE_DIR"; then
   echo ""
   do_exit 5
 fi
+
+echo "* Using image directory: $IMAGE_DIR"
 
 # Make sure target directory is empty
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then
