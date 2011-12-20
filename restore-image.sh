@@ -330,7 +330,7 @@ if [ -n "$IMAGE_NAME" ]; then
   fi
 else
   # Ask user for IMAGE_NAME:
-  while [ -z "$IMAGE_NAME" ]; do
+  while true; do
     echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
     IFS=$EOL
     find "$MOUNT_POINT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
@@ -354,8 +354,8 @@ else
 
     if [ ! -d "$IMAGE_DIR" ]; then
       printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
-      IMAGE_NAME=""
-      continue;
+    else
+      break;
     fi
   fi
 fi
