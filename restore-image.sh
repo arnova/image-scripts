@@ -329,14 +329,14 @@ if [ -n "$IMAGE_NAME" ]; then
     do_exit 7
   fi
 else
+  echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
+  IFS=$EOL
+  find "$MOUNT_POINT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+    echo "$(basename "$ITEM")"
+  done
+
   # Ask user for IMAGE_NAME:
   while true; do
-    echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
-    IFS=$EOL
-    find "$MOUNT_POINT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
-      echo "$(basename "$ITEM")"
-    done
-    
     printf "\nImage to use ($DEFAULT_DIR): "
     read IMAGE_NAME
     
@@ -357,7 +357,7 @@ else
     else
       break;
     fi
-  fi
+  done
 fi
 
 # Make the image dir our working directory
