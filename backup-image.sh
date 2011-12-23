@@ -3,7 +3,7 @@
 MY_VERSION="3.03b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: December 20, 2011
+# Last update: December 23, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -362,12 +362,13 @@ fi
 
 if [ -z "$IMAGE_NAME" ]; then
   while true; do
-    printf "\nImage target directory to use: "
+    printf "\nImage name (directory) to use: "
     read IMAGE_NAME
     
     if [ -z "$IMAGE_NAME" ]; then
       printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
     else
+      echo ""
       break;
     fi    
   done
@@ -378,21 +379,18 @@ IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
 if ! mkdir -p "$IMAGE_DIR"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($IMAGE_DIR)! Quitting...\n\033[0m" >&2
-  echo ""
   do_exit 7
 fi
 
 if [ ! -d "$IMAGE_DIR" ]; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist! Quitting...\n\033[0m" >&2
-  echo ""
   do_exit 7
 fi
 
 if ! cd "$IMAGE_DIR"; then
   echo ""
   printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m" >&2
-  echo ""
   do_exit 7
 fi
 

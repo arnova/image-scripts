@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.03a"
+MY_VERSION="3.03b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: December 19, 2011
+# Last update: December 23, 2011
 # (C) Copyright 2004-2011 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -325,7 +325,7 @@ fi
 if [ -n "$IMAGE_NAME" ]; then
   IMAGE_DIR="$MOUNT_POINT/$IMAGE_NAME"
   if [ ! -d "$IMAGE_DIR" ]; then
-    printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\033[0m" >&2
     do_exit 7
   fi
 else
