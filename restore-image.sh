@@ -1,4 +1,4 @@
-#!/bin/bash
+# !/bin/bash
 
 MY_VERSION="3.03c"
 # ----------------------------------------------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ configure_network()
   IFS=$EOL
   for LINE in $(ifconfig -a 2>/dev/null); do
     if echo "$LINE" |grep -q -i 'Link encap'; then
-      CUR_IF="$(echo "$LINE" |grep -i 'link encap:ethernet' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' |cut -f1 -d' ')"
+      CUR_IF="$(echo "$LINE" |grep -i 'link encap:ethernet' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan' |cut -f1 -d' ')"
       MAC_ADDR="$(echo "$LINE" |awk '{ print $NF }')"
     elif echo "$LINE" |grep -q -i 'inet addr:.*Bcast.*Mask.*'; then
       IP_SET="$(echo "$LINE" |sed 's/^ *//g')"
