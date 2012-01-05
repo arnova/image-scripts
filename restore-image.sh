@@ -469,8 +469,11 @@ for FN in partitions.*; do
 
     echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
     # NOTE: Without partition table use bs=446 (mbr loader only)
-    if ! dd if=$DD_SOURCE of=/dev/$TARGET_NODEV bs=32768 count=1; then
-      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore from $DD_SOURCE failed. Quitting...\n\033[0m" >&2
+    result=`dd if=$DD_SOURCE of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
+    retval=$?
+    if [ $retval -ne 0 ]; then
+      echo "$result" >&2
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore from $DD_SOURCE failed($retval). Quitting...\n\033[0m" >&2
       do_exit 5
     fi
 
@@ -480,7 +483,7 @@ for FN in partitions.*; do
       retval=$?
         
       if [ $retval -ne 0 ]; then
-        printf "\033[40m\033[1;31mPartition table restore failed. Quitting...\n\033[0m"
+        printf "\033[40m\033[1;31mPartition table restore failed($retval). Quitting...\n\033[0m"
         do_exit 5
       fi
     fi
