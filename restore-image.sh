@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.03b"
+MY_VERSION="3.03c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: December 23, 2011
-# (C) Copyright 2004-2011 by Arno van Amersfoort
+# Last update: January 4, 2012
+# (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -460,15 +460,9 @@ for FN in partitions.*; do
       do_exit 5
     fi
 
-    # Re-read partition table
-    if ! partprobe /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
-      read -n1
-      echo ""
-    fi
-
     if [ -f "partitions.$HDD_NAME" ]; then
-      sfdisk --no-reread --force /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
+      echo "* Updating partition table on /dev/$TARGET_NODEV"
+      sfdisk --force --no-reread --quiet /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
       retval=$?
         
       if [ $retval -ne 0 ]; then
@@ -489,7 +483,7 @@ for FN in partitions.*; do
     sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
       PART="$(echo "$LINE" |awk '{ print $1 }')"
       if ! mkswap $PART; then
-        printf "\033[40m\033[1;31mMkswap failed for $PART. Quitting...\n\033[0m"
+        printf "\033[40m\033[1;31mmkswap failed for $PART. Quitting...\n\033[0m"
         do_exit 5
       fi
     done
@@ -501,7 +495,8 @@ for FN in partitions.*; do
   fi
 done
 
-
+echo ""
+  
 # Test whether the target partition(s) exist and have the correct geometry:
 IFS=$EOL
 for IMAGE_FILE in $IMAGE_FILES; do
@@ -571,7 +566,6 @@ for IMAGE_FILE in $IMAGE_FILES; do
     retval=$?
   fi
 
-  echo ""
   if [ $retval -ne 0 ]; then
     FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
     printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
