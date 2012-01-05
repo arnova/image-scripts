@@ -24,6 +24,7 @@ MY_VERSION="3.03c"
 # ----------------------------------------------------------------------------------------------------------------------
 
 DEFAULT_CONF="$(dirname $0)/rimage.cnf"
+PARTPROBE="/usr/sbin/partprobe"
 EOL='
 '
 
@@ -228,6 +229,39 @@ show_help()
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--clean                     - Even write MBR/partition table if not empty"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
+}
+
+
+# Wrapper for partprobe (call when performing a partition table update with eg. fdisk/sfdisk).
+# $1 = Device to re-read
+partprobe()
+{
+  printf "(Re)reading partition table on $device..."
+  
+  local device=$1
+  local retval=0
+  local result=""
+  
+  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
+  for x in `seq 1 10`; do
+    result=`$PARTPROBE "$device" 2>&1`
+    retval=$?
+    
+    if [ $retval -eq 0 ]; then
+      break;
+    fi
+    
+    # Wait a bit before retry
+    sleep 1
+    printf "."
+  done
+  
+  echo ""
+  
+  if [ -n "$result" ]; then
+    echo "$result"
+  fi
+  return $retval
 }
 
 
@@ -458,7 +492,7 @@ for FN in partitions.*; do
       swapoff /dev/$PART >/dev/null
     fi
   done
-
+  
   # Only restore track0 (MBR) / partition table if they don't exist already on device
   if ! get_partitions |grep -E -q -x "${TARGET_NODEV}p?[0-9]+" || [ "$CLEAN" = "1" ]; then
     if [ -f "track0.$HDD_NAME" ]; then
@@ -487,7 +521,7 @@ for FN in partitions.*; do
         do_exit 5
       fi
     fi
-
+    
     # Re-read partition table
     if ! partprobe /dev/$TARGET_NODEV; then
       printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
