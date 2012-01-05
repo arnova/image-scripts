@@ -142,6 +142,20 @@ configure_network()
 }
 
 
+# Wrapper for partclone to autodetect filesystem and select the proper partclone.*
+partclone_detect()
+{
+  local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
+  case $TYPE in
+    # TODO: On Linux we only support ext2/3/4 for now. For eg. btrfs we may need to probe using "fsck -N" or "file -s -b"
+    7|17)                           echo "partclone.ntfs";;
+    1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
+    fd|83)                          echo "partclone.extfs";;
+    *)                              echo "partclone.dd";;
+  esac
+}
+
+
 # Check if DMA is enabled for HDD
 check_dma()
 {
@@ -545,34 +559,35 @@ for IMAGE_FILE in $IMAGE_FILES; do
   # We want another target device than specified in the image name?:
   if [ -n "$USER_TARGET_NODEV" ]; then
     NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-    TARGET_PARTITION="$(get_partitions |grep -E -x -e "${USER_TARGET_NODEV}p?${NUM}")"
+    TARGET_PART_NODEV="$(get_partitions |grep -E -x -e "${USER_TARGET_NODEV}p?${NUM}")"
   else
-    TARGET_PARTITION="$PARTITION"
+    TARGET_PART_NODEV="$PARTITION"
   fi
 
-  echo "* Selected partition: /dev/$TARGET_PARTITION. Using image file: $IMAGE_FILE"
+  echo "* Selected partition: /dev/$TARGET_PART_NODEV. Using image file: $IMAGE_FILE"
   retval=0
   if echo "$IMAGE_FILE" |grep -q "\.fsa$"; then
-    fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PARTITION"
+    fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PART_NODEV"
     retval=$?
   elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
-    partimage -b restore "/dev/$TARGET_PARTITION" "$IMAGE_FILE"
+    partimage -b restore "/dev/$TARGET_PART_NODEV" "$IMAGE_FILE"
     retval=$?
   elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
-    zcat "$IMAGE_FILE" |partclone.restore -s - -o "/dev/$TARGET_PARTITION"
+    PARTCLONE=`partclone_detect "/dev/$TARGET_PART_NODEV"`
+    zcat "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
     retval=$?
   else
-    gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PARTITION" bs=64K
+    gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=64K
     retval=$?
   fi
 
   if [ $retval -ne 0 ]; then
-    FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
-    printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PARTITION.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
+    FAILED="${FAILED}${FAILED:+ }${TARGET_PART_NODEV}"
+    printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PART_NODEV.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
     read -n1
   else
-    SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
-    echo "****** $IMAGE_FILE restored to /dev/$TARGET_PARTITION ******"
+    SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PART_NODEV}"
+    echo "****** $IMAGE_FILE restored to /dev/$TARGET_PART_NODEV ******"
   fi
   echo ""
 done
