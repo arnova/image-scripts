@@ -235,15 +235,15 @@ show_help()
 # $1 = Device to re-read
 partprobe()
 {
-  printf "(Re)reading partition table on $device..."
-  
-  local device=$1
+  local DEVICE="$1"
   local retval=0
   local result=""
+
+  printf "(Re)reading partition table on $DEVICE..."
   
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   for x in `seq 1 10`; do
-    result=`$(which partprobe) "$device" 2>&1`
+    result=`$(which partprobe) "$DEVICE" 2>&1`
     retval=$?
     
     if [ $retval -eq 0 ]; then
@@ -522,8 +522,10 @@ for FN in partitions.*; do
     fi
     
     # Re-read partition table
-    if ! partprobe /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
+    partprobe "/dev/$TARGET_NODEV"
+    retval=$?
+    if [ $retval -ne 0 ]; then
+      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed($retval)!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
       read -n1
       echo ""
     fi
