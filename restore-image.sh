@@ -512,7 +512,7 @@ for FN in partitions.*; do
 
     if [ -f "partitions.$HDD_NAME" ]; then
       echo "* Updating partition table on /dev/$TARGET_NODEV"
-      sfdisk --force --no-reread --quiet /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
+      sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
       retval=$?
         
       if [ $retval -ne 0 ]; then
