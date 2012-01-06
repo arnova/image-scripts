@@ -450,13 +450,16 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
           check_dma /dev/$HDD
 
           # Dump hdd info for all disks in the current system
-          if ! dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 >/dev/null 2>&1; then
-            printf "\033[40m\033[1;31mERROR: Track0(MBR) backup failed!\n\033[0m" >&2
+          result=`dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 2>&1`
+          retval=$?
+          if [ $retval -ne 0 ]; then
+            echo "$result" >&2
+            printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD failed($retval)! Quitting...\n\033[0m" >&2
             do_exit 8
           fi
 
           if ! sfdisk -d /dev/$HDD > "partitions.$HDD"; then
-            printf "\033[40m\033[1;31mERROR: Partition table backup failed!\n\033[0m" >&2
+            printf "\033[40m\033[1;31mERROR: Partition table backup failed! Quitting...\n\033[0m" >&2
             do_exit 9
           fi
 

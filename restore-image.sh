@@ -506,7 +506,7 @@ for FN in partitions.*; do
     retval=$?
     if [ $retval -ne 0 ]; then
       echo "$result" >&2
-      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore from $DD_SOURCE failed($retval). Quitting...\n\033[0m" >&2
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
       do_exit 5
     fi
 
@@ -516,7 +516,7 @@ for FN in partitions.*; do
       retval=$?
         
       if [ $retval -ne 0 ]; then
-        printf "\033[40m\033[1;31mPartition table restore failed($retval). Quitting...\n\033[0m"
+        printf "\033[40m\033[1;31mPartition table restore failed($retval). Quitting...\n\033[0m" >&2
         do_exit 5
       fi
     fi
