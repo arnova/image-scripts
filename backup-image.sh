@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.03c"
+MY_VERSION="3.03d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: January 4, 2012
@@ -444,7 +444,7 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
       unset IFS
       for PART in $BACKUP_PARTITIONS; do
         if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
-          echo "* Including /dev/$HDD for backup *"    
+          echo "* Including /dev/$HDD for backup"
           
           # Check if DMA is enabled for HDD
           check_dma /dev/$HDD

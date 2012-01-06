@@ -19,10 +19,11 @@ else
     # Create NTFS partition:
     printf "n\np\n${USER_PART_ID}\n\n\nt\n${USER_PART_ID}\n7\nw\n" |fdisk /dev/$TARGET_NODEV >/dev/null
 
-    # HACK: Wait a bit since newer fdisk/kernels don't seem to immediately rewrite the partition table
-    #       causing mkntfs (below) to fail
-    echo "* Syncing disk..."
-    sleep 10
+    if ! partprobe /dev/$TARGET_NODEV; then
+      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
+      read -n1
+      echo ""
+    fi
 
     echo "* Creating user NTFS filesystem on \"/dev/$USER_PART\""
     if mkntfs -L USER -Q "/dev/$USER_PART"; then

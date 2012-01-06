@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.03c"
+MY_VERSION="3.03d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: January 4, 2012
+# Last update: January 6, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -24,7 +24,6 @@ MY_VERSION="3.03c"
 # ----------------------------------------------------------------------------------------------------------------------
 
 DEFAULT_CONF="$(dirname $0)/rimage.cnf"
-PARTPROBE="/usr/sbin/partprobe"
 EOL='
 '
 
@@ -244,7 +243,7 @@ partprobe()
   
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   for x in `seq 1 10`; do
-    result=`$PARTPROBE "$device" 2>&1`
+    result=`$(which partprobe) "$device" 2>&1`
     retval=$?
     
     if [ $retval -eq 0 ]; then
@@ -259,7 +258,7 @@ partprobe()
   echo ""
   
   if [ -n "$result" ]; then
-    echo "$result"
+    echo "$result" >&2
   fi
   return $retval
 }
