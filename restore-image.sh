@@ -533,7 +533,7 @@ for FN in partitions.*; do
     sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
       PART="$(echo "$LINE" |awk '{ print $1 }')"
       if ! mkswap $PART; then
-        printf "\033[40m\033[1;31mmkswap failed for $PART\n\033[0m" >&2
+        printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi
     done
   else
