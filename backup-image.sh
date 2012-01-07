@@ -195,7 +195,6 @@ sanity_check()
   check_binary sed
   check_binary grep
   check_binary sfdisk
-  check_binary fdisk
   check_binary dd
   check_binary mount
   check_binary umount
@@ -463,8 +462,8 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
             do_exit 9
           fi
 
-          # Dump fdisk info to file
-          fdisk -l /dev/$HDD >"fdisk.$HDD"
+          # Dump sfdisk -l info to file
+          sfdisk -l /dev/$HDD >"fdisk.$HDD"
 
           # Mark HDD as done
           HDD=""

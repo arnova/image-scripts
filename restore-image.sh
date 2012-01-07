@@ -196,7 +196,6 @@ sanity_check()
   check_binary grep
   check_binary mkswap
   check_binary sfdisk
-  check_binary fdisk
   check_binary dd
   check_binary mount
   check_binary umount
@@ -643,7 +642,7 @@ for script in *.sh; do
 done
 
 # Show current partition status
-fdisk -l |grep "^/"
+sfdisk -l |grep "^/"
 
 if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
