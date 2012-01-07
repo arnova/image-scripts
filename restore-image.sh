@@ -194,7 +194,6 @@ sanity_check()
   check_binary ifconfig
   check_binary sed
   check_binary grep
-  check_binary partprobe
   check_binary mkswap
   check_binary sfdisk
   check_binary fdisk
@@ -236,17 +235,15 @@ show_help()
 partprobe()
 {
   local DEVICE="$1"
-  local retval=0
   local result=""
 
   printf "(Re)reading partition table on $DEVICE..."
   
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   for x in `seq 1 10`; do
-    result=`$(which partprobe) "$DEVICE" 2>&1`
-    retval=$?
+    result=`sfdisk -R "$DEVICE" 2>&1`
     
-    if [ $retval -eq 0 ]; then
+    if [ -z "$result" ]; then
       break;
     fi
     
@@ -259,8 +256,9 @@ partprobe()
   
   if [ -n "$result" ]; then
     echo "$result" >&2
+    return 1
   fi
-  return $retval
+  return 0
 }
 
 
