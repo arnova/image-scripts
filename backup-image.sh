@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.03e"
+MY_VERSION="3.03f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: January 7, 2012
+# Last update: January 9, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -195,6 +195,7 @@ sanity_check()
   check_binary sed
   check_binary grep
   check_binary sfdisk
+  check_binary fdisk
   check_binary dd
   check_binary mount
   check_binary umount
@@ -462,8 +463,8 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
             do_exit 9
           fi
 
-          # Dump sfdisk -l info to file
-          sfdisk -l /dev/$HDD >"fdisk.$HDD"
+          # Dump fdisk -l info to file
+          fdisk -l /dev/$HDD >"fdisk.$HDD"
 
           # Mark HDD as done
           HDD=""
