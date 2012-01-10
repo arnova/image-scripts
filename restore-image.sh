@@ -196,6 +196,7 @@ sanity_check()
   check_binary grep
   check_binary mkswap
   check_binary sfdisk
+  check_binary fdisk
   check_binary dd
   check_binary mount
   check_binary umount
@@ -251,12 +252,12 @@ partwait()
     sleep 1
     
     if [ $FAIL -eq 0 ]; then
-      echo ""
+      echo " Done."
       return 0
     fi
   done
 
-  echo ""
+  echo " FAIL!"
   printf "\033[40m\033[1;31mWaiting for the kernel to reread the partition timed out!\n\033[0m" >&2
   return 1
 }
@@ -284,12 +285,13 @@ partprobe()
     fi
   done
   
-  echo ""
-  
   if [ -n "$result" ]; then
+    echo " FAIL!"
     printf "\033[40m\033[1;31m${result}\n\033[0m" >&2
     return 1
   fi
+  
+  echo " Done."
   
   # Wait till the kernel reread the partition table
   if ! partwait "$DEVICE"; then
@@ -681,7 +683,7 @@ for script in *.sh; do
 done
 
 # Show current partition status
-sfdisk -l |grep "^/"
+fdisk -l |grep "^/"
 
 if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
