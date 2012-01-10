@@ -241,7 +241,7 @@ partwait()
     printf "."
     FAIL=0
     IFS=$EOL
-    for PART in `sfdisk -d "$DEVICE" |grep "^/dev/" |grep -i -v "id= 0" |awk '{ print $1 }'`
+    for PART in `sfdisk -d "$DEVICE" |grep "^/dev/" |grep -i -v "id= 0" |awk '{ print $1 }'`; do
       if [ ! -e "$PART" ]; then
         FAIL=1
         break;
