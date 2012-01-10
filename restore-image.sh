@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.03e"
+MY_VERSION="3.03f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: January 7, 2012
+# Last update: January 10, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
