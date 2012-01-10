@@ -1,6 +1,6 @@
 # !/bin/bash
 
-MY_VERSION="3.03f"
+MY_VERSION="3.04"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: January 10, 2012
