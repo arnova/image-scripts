@@ -15,7 +15,7 @@ if [ -z "$TARGET_NODEV" ]; then
 else
   USER_PART="${TARGET_NODEV}${USER_PART_ID}"
   if ! cat /proc/partitions |awk '{ print $NF }' |sed s,'^/dev/','', |grep -q "$USER_PART$" || [ "$CLEAN" = "1" ]; then
-    echo "* Creating user partition on \"/dev/$TARGET_NODEV\""
+    echo "* Creating user partition on /dev/$TARGET_NODEV"
     # Create NTFS partition:
     printf "n\np\n${USER_PART_ID}\n\n\nt\n${USER_PART_ID}\n7\nw\n" |fdisk /dev/$TARGET_NODEV >/dev/null
 
@@ -25,7 +25,7 @@ else
       echo ""
     fi
 
-    echo "* Creating user NTFS filesystem on \"/dev/$USER_PART\""
+    echo "* Creating user NTFS filesystem on /dev/$USER_PART"
     if mkntfs -L USER -Q "/dev/$USER_PART"; then
       mkdir -p /mnt/windows &&
       ntfs-3g "/dev/$USER_PART" /mnt/windows &&
@@ -39,7 +39,7 @@ else
       printf "\033[40m\033[1;31mERROR: Creating NTFS filesystem on /dev/$USER_PART failed!\033[0m\n" >&2
     fi
   else
-    echo "* Skipping creation of NTFS filesystem on \"/dev/$USER_PART\" since it already exists"
+    echo "* Skipping creation of NTFS filesystem on /dev/$USER_PART since it already exists"
   fi
 fi
 

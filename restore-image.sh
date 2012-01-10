@@ -682,8 +682,13 @@ for script in *.sh; do
   fi
 done
 
+echo ""
+
 # Show current partition status
-fdisk -l |grep "^/"
+for FN in partitions.*; do
+  HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
+  fdisk -l "/dev/$HDD_NAME" |grep "^/"
+done
 
 if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
