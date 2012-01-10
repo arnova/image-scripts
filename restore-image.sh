@@ -613,8 +613,8 @@ for IMAGE_FILE in $IMAGE_FILES; do
     do_exit 5
   fi
 
-  echo "*Source partition: $SFDISK_SOURCE_PART"
-  echo "*Target partition: $SFDISK_TARGET_PART"
+  echo "* Source partition: $SFDISK_SOURCE_PART"
+  echo "* Target partition: $SFDISK_TARGET_PART"
 
   if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]*/","",)$"; then
     printf "\033[40m\033[1;31m\nWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m" >&2
