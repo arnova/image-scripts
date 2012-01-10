@@ -20,8 +20,8 @@ else
     printf "n\np\n${USER_PART_ID}\n\n\nt\n${USER_PART_ID}\n7\nw\n" |fdisk /dev/$TARGET_NODEV >/dev/null
 
     if ! partprobe /dev/$TARGET_NODEV; then
-      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
-      read -n1
+      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress enter to continue or CTRL-C to abort...\n\033[0m" >&2
+      read
       echo ""
     fi
 

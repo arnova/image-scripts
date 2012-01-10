@@ -236,19 +236,19 @@ partprobe()
   local DEVICE="$1"
   local result=""
 
-  printf "(Re)reading partition table on $DEVICE..."
+  printf "(Re)reading partition table on $DEVICE"
   
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   for x in `seq 1 10`; do
+    printf "."  
     result=`sfdisk -R "$DEVICE" 2>&1`
+    
+    # Wait a bit for things to settle
+    sleep 1
     
     if [ -z "$result" ]; then
       break;
     fi
-    
-    # Wait a bit before retry
-    sleep 1
-    printf "."
   done
   
   echo ""
