@@ -229,6 +229,39 @@ show_help()
 }
 
 
+# Function which waits till the kernel ACTUALLY re-read the partition table
+partwait()
+{
+  local DEVICE="$1"
+  
+  printf "Waiting for kernel to reread the partition on $DEVICE"
+    
+  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
+  for x in `seq 1 10`; do
+    printf "."
+    FAIL=0
+    IFS=$EOL
+    for PART in `sfdisk -d "$DEVICE" |grep "^/dev/" |grep -i -v "id= 0" |awk '{ print $1 }'`
+      if [ ! -e "$PART" ]; then
+        FAIL=1
+        break;
+      fi
+    done
+    
+    sleep 1
+    
+    if [ $FAIL -eq 0 ]; then
+      echo ""
+      return 0
+    fi
+  done
+
+  echo ""
+  printf "\033[40m\033[1;31mWaiting for the kernel to reread the partition timed out!\n\033[0m" >&2
+  return 1
+}
+
+
 # Wrapper for partprobe (call when performing a partition table update with eg. fdisk/sfdisk).
 # $1 = Device to re-read
 partprobe()
@@ -254,9 +287,15 @@ partprobe()
   echo ""
   
   if [ -n "$result" ]; then
-    echo "$result" >&2
+    printf "\033[40m\033[1;31m${result}\n\033[0m" >&2
     return 1
   fi
+  
+  # Wait till the kernel reread the partition table
+  if ! partwait "$DEVICE"; then
+    return 2
+  fi
+  
   return 0
 }
 
