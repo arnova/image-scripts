@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.04"
+MY_VERSION="3.04a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: January 10, 2012
+# Last update: January 11, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -242,10 +242,18 @@ partwait()
     printf "."
     FAIL=0
     IFS=$EOL
-    for PART in `sfdisk -d "$DEVICE" |grep "^/dev/" |grep -i -v "id= 0" |awk '{ print $1 }'`; do
-      if [ ! -e "$PART" ]; then
-        FAIL=1
-        break;
+    for LINE in `sfdisk -d "$DEVICE" |grep "^/dev/"`; do
+      PART=`echo "$LINE" |awk '{ print $1 }'`
+      if echo "$LINE" |grep -i -q "id= 0"; then
+        if [ -e "$PART" ]; then
+          FAIL=1
+          break;
+        fi
+      else
+        if [ ! -e "$PART" ]; then
+          FAIL=1
+          break;
+        fi
       fi
     done
     
