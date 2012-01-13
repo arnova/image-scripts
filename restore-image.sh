@@ -380,85 +380,88 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if [ -n "$MOUNT_DEVICE" ]; then
-  # Create mount point
-  if ! mkdir -p "$IMAGE_ROOT"; then
-    echo ""
-    printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-    echo ""
-    exit 7
-  fi
-
-  # Unmount mount point to be used
-  umount "$IMAGE_ROOT" 2>/dev/null
-
-  MOUNT_ARGS="-t $MOUNT_TYPE"
-
-  if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
-    read -p "Network username ($DEFAULT_USERNAME): " USERNAME
-    if [ -z "$USERNAME" ]; then
-      USERNAME="$DEFAULT_USERNAME"
-    fi
-
-    echo "* Using network username $USERNAME"
-    
-    # Replace username in our mount arguments (it's a little dirty, I know ;-))
-    MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
-  fi
-
-  echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
-  IFS=' '
-  if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
-    echo ""
-    printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-    echo ""
-    exit 6
-  fi
-fi
-
-# The IMAGE_NAME was set from the commandline:
-if [ -n "$IMAGE_NAME" ]; then
-  if echo "$IMAGE_NAME" |grep -q '^/'; then
-    # Assume absolute path
-    IMAGE_DIR="$IMAGE_NAME"
-  else
-    IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
-  fi
+if echo "$IMAGE_NAME" |grep -q '^/'; then
+  # Assume absolute path
+  IMAGE_DIR="$IMAGE_NAME"
   
-  if [ ! -d "$IMAGE_DIR" ]; then
-    printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\033[0m" >&2
-    do_exit 7
-  fi
+  # Reset mount device since we've been overruled
+  MOUNT_DEVICE=""
 else
-  echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
-  IFS=$EOL
-  find "$IMAGE_ROOT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
-    echo "$(basename "$ITEM")"
-  done
-
-  # Ask user for IMAGE_NAME:
-  while true; do
-    printf "\nImage to use ($IMAGE_DEFAULT_DIR): "
-    read IMAGE_NAME
-    
-    if [ -z "$IMAGE_NAME" ]; then
-      IMAGE_NAME="$IMAGE_DEFAULT_DIR"
-    fi
-    
-    if [ -z "$IMAGE_NAME" ]; then
-      printf "\033[40m\033[1;31m\nERROR: No image directory specified!\n\n\033[0m" >&2
-      continue;
+  if [ -n "$MOUNT_DEVICE" ]; then
+    # Create mount point
+    if ! mkdir -p "$IMAGE_ROOT"; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+      echo ""
+      exit 7
     fi
 
-    # Set the directory where the image(s) are
+    # Unmount mount point to be used
+    umount "$IMAGE_ROOT" 2>/dev/null
+
+    MOUNT_ARGS="-t $MOUNT_TYPE"
+
+    if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
+      read -p "Network username ($DEFAULT_USERNAME): " USERNAME
+      if [ -z "$USERNAME" ]; then
+        USERNAME="$DEFAULT_USERNAME"
+      fi
+
+      echo "* Using network username $USERNAME"
+      
+      # Replace username in our mount arguments (it's a little dirty, I know ;-))
+      MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
+    fi
+
+    echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
+    IFS=' '
+    if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+      echo ""
+      exit 6
+    fi
+  fi
+
+  # The IMAGE_NAME was set from the commandline:
+  if [ -n "$IMAGE_NAME" ]; then
     IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
-
+    
     if [ ! -d "$IMAGE_DIR" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
-    else
-      break;
+      printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\033[0m" >&2
+      do_exit 7
     fi
-  done
+  else
+    echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
+    IFS=$EOL
+    find "$IMAGE_ROOT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+      echo "$(basename "$ITEM")"
+    done
+
+    # Ask user for IMAGE_NAME:
+    while true; do
+      printf "\nImage to use ($IMAGE_DEFAULT_DIR): "
+      read IMAGE_NAME
+      
+      if [ -z "$IMAGE_NAME" ]; then
+        IMAGE_NAME="$IMAGE_DEFAULT_DIR"
+      fi
+      
+      if [ -z "$IMAGE_NAME" ]; then
+        printf "\033[40m\033[1;31m\nERROR: No image directory specified!\n\n\033[0m" >&2
+        continue;
+      fi
+
+      # Set the directory where the image(s) are
+      IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
+
+      if [ ! -d "$IMAGE_DIR" ]; then
+        printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
+      else
+        break;
+      fi
+    done
+  fi
 fi
 
 # Make the image dir our working directory

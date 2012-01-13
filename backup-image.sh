@@ -326,60 +326,63 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if [ -n "$MOUNT_DEVICE" ]; then
-  # Create mount point
-  if ! mkdir -p "$IMAGE_ROOT"; then
-    echo ""
-    printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-    echo ""
-    exit 7
-  fi
-
-  # Unmount mount point to be used
-  umount "$IMAGE_ROOT" 2>/dev/null
-
-  MOUNT_ARGS="-t $MOUNT_TYPE"
-
-  if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
-    read -p "Network username ($DEFAULT_USERNAME): " USERNAME
-    if [ -z "$USERNAME" ]; then
-      USERNAME="$DEFAULT_USERNAME"
-    fi
-
-    echo "* Using network username $USERNAME"
-  
-    # Replace username in our mount arguments (it's a little dirty, I know ;-))
-    MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
-  fi
-
-  echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
-  IFS=' '
-  if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
-    echo ""
-    printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-    echo ""
-    exit 6
-  fi
-fi
-
-if [ -z "$IMAGE_NAME" ]; then
-  while true; do
-    printf "\nImage name (directory) to use: "
-    read IMAGE_NAME
-    
-    if [ -z "$IMAGE_NAME" ]; then
-      printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
-    else
-      echo ""
-      break;
-    fi    
-  done
-fi
-
 if echo "$IMAGE_NAME" |grep -q '^/'; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
+  
+  # Reset mount device since we've been overruled
+  MOUNT_DEVICE=""
 else
+  if [ -n "$MOUNT_DEVICE" ]; then
+    # Create mount point
+    if ! mkdir -p "$IMAGE_ROOT"; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+      echo ""
+      exit 7
+    fi
+
+    # Unmount mount point to be used
+    umount "$IMAGE_ROOT" 2>/dev/null
+
+    MOUNT_ARGS="-t $MOUNT_TYPE"
+
+    if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
+      read -p "Network username ($DEFAULT_USERNAME): " USERNAME
+      if [ -z "$USERNAME" ]; then
+        USERNAME="$DEFAULT_USERNAME"
+      fi
+
+      echo "* Using network username $USERNAME"
+    
+      # Replace username in our mount arguments (it's a little dirty, I know ;-))
+      MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
+    fi
+
+    echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
+    IFS=' '
+    if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+      echo ""
+      exit 6
+    fi
+  fi
+
+  if [ -z "$IMAGE_NAME" ]; then
+    while true; do
+      printf "\nImage name (directory) to use: "
+      read IMAGE_NAME
+      
+      if [ -z "$IMAGE_NAME" ]; then
+        printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
+      else
+        echo ""
+        break;
+      fi    
+    done
+  fi
+
   IMAGE_DIR="$IMAGE_ROOT/$IMAGE_TARGET_DIR/$IMAGE_NAME"
 fi
 
