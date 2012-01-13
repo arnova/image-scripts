@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.04a"
+MY_VERSION="3.04b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: January 11, 2012
+# Last update: January 13, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -32,7 +32,7 @@ do_exit()
   echo ""
   
   # Auto unmount?
-  if [ "$AUTO_UNMOUNT" = "1" ] && grep -q " $MOUNT_POINT " /etc/mtab; then
+  if [ "$AUTO_UNMOUNT" = "1" ] && [ -n "$MOUNT_DEVICE" ] && grep -q " $MOUNT_POINT " /etc/mtab; then
     # Go to root else we can't umount
     cd /
     
@@ -204,8 +204,8 @@ sanity_check()
 #  check_binary partimage
 #  check_binary partclone.restore
 
-  if [ -z "$MOUNT_TYPE" ] || [ -z "$MOUNT_DEVICE" ] || [ -z "$MOUNT_POINT" ]; then
-    printf "\033[40m\033[1;31mERROR: One or more mount options missing in rimage.conf! Quitting...\033[0m\n" >&2
+  if [ -z "$MOUNT_POINT" ]; then
+    printf "\033[40m\033[1;31mERROR: MOUNT_POINT not set in rimage.conf! Quitting...\033[0m\n" >&2
     exit 2
   fi
 }
@@ -367,7 +367,7 @@ if [ -n "$USER_TARGET_NODEV" ]; then
   fi
 fi
 
-if [ "$NETWORK" != "none" ]; then
+if [ "$NETWORK" != "none" ] && [ -n "$NETWORK" ]; then
   # Setup network (interface)
   configure_network;
 
@@ -380,38 +380,40 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-# Create mount point
-if ! mkdir -p "$MOUNT_POINT"; then
-  echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $MOUNT_POINT! Quitting...\n\033[0m" >&2
-  echo ""
-  exit 7
-fi
-
-# Unmount mount point to be used
-umount "$MOUNT_POINT" 2>/dev/null
-
-MOUNT_ARGS="-t $MOUNT_TYPE"
-
-if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
-  read -p "Network username ($DEFAULT_USERNAME): " USERNAME
-  if [ -z "$USERNAME" ]; then
-    USERNAME="$DEFAULT_USERNAME"
+if [ -n "$MOUNT_DEVICE" ]; then
+  # Create mount point
+  if ! mkdir -p "$MOUNT_POINT"; then
+    echo ""
+    printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $MOUNT_POINT! Quitting...\n\033[0m" >&2
+    echo ""
+    exit 7
   fi
 
-  echo "* Using network username $USERNAME"
-  
-  # Replace username in our mount arguments (it's a little dirty, I know ;-))
-  MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
-fi
+  # Unmount mount point to be used
+  umount "$MOUNT_POINT" 2>/dev/null
 
-echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with arguments \"$MOUNT_ARGS\""
-IFS=' '
-if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
-  echo ""
-  printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m" >&2
-  echo ""
-  exit 6
+  MOUNT_ARGS="-t $MOUNT_TYPE"
+
+  if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
+    read -p "Network username ($DEFAULT_USERNAME): " USERNAME
+    if [ -z "$USERNAME" ]; then
+      USERNAME="$DEFAULT_USERNAME"
+    fi
+
+    echo "* Using network username $USERNAME"
+    
+    # Replace username in our mount arguments (it's a little dirty, I know ;-))
+    MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
+  fi
+
+  echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with arguments \"$MOUNT_ARGS\""
+  IFS=' '
+  if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
+    echo ""
+    printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m" >&2
+    echo ""
+    exit 6
+  fi
 fi
 
 # The IMAGE_NAME was set from the commandline:
