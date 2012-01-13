@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.04a"
+MY_VERSION="3.04c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: January 13, 2012
@@ -376,7 +376,12 @@ if [ -z "$IMAGE_NAME" ]; then
   done
 fi
 
-IMAGE_DIR="$IMAGE_ROOT/$IMAGE_TARGET_DIR/$IMAGE_NAME"
+if echo "$IMAGE_NAME" |grep -q '^/'; then
+  # Assume absolute path
+  IMAGE_DIR="$IMAGE_NAME"
+else
+  IMAGE_DIR="$IMAGE_ROOT/$IMAGE_TARGET_DIR/$IMAGE_NAME"
+fi
 
 if ! mkdir -p "$IMAGE_DIR"; then
   echo ""

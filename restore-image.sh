@@ -1,6 +1,6 @@
 # !/bin/bash
 
-MY_VERSION="3.04b"
+MY_VERSION="3.04c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: January 13, 2012
@@ -418,7 +418,13 @@ fi
 
 # The IMAGE_NAME was set from the commandline:
 if [ -n "$IMAGE_NAME" ]; then
-  IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
+  if echo "$IMAGE_NAME" |grep -q '^/'; then
+    # Assume absolute path
+    IMAGE_DIR="$IMAGE_NAME"
+  else
+    IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
+  fi
+  
   if [ ! -d "$IMAGE_DIR" ]; then
     printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\033[0m" >&2
     do_exit 7
