@@ -227,6 +227,7 @@ show_help()
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--clean                     - Even write MBR/partition table if not empty"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
+  echo "--nonet|-n                  - No networking"
 }
 
 
@@ -323,6 +324,7 @@ FAILED=""
 USER_TARGET_NODEV=""
 PARTITIONS_NODEV=""
 CLEAN=0
+NONET=0
 
 # Check arguments
 unset IFS
@@ -338,6 +340,7 @@ for arg in $*; do
       --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
       --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
+      --nonet|-n) NONET=1;;
       --help|-h) show_help; exit 3;;
       *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
     esac
@@ -367,7 +370,7 @@ if [ -n "$USER_TARGET_NODEV" ]; then
   fi
 fi
 
-if [ "$NETWORK" != "none" ] && [ -n "$NETWORK" ]; then
+if [ "$NETWORK" != "none" ] && [ -n "$NETWORK" ] && [ "$NONET" != "1" ]; then
   # Setup network (interface)
   configure_network;
 

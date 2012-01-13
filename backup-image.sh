@@ -230,6 +230,7 @@ show_help()
   echo "--pi                        - Use partimage for imaging"
   echo "--pc                        - Use partclone for imaging"
   echo "--ddgz                      - Use dd + gzip for imaging"
+  echo "--nonet|-n                  - No networking"
 }
 
 
@@ -246,6 +247,7 @@ FAILED=""
 USER_SOURCE_NODEV=""
 PARTITIONS=""
 IMAGE_PROGRAM=""
+NONET=0
 
 # Check arguments
 unset IFS
@@ -263,6 +265,7 @@ for arg in $*; do
       --ddgz) IMAGE_PROGRAM="ddgz";;
       --pi) IMAGE_PROGRAM="pi";;
       --pc) IMAGE_PROGRAM="pc";;
+      --nonet|-n) NONET=1;;
       --help) show_help; exit 3;;
       *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
     esac
@@ -313,7 +316,7 @@ else
   PARTITIONS="${PARTITIONS}$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
 fi
 
-if [ "$NETWORK" != "none" ] && [ -n "$NETWORK" ]; then
+if [ "$NETWORK" != "none" ] && [ -n "$NETWORK" ] && [ "$NONET" != "1" ]; then
   # Setup network (interface)
   configure_network;
 
