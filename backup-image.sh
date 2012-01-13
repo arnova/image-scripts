@@ -415,7 +415,7 @@ BACKUP_PARTITIONS=""
 IGNORE_PARTITIONS=""
 unset IFS
 for PART in $PARTITIONS; do
-  if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/mounts; then
+  if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
     IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }$PART"
   else
     BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }$PART"

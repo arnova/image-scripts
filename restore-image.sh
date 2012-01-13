@@ -530,7 +530,7 @@ for FN in partitions.*; do
   IFS=$EOL
   for PART in `get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`; do
     # (Try) to unmount all partitions on this device
-    if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/mounts; then
+    if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
       umount /dev/$PART >/dev/null
     fi
 
