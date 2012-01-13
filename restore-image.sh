@@ -432,11 +432,11 @@ else
 
   # Ask user for IMAGE_NAME:
   while true; do
-    printf "\nImage to use ($DEFAULT_DIR): "
+    printf "\nImage to use ($IMAGE_DEFAULT_DIR): "
     read IMAGE_NAME
     
     if [ -z "$IMAGE_NAME" ]; then
-      IMAGE_NAME="$DEFAULT_DIR"
+      IMAGE_NAME="$IMAGE_DEFAULT_DIR"
     fi
     
     if [ -z "$IMAGE_NAME" ]; then

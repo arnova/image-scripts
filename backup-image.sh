@@ -376,7 +376,7 @@ if [ -z "$IMAGE_NAME" ]; then
   done
 fi
 
-IMAGE_DIR="$IMAGE_ROOT/$TARGET_DIR/$IMAGE_NAME"
+IMAGE_DIR="$IMAGE_ROOT/$IMAGE_TARGET_DIR/$IMAGE_NAME"
 
 if ! mkdir -p "$IMAGE_DIR"; then
   echo ""

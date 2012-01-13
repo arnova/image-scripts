@@ -1,15 +1,38 @@
-DEFAULT_USERNAME="image"
+# Network type to use. Options are "dhcp", "static" or "none". It also allows a fallback option like "dhcp,static"
 NETWORK=dhcp
+
+# The network settings to use for static network mode
 IP_ADDRESS=""
 NET_MASK=""
-#GATEWAY=""
+GATEWAY=""
+
+# In case a network filesystem (like SMBFS/CIFS) is used, the server to use
 SERVER="myserver"
+
+# In case a network filesystem (like SMBFS/CIFS) is used, the default username to use
+DEFAULT_USERNAME="image"
+
+# The device to be mounted and its type/options. Comment out in case you want to use a local already mounted filesystem
+MOUNT_DEVICE="//$SERVER/images"
 MOUNT_TYPE="cifs"
 MOUNT_OPTIONS="iocharset=utf8,username=$DEFAULT_USERNAME"
-MOUNT_DEVICE="//$SERVER/images"
+
+# Automatically unmount filesystems we mount?
 AUTO_UNMOUNT=1
+
+# The image root directory. This is also the mount point for MOUNT_DEVICE, when used.
 IMAGE_ROOT="/mnt/images"
-TARGET_DIR="temp"
+
+# The image target directory/name to use where new image directories are created. This is a subdirectory of the IMAGE_ROOT
+IMAGE_TARGET_DIR="temp"
+
+# The default image program to use. Options are:
+# pc - PartClone
+# pi - PartImage
+# fsa - FsArchiver
+# ddgz - dd + gzip
 DEFAULT_IMAGE_PROGRAM="pc"
+
+# Optional custom script to run at the end of the script
 CUSTOM_POST_SCRIPT=""
 

@@ -1,13 +1,28 @@
-DEFAULT_USERNAME="image"
+# Network type to use. Options are "dhcp", "static" or "none". It also allows a fallback option like "dhcp,static"
 NETWORK=dhcp
-IP_ADDRESS=""
-NET_MASK="255.255.255.0"
-#GATEWAY=""
+
+# The network settings to use for static network mode
+IPADDRESS=""
+NETMASK="255.255.255.0"
+GATEWAY=""
+
+# In case a network filesystem (like SMBFS/CIFS) is used, the server to use
 SERVER="myserver"
+
+# In case a network filesystem (like SMBFS/CIFS) is used, the default username to use
+DEFAULT_USERNAME="image"
+
+# The device to be mounted and its type/options. Comment out in case you want to use a local already mounted filesystem
+MOUNT_DEVICE="//$SERVER/images"
 MOUNT_TYPE="cifs" 
 MOUNT_OPTIONS="iocharset=utf8,username=$DEFAULT_USERNAME"
-MOUNT_DEVICE="//$SERVER/images"
+
+# Automatically unmount filesystems we mount?
 AUTO_UNMOUNT=1
+
+# The image root directory. This is also the mount point for MOUNT_DEVICE, when used
 IMAGE_ROOT="/mnt/images"
+
+# The default image directory/name to use. This is a subdirectory of the IMAGE_ROOT
 DEFAULT_DIR="win7-x64"
 
