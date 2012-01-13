@@ -7,7 +7,7 @@ SERVER="myserver"
 MOUNT_TYPE="cifs" 
 MOUNT_OPTIONS="iocharset=utf8,username=$DEFAULT_USERNAME"
 MOUNT_DEVICE="//$SERVER/images"
-MOUNT_POINT="/mnt/images"
 AUTO_UNMOUNT=1
+IMAGE_ROOT="/mnt/images"
 DEFAULT_DIR="win7-x64"
 

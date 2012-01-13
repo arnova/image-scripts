@@ -32,12 +32,12 @@ do_exit()
   echo ""
   
   # Auto unmount?
-  if [ "$AUTO_UNMOUNT" = "1" ] && [ -n "$MOUNT_DEVICE" ] && grep -q " $MOUNT_POINT " /etc/mtab; then
+  if [ "$AUTO_UNMOUNT" = "1" ] && [ -n "$MOUNT_DEVICE" ] && grep -q " $IMAGE_ROOT " /etc/mtab; then
     # Go to root else we can't umount
     cd /
     
     # Umount our image repo
-    umount -v "$MOUNT_POINT"
+    umount -v "$IMAGE_ROOT"
   fi
   exit $1
 }
@@ -205,8 +205,8 @@ sanity_check()
   [ "$IMAGE_PROGRAM" = "pc" ] && check_binary partclone.dd
   [ "$IMAGE_PROGRAM" = "ddgz" ] && check_binary gzip
   
-  if [ -z "$MOUNT_POINT" ]; then
-    printf "\033[40m\033[1;31mERROR: MOUNT_POINT not set in bimage.conf! Quitting...\033[0m\n" >&2
+  if [ -z "$IMAGE_ROOT" ]; then
+    printf "\033[40m\033[1;31mERROR: IMAGE_ROOT not set in bimage.conf! Quitting...\033[0m\n" >&2
     exit 2
   fi
 }
@@ -328,15 +328,15 @@ trap 'ctrlc_handler' 2
 
 if [ -n "$MOUNT_DEVICE" ]; then
   # Create mount point
-  if ! mkdir -p "$MOUNT_POINT"; then
+  if ! mkdir -p "$IMAGE_ROOT"; then
     echo ""
-    printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $MOUNT_POINT! Quitting...\n\033[0m" >&2
+    printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
     echo ""
     exit 7
   fi
 
   # Unmount mount point to be used
-  umount "$MOUNT_POINT" 2>/dev/null
+  umount "$IMAGE_ROOT" 2>/dev/null
 
   MOUNT_ARGS="-t $MOUNT_TYPE"
 
@@ -352,11 +352,11 @@ if [ -n "$MOUNT_DEVICE" ]; then
     MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
   fi
 
-  echo "* Mounting $MOUNT_DEVICE on $MOUNT_POINT with arguments \"$MOUNT_ARGS\""
+  echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
   IFS=' '
-  if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$MOUNT_POINT"; then
+  if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
     echo ""
-    printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $MOUNT_POINT! Quitting...\n\033[0m" >&2
+    printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
     echo ""
     exit 6
   fi
@@ -376,7 +376,7 @@ if [ -z "$IMAGE_NAME" ]; then
   done
 fi
 
-IMAGE_DIR="$MOUNT_POINT/$TARGET_DIR/$IMAGE_NAME"
+IMAGE_DIR="$IMAGE_ROOT/$TARGET_DIR/$IMAGE_NAME"
 
 if ! mkdir -p "$IMAGE_DIR"; then
   echo ""
