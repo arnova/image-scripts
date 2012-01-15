@@ -1,6 +1,6 @@
 # !/bin/bash
 
-MY_VERSION="3.04c"
+MY_VERSION="3.05"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: January 13, 2012
@@ -204,10 +204,7 @@ sanity_check()
 #  check_binary partimage
 #  check_binary partclone.restore
 
-  if [ -z "$IMAGE_ROOT" ]; then
-    printf "\033[40m\033[1;31mERROR: IMAGE_ROOT not set in rimage.conf! Quitting...\033[0m\n" >&2
-    exit 2
-  fi
+
 }
 
 
@@ -351,10 +348,6 @@ done
 if [ -e "$CONF" ]; then
   # Source the configuration
   . "$CONF"
-else
-  echo "ERROR: Missing configuration file ($CONF)!" >&2
-  echo "Program aborted" >&2
-  exit 1
 fi
 
 # Sanity check environment
@@ -383,7 +376,7 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if echo "$IMAGE_NAME" |grep -q '^/'; then
+if [ -z "$IMAGE_ROOT" ] || echo "$IMAGE_NAME" |grep -q '^/'; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
   
