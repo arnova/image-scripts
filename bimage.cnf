@@ -2,9 +2,9 @@
 NETWORK=dhcp,static
 
 # The network settings to use for static network mode
-IPADDRESS="192.168.1.20"
+IPADDRESS="132.228.38.8"
 NETMASK="255.255.255.0"
-GATEWAY="192.168.1.1" 
+GATEWAY="132.229.38.1" 
 
 # In case a network filesystem (like SMBFS/CIFS) is used, the server to use
 SERVER="132.229.46.12"
