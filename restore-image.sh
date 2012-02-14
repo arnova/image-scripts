@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.05"
+MY_VERSION="3.05a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: January 13, 2012
+# Last update: February 14, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -633,7 +633,7 @@ for IMAGE_FILE in $IMAGE_FILES; do
   echo "* Source partition: $SFDISK_SOURCE_PART"
   echo "* Target partition: $SFDISK_TARGET_PART"
 
-  if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]*/","",)$"; then
+  if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
     printf "\033[40m\033[1;31m\nWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m" >&2
     read -n1
   fi
