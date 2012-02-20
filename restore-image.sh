@@ -671,7 +671,7 @@ for IMAGE_FILE in $IMAGE_FILES; do
     zcat "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
     retval=$?
   else
-    gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4k
+    gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
     retval=$?
   fi
 
