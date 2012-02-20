@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.05a"
+MY_VERSION="3.05b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: February 14, 2012
+# Last update: February 20, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -428,14 +428,15 @@ else
       do_exit 7
     fi
   else
-    echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
-    IFS=$EOL
-    find "$IMAGE_ROOT" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
-      echo "$(basename "$ITEM")"
-    done
-
     # Ask user for IMAGE_NAME:
+    IMAGE_DIR="$IMAGE_ROOT"
     while true; do
+      echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
+      IFS=$EOL
+      find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+        echo "$(basename "$ITEM")"
+      done
+
       printf "\nImage to use ($IMAGE_DEFAULT_DIR): "
       read IMAGE_NAME
       
@@ -451,8 +452,11 @@ else
       # Set the directory where the image(s) are
       IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
 
-      if [ ! -d "$IMAGE_DIR" ]; then
+      if echo "$IMAGE_DIR" |grep -q "/$"; then
+        continue;
+      elif [ ! -d "$IMAGE_DIR" ]; then
         printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
+        IMAGE_DIR="$IMAGE_ROOT"
       else
         break;
       fi
