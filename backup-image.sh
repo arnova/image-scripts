@@ -503,7 +503,7 @@ for PART in $BACKUP_PARTITIONS; do
           ;;
     ddgz) TARGET_FILE="$PART.dd.gz"
           printf "****** Using dd (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          dd if="/dev/$PART" bs=64K |gzip -c >"$TARGET_FILE"
+          dd if="/dev/$PART" bs=4k |gzip -c >"$TARGET_FILE"
           retval=$?
           ;;
   esac
