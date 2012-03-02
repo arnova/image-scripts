@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.05b"
+MY_VERSION="3.05c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: February 20, 2012
+# Last update: March 2, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -540,12 +540,22 @@ for FN in partitions.*; do
   for PART in `get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`; do
     # (Try) to unmount all partitions on this device
     if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
-      umount /dev/$PART >/dev/null
+      if ! umount /dev/$PART >/dev/null; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Unable to umount /dev/$PART. Wrong target device specified? Quitting...\n\033[0m" >&2
+        echo ""
+        do_exit 5
+      fi
     fi
 
     # Disable all swaps on this device
     if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
-      swapoff /dev/$PART >/dev/null
+      if ! swapoff /dev/$PART >/dev/null; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Unable to swapoff /dev/$PART. Wrong target device specified? Quitting...\n\033[0m" >&2
+        echo ""
+        do_exit 5
+      fi
     fi
   done
   
