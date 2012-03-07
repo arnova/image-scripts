@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.05c"
+MY_VERSION="3.05d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: March 2, 2012
+# Last update: March 7, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -222,6 +222,7 @@ show_help()
   echo "--help|-h                   - Print this help"
   echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions)"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
+  echo "--noconf                    - Don't read the config file"
   echo "--clean                     - Even write MBR/partition table if not empty"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
   echo "--nonet|-n                  - No networking"
@@ -322,6 +323,7 @@ USER_TARGET_NODEV=""
 PARTITIONS_NODEV=""
 CLEAN=0
 NONET=0
+NOCONF=0
 
 # Check arguments
 unset IFS
@@ -338,6 +340,7 @@ for arg in $*; do
       --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --nonet|-n) NONET=1;;
+      --noconf) NOCONF=1;;
       --help|-h) show_help; exit 3;;
       *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
     esac
@@ -345,7 +348,7 @@ for arg in $*; do
 done
 
 # Check if configuration file exists
-if [ -e "$CONF" ]; then
+if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
   # Source the configuration
   . "$CONF"
 fi
@@ -376,14 +379,14 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if [ -z "$IMAGE_ROOT" ] || echo "$IMAGE_NAME" |grep -q '^/'; then
+if echo "$IMAGE_NAME" |grep -q '^/'; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
   
   # Reset mount device since we've been overruled
   MOUNT_DEVICE=""
 else
-  if [ -n "$MOUNT_DEVICE" ]; then
+  if [ -n "$MOUNT_DEVICE" -a -n "$IMAGE_ROOT" ]; then
     # Create mount point
     if ! mkdir -p "$IMAGE_ROOT"; then
       echo ""
@@ -417,21 +420,34 @@ else
       echo ""
       exit 6
     fi
+  else
+    # Reset mount device since we didn't mount
+    MOUNT_DEVICE=""
   fi
 
   # The IMAGE_NAME was set from the commandline:
   if [ -n "$IMAGE_NAME" ]; then
-    IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
+    if [ -n "$IMAGE_ROOT" ]; then
+      IMAGE_DIR="$IMAGE_ROOT/$IMAGE_IMAGE_NAME"
+    else
+      IMAGE_DIR="$IMAGE_NAME"
+    fi
     
     if [ ! -d "$IMAGE_DIR" ]; then
       printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\033[0m" >&2
       do_exit 7
     fi
   else
-    # Ask user for IMAGE_NAME:
+    if [ -z "$IMAGE_ROOT" ]; then
+      # Default to the cwd
+      IMAGE_ROOT="."
+    fi
+    
     IMAGE_DIR="$IMAGE_ROOT"
+    
+    # Ask user for IMAGE_NAME:
     while true; do
-      echo "* Showing contents of image root directory ($MOUNT_DEVICE):"
+      echo "* Showing contents of the image root directory ($IMAGE_DIR):"
       IFS=$EOL
       find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
         echo "$(basename "$ITEM")"
@@ -440,7 +456,7 @@ else
       printf "\nImage to use ($IMAGE_DEFAULT_DIR): "
       read IMAGE_NAME
       
-      if [ -z "$IMAGE_NAME" ]; then
+      if [ -z "$IMAGE_NAME" -a -n "$IMAGE_DEFAULT_DIR" ]; then
         IMAGE_NAME="$IMAGE_DEFAULT_DIR"
       fi
       

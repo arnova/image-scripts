@@ -221,7 +221,7 @@ show_help()
   echo "--help|-h                   - Print this help"
   echo "--part|-p={dev1,dev2}       - Backup only these partitions (instead of all partitions)"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
-  echo "--noconf                    - Don't try to read the bimage.cnf config file"
+  echo "--noconf                    - Don't read the config file"
   echo "--fsa                       - Use fsarchiver for imaging"
   echo "--pi                        - Use partimage for imaging"
   echo "--pc                        - Use partclone for imaging"
@@ -383,15 +383,15 @@ else
     done
   fi
 
+  IMAGE_DIR="$IMAGE_NAME"
+  
+  if [ -n "$IMAGE_TARGET_DIR" ]; then
+    IMAGE_DIR="${IMAGE_TARGET_DIR}/${IMAGE_DIR}"
+  fi
+
   if [ -n "$IMAGE_ROOT" ]; then
-    IMAGE_DIR="$IMAGE_ROOT/"
+    IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
   fi
-
-  if [ -n "$IMAGE_TARGET" ]; then
-    IMAGE_DIR="${IMAGE_DIR}${IMAGE_TARGET_DIR}/"
-  fi
-
-  IMAGE_DIR="${IMAGE_DIR}${IMAGE_NAME}"
 fi
 
 if ! mkdir -p "$IMAGE_DIR"; then
