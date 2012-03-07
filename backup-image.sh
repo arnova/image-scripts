@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.05"
+MY_VERSION="3.05a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: January 13, 2012
+# Last update: March 7, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -221,6 +221,7 @@ show_help()
   echo "--help|-h                   - Print this help"
   echo "--part|-p={dev1,dev2}       - Backup only these partitions (instead of all partitions)"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
+  echo "--noconf                    - Don't try to read the bimage.cnf config file"
   echo "--fsa                       - Use fsarchiver for imaging"
   echo "--pi                        - Use partimage for imaging"
   echo "--pc                        - Use partclone for imaging"
@@ -243,6 +244,7 @@ USER_SOURCE_NODEV=""
 PARTITIONS=""
 IMAGE_PROGRAM=""
 NONET=0
+NOCONF=0
 
 # Check arguments
 unset IFS
@@ -261,6 +263,7 @@ for arg in $*; do
       --pi) IMAGE_PROGRAM="pi";;
       --pc) IMAGE_PROGRAM="pc";;
       --nonet|-n) NONET=1;;
+      --noconf) NOCONF=1;;
       --help) show_help; exit 3;;
       *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
     esac
@@ -268,7 +271,7 @@ for arg in $*; do
 done
 
 # Check if configuration file exists
-if [ -e "$CONF" ]; then
+if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
   # Source the configuration
   . "$CONF"
 fi
@@ -320,14 +323,14 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if [ -z "$IMAGE_ROOT" ] || echo "$IMAGE_NAME" |grep -q '^/'; then
+if echo "$IMAGE_NAME" |grep -q '^/'; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
   
   # Reset mount device since we've been overruled
   MOUNT_DEVICE=""
 else
-  if [ -n "$MOUNT_DEVICE" ]; then
+  if [ -n "$MOUNT_DEVICE" -a -n "$IMAGE_ROOT" ]; then
     # Create mount point
     if ! mkdir -p "$IMAGE_ROOT"; then
       echo ""
@@ -361,6 +364,9 @@ else
       echo ""
       exit 6
     fi
+  else
+    # Reset mount device since we didn't mount
+    MOUNT_DEVICE=""
   fi
 
   if [ -z "$IMAGE_NAME" ]; then
@@ -373,11 +379,19 @@ else
       else
         echo ""
         break;
-      fi    
+      fi
     done
   fi
 
-  IMAGE_DIR="$IMAGE_ROOT/$IMAGE_TARGET_DIR/$IMAGE_NAME"
+  if [ -n "$IMAGE_ROOT" ]; then
+    IMAGE_DIR="$IMAGE_ROOT/"
+  fi
+
+  if [ -n "$IMAGE_TARGET" ]; then
+    IMAGE_DIR="${IMAGE_DIR}${IMAGE_TARGET_DIR}/"
+  fi
+
+  IMAGE_DIR="${IMAGE_DIR}${IMAGE_NAME}"
 fi
 
 if ! mkdir -p "$IMAGE_DIR"; then
