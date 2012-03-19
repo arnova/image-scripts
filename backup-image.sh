@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.05a"
+MY_VERSION="3.05b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: March 7, 2012
+# Last update: March 16, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -323,7 +323,7 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if echo "$IMAGE_NAME" |grep -q '^/'; then
+if echo "$IMAGE_NAME" |grep -q '^[\./]'; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
   
@@ -412,7 +412,8 @@ if ! cd "$IMAGE_DIR"; then
   do_exit 7
 fi
 
-echo "* Using image directory: $IMAGE_DIR"
+echo "* Using image name: $IMAGE_DIR"
+echo "* Image working directory: $(pwd)"
 
 # Make sure target directory is empty
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then
