@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.05e"
+MY_VERSION="3.05f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: March 16, 2012
+# Last update: May 1, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -428,7 +428,7 @@ else
   # The IMAGE_NAME was set from the commandline:
   if [ -n "$IMAGE_NAME" ]; then
     if [ -n "$IMAGE_ROOT" ]; then
-      IMAGE_DIR="$IMAGE_ROOT/$IMAGE_IMAGE_NAME"
+      IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
     else
       IMAGE_DIR="$IMAGE_NAME"
     fi
