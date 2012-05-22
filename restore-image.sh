@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.05f"
+MY_VERSION="3.05g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 1, 2012
+# Last update: May 22, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -630,10 +630,9 @@ for FN in partitions.*; do
   fi
 done
 
-echo ""
-  
 # Test whether the target partition(s) exist and have the correct geometry:
-IFS=$EOL
+MISMATCH=0
+unset IFS
 for IMAGE_FILE in $IMAGE_FILES; do
   # Strip extension so we get the actual device name
   PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
@@ -663,14 +662,19 @@ for IMAGE_FILE in $IMAGE_FILES; do
 
   echo "* Source partition: $SFDISK_SOURCE_PART"
   echo "* Target partition: $SFDISK_TARGET_PART"
+  echo ""
 
   if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
-    printf "\033[40m\033[1;31m\nWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m" >&2
-    read -n1
+    MISMATCH=1
   fi
-  echo ""
 done
 
+if [ $MISMATCH -ne 0 ]; then
+  printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m" >&2
+  read -n1
+  echo ""
+fi
+ 
 # Restore the actual image(s):
 unset IFS
 for IMAGE_FILE in $IMAGE_FILES; do
