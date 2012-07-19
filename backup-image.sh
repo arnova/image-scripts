@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.05b"
+MY_VERSION="3.05c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: March 16, 2012
+# Last update: July 19, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -219,7 +219,7 @@ show_help()
   echo ""
   echo "Options:"
   echo "--help|-h                   - Print this help"
-  echo "--part|-p={dev1,dev2}       - Backup only these partitions (instead of all partitions)"
+  echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all)"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--noconf                    - Don't read the config file"
   echo "--fsa                       - Use fsarchiver for imaging"
@@ -256,7 +256,7 @@ for arg in $*; do
     IMAGE_NAME="$ARGVAL"
   else
     case "$ARGNAME" in
-      --partitions|--partition|--part|-p) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+      --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --fsa) IMAGE_PROGRAM="fsa";;
       --ddgz) IMAGE_PROGRAM="ddgz";;
