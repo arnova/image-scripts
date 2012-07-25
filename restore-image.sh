@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.05g"
+MY_VERSION="3.06"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 22, 2012
+# Last update: July 24, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -223,7 +223,9 @@ show_help()
   echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions)"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--noconf                    - Don't read the config file"
-  echo "--clean                     - Even write MBR/partition table if not empty"
+  echo "--mbr                       - Always write a new MBR (from track0.*)"
+  echo "--pt                        - Always write a new partition table (from partition.*)"
+  echo "--clean                     - Always write MBR/partition table/swap space even if device is not empty (USE WITH CARE!)"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
   echo "--nonet|-n                  - No networking"
 }
@@ -324,6 +326,8 @@ PARTITIONS_NODEV=""
 CLEAN=0
 NONET=0
 NOCONF=0
+MBR_WRITE=0
+PT_WRITE=0
 
 # Check arguments
 unset IFS
@@ -341,6 +345,8 @@ for arg in $*; do
       --conf|-c) CONF="$ARGVAL";;
       --nonet|-n) NONET=1;;
       --noconf) NOCONF=1;;
+      --mbr) MBR_WRITE=1;;
+      --pt) PT_WRITE=1;;
       --help|-h) show_help; exit 3;;
       *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
     esac
@@ -576,8 +582,12 @@ for FN in partitions.*; do
     fi
   done
   
-  # Only restore track0 (MBR) / partition table if they don't exist already on device
-  if ! get_partitions |grep -E -q -x "${TARGET_NODEV}p?[0-9]+" || [ "$CLEAN" = "1" ]; then
+  # Check whether device already contains partitions
+  PARTITIONS_FOUND=`grep -E -q -x "${TARGET_NODEV}p?[0-9]+"`
+  PARTPROBE=0
+
+  # Check for MBR restore
+  if [ -z "$PARTITIONS_FOUND" ] || [ $CLEAN -eq 1 ] || [ $MBR_WRITE -eq 1 ]; then
     if [ -f "track0.$HDD_NAME" ]; then
       DD_SOURCE="track0.$HDD_NAME"
     else
@@ -585,15 +595,28 @@ for FN in partitions.*; do
     fi
 
     echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
-    # NOTE: Without partition table use bs=446 (mbr loader only)
-    result=`dd if=$DD_SOURCE of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
-    retval=$?
+    if [ -z "$PARTITIONS_FOUND" ]; then
+      result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=32256 count=1`
+      retval=$?
+    else
+      result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
+      retval=$?
+    fi
     if [ $retval -ne 0 ]; then
       echo "$result" >&2
-      printf "\033[40m\033[1;31mERROR: Track0(MBR) restore to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
       do_exit 5
     fi
-
+    PARTPROBE=1
+  fi
+  
+  # Check for partition restore
+  if [ -n "$PARTITIONS_FOUND" ] && [ $CLEAN -eq 0 ] && [ $PT_WRITE -eq 0 ]; then
+    printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
+    echo "To override this you must specify --clean or --pt. Press any key to continue or CTRL-C to abort..." >&2
+    read -n1
+    echo ""
+  else
     if [ -f "partitions.$HDD_NAME" ]; then
       echo "* Updating partition table on /dev/$TARGET_NODEV"
       sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
@@ -603,8 +626,11 @@ for FN in partitions.*; do
         printf "\033[40m\033[1;31mPartition table restore failed($retval). Quitting...\n\033[0m" >&2
         do_exit 5
       fi
+      PARTPROBE=1
     fi
-    
+  fi
+  
+  if [ $PARTPROBE -eq 1 ]; then
     # Re-read partition table
     partprobe "/dev/$TARGET_NODEV"
     retval=$?
@@ -613,7 +639,9 @@ for FN in partitions.*; do
       read -n1
       echo ""
     fi
-
+  fi
+  
+  if [ $CLEAN -eq 1 ]; then
     # Create swap on swap partitions
     IFS=$EOL
     sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
@@ -622,11 +650,6 @@ for FN in partitions.*; do
         printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi
     done
-  else
-    printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
-    echo "To override this you must specify --clean. Press any key to continue or CTRL-C to abort..." >&2
-    read -n1
-    echo ""
   fi
 done
 
