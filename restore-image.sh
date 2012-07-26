@@ -568,8 +568,11 @@ for FN in partitions.*; do
   # Check if DMA is enabled for device
   check_dma "/dev/$TARGET_NODEV"
 
+  # Check whether device already contains partitions
+  PARTITIONS_FOUND=`get_partitions |grep -E -q -x "${TARGET_NODEV}p?[0-9]+"`
+  
   IFS=$EOL
-  for PART in `get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`; do
+  for PART in $PARTITIONS_FOUND; do
     # (Try) to unmount all partitions on this device
     if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
       if ! umount /dev/$PART >/dev/null; then
@@ -591,8 +594,7 @@ for FN in partitions.*; do
     fi
   done
   
-  # Check whether device already contains partitions
-  PARTITIONS_FOUND=`grep -E -q -x "${TARGET_NODEV}p?[0-9]+"`
+  # Flag in case we update the mbr/partition table so we know we need to have the kernel to re-probe
   PARTPROBE=0
 
   # Check for MBR restore
