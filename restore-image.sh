@@ -227,7 +227,7 @@ show_help()
   echo "--pt                        - Always write a new partition table (from partition.*)"
   echo "--clean                     - Always write MBR/partition table/swap space even if device is not empty (USE WITH CARE!)"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
-  echo "--nonet|-n                  - No networking"
+  echo "--nonet|-n                  - Don't try to setup networking"
 }
 
 
@@ -357,6 +357,15 @@ done
 if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
   # Source the configuration
   . "$CONF"
+fi
+
+# Translate "long" names to short
+if   [ "$IMAGE_PROGRAM" = "fsarchiver" ]; then
+  IMAGE_PROGRAM="fsa"
+elif [ "$IMAGE_PROGRAM" = "partimage" ]; then
+  IMAGE_PROGRAM="pi"
+elif [ "$IMAGE_PROGRAM" = "partclone" ]; then
+  IMAGE_PROGRAM="pc"
 fi
 
 # Sanity check environment

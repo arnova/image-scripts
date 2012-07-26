@@ -226,7 +226,7 @@ show_help()
   echo "--pi                        - Use partimage for imaging"
   echo "--pc                        - Use partclone for imaging"
   echo "--ddgz                      - Use dd + gzip for imaging"
-  echo "--nonet|-n                  - No networking"
+  echo "--nonet|-n                  - Don't try to setup networking"
 }
 
 
@@ -282,6 +282,15 @@ if [ -z "$IMAGE_PROGRAM" ]; then
   else
     IMAGE_PROGRAM="pc"
   fi
+fi
+
+# Translate "long" names to short
+if   [ "$IMAGE_PROGRAM" = "fsarchiver" ]; then
+  IMAGE_PROGRAM="fsa"
+elif [ "$IMAGE_PROGRAM" = "partimage" ]; then
+  IMAGE_PROGRAM="pi"
+elif [ "$IMAGE_PROGRAM" = "partclone" ]; then
+  IMAGE_PROGRAM="pc"
 fi
 
 # Sanity check environment
