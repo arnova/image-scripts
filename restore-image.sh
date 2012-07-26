@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.06"
+MY_VERSION="3.06a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: July 24, 2012
+# Last update: July 25, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -569,7 +569,7 @@ for FN in partitions.*; do
   check_dma "/dev/$TARGET_NODEV"
 
   # Check whether device already contains partitions
-  PARTITIONS_FOUND=`get_partitions |grep -E -q -x "${TARGET_NODEV}p?[0-9]+"`
+  PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
   
   IFS=$EOL
   for PART in $PARTITIONS_FOUND; do
@@ -607,7 +607,7 @@ for FN in partitions.*; do
 
     echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
     if [ -z "$PARTITIONS_FOUND" ]; then
-      result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=32256 count=1`
+      result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=1 count=32256 2>&1`
       retval=$?
     else
       result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
@@ -619,6 +619,7 @@ for FN in partitions.*; do
       do_exit 5
     fi
     PARTPROBE=1
+    echo ""
   fi
   
   # Check for partition restore
@@ -638,6 +639,7 @@ for FN in partitions.*; do
         do_exit 5
       fi
       PARTPROBE=1
+      echo ""
     fi
   fi
   
