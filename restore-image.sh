@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.06a"
+MY_VERSION="3.07"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: July 25, 2012
+# Last update: August 3, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -23,7 +23,7 @@ MY_VERSION="3.06a"
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ----------------------------------------------------------------------------------------------------------------------
 
-DEFAULT_CONF="$(dirname $0)/rimage.cnf"
+DEFAULT_CONF="$(dirname $0)/image.cnf"
 EOL='
 '
 
