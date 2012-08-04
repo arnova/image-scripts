@@ -1,13 +1,13 @@
 # Network type to use. Options are "dhcp", "static" or "none". It also allows a fallback option like "dhcp,static"
-NETWORK=dhcp
+NETWORK=dhcp,static
 
 # The network settings to use for static network mode
-IPADDRESS=""
+IPADDRESS="132.228.38.8"
 NETMASK="255.255.255.0"
-GATEWAY=""
+GATEWAY="132.229.38.1" 
 
 # In case a network filesystem (like SMBFS/CIFS) is used, the server to use
-SERVER="myserver"
+SERVER="132.229.46.12"
 
 # In case a network filesystem (like SMBFS/CIFS) is used, the default username to use
 DEFAULT_USERNAME="image"
@@ -20,11 +20,8 @@ MOUNT_OPTIONS="iocharset=utf8,username=$DEFAULT_USERNAME"
 # Automatically unmount filesystems we mount?
 AUTO_UNMOUNT=1
 
-# The image root directory. This is also the mount point for MOUNT_DEVICE, when used
+# The image root directory. This is also the mount point for MOUNT_DEVICE, when used.
 IMAGE_ROOT="/mnt/images"
-
-# The default image directory/name to use for restore. This is a subdirectory of the IMAGE_ROOT
-DEFAULT_DIR="win7-x64"
 
 # The image target directory/name to use where new image directories are created. This is a subdirectory of the IMAGE_ROOT
 IMAGE_TARGET_DIR="temp"
@@ -39,4 +36,7 @@ DEFAULT_IMAGE_PROGRAM="pc"
 
 # Optional custom script to run at the end of the backup script
 BACKUP_POST_SCRIPT=""
+
+# The default image directory/name to use for restore. This is a subdirectory of the IMAGE_ROOT
+IMAGE_DEFAULT_DIR="win7-x64"
 
