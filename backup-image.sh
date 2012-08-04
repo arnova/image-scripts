@@ -556,9 +556,9 @@ ls -l
 echo ""
 
 # Run custom script, if specified
-if [ -n "$CUSTOM_POST_SCRIPT" ]; then
+if [ -n "$BACKUP_POST_SCRIPT" ]; then
   # Source script:
-  . "$CUSTOM_POST_SCRIPT"
+  . "$BACKUP_POST_SCRIPT"
 fi
 
 if [ -n "$FAILED" ]; then
@@ -579,3 +579,4 @@ fi
 
 # Exit (+unmount)
 do_exit 0
+
