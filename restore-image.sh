@@ -468,11 +468,11 @@ else
         echo "$(basename "$ITEM")"
       done
 
-      printf "\nImage to use ($IMAGE_DEFAULT_DIR): "
+      printf "\nImage to use ($IMAGE_RESTORE_DEFAULT): "
       read IMAGE_NAME
       
-      if [ -z "$IMAGE_NAME" -a -n "$IMAGE_DEFAULT_DIR" ]; then
-        IMAGE_NAME="$IMAGE_DEFAULT_DIR"
+      if [ -z "$IMAGE_NAME" -a -n "$IMAGE_RESTORE_DEFAULT" ]; then
+        IMAGE_NAME="$IMAGE_RESTORE_DEFAULT"
       fi
       
       if [ -z "$IMAGE_NAME" ]; then

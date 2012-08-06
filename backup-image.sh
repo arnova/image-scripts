@@ -394,8 +394,8 @@ else
 
   IMAGE_DIR="$IMAGE_NAME"
   
-  if [ -n "$IMAGE_TARGET_DIR" ]; then
-    IMAGE_DIR="${IMAGE_TARGET_DIR}/${IMAGE_DIR}"
+  if [ -n "$IMAGE_BACKUP_DIR" ]; then
+    IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
   fi
 
   if [ -n "$IMAGE_ROOT" ]; then

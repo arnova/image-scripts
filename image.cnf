@@ -23,8 +23,11 @@ AUTO_UNMOUNT=1
 # The image root directory. This is also the mount point for MOUNT_DEVICE, when used.
 IMAGE_ROOT="/mnt/images"
 
+# The default image directory/name to use for restore. This is a subdirectory of the IMAGE_ROOT
+IMAGE_RESTORE_DEFAULT="win7-x64"
+
 # The image target directory/name to use where new image directories are created. This is a subdirectory of the IMAGE_ROOT
-IMAGE_TARGET_DIR="temp"
+IMAGE_BACKUP_DIR="temp"
 
 # The default image program to use for creating images
 # Options are:
@@ -36,7 +39,4 @@ DEFAULT_IMAGE_PROGRAM="pc"
 
 # Optional custom script to run at the end of the backup script
 BACKUP_POST_SCRIPT=""
-
-# The default image directory/name to use for restore. This is a subdirectory of the IMAGE_ROOT
-IMAGE_DEFAULT_DIR="win7-x64"
 
