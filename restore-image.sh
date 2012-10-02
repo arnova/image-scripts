@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.07"
+MY_VERSION="3.07a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: August 3, 2012
+# Last update: October 2, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -599,22 +599,27 @@ for FN in partitions.*; do
 
   # Check for MBR restore
   if [ -z "$PARTITIONS_FOUND" ] || [ $CLEAN -eq 1 ] || [ $MBR_WRITE -eq 1 ]; then
-    if [ -f "track0.$HDD_NAME" ]; then
-      DD_SOURCE="track0.$HDD_NAME"
+    if [ -f "track0.${HDD_NAME}" ]; then
+      DD_SOURCE="track0.${HDD_NAME}"
     else
+      echo "WARNING: No track0.${HDD_NAME} found. MBR will be zeroed instead!" >&2
       DD_SOURCE="/dev/zero"
     fi
 
-    echo "* Updating track0(MBR) on /dev/$TARGET_NODEV"
-    if [ -z "$PARTITIONS_FOUND" ]; then
+    echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
+    
+    if [ $MBR_WRITE -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
       result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=1 count=32256 2>&1`
       retval=$?
-    else
+    elif [ $CLEAN - eq 1 ]; then
       result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
       retval=$?
     fi
+    
     if [ $retval -ne 0 ]; then
-      echo "$result" >&2
+      if [ -n "$result" ]; then
+        echo "$result" >&2
+      fi
       printf "\033[40m\033[1;31mERROR: Track0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
       do_exit 5
     fi
@@ -787,4 +792,3 @@ fi
 
 # Exit (+unmount)
 do_exit 0
-
