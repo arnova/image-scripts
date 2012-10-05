@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.07a"
+MY_VERSION="3.07b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 2, 2012
+# Last update: October 5, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -598,7 +598,7 @@ for FN in partitions.*; do
   PARTPROBE=0
 
   # Check for MBR restore
-  if [ -z "$PARTITIONS_FOUND" ] || [ $CLEAN -eq 1 ] || [ $MBR_WRITE -eq 1 ]; then
+  if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ]; then
     if [ -f "track0.${HDD_NAME}" ]; then
       DD_SOURCE="track0.${HDD_NAME}"
     else
@@ -608,11 +608,11 @@ for FN in partitions.*; do
 
     echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
     
-    if [ $MBR_WRITE -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
-      result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=1 count=32256 2>&1`
-      retval=$?
-    elif [ $CLEAN - eq 1 ]; then
+    if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
       result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
+      retval=$?
+    else
+      result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=1 count=32256 2>&1`
       retval=$?
     fi
     
