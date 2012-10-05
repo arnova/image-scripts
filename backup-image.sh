@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.06"
+MY_VERSION="3.07"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: August 3, 2012
+# Last update: October 5, 2012
 # (C) Copyright 2004-2012 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -94,7 +94,7 @@ configure_network()
             printf "Setup interface $CUR_IF statically (Y/N)? "
             
             read answer
-            if [ "$answer" = "n" ] || [ "$answer" = "N" ]; then
+            if [ "$answer" = "n" -o "$answer" = "N" ]; then
               continue
             fi
             
@@ -319,7 +319,7 @@ else
   PARTITIONS="${PARTITIONS}$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
 fi
 
-if [ "$NETWORK" != "none" ] && [ -n "$NETWORK" ] && [ "$NONET" != "1" ]; then
+if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NONET" != "1" ]; then
   # Setup network (interface)
   configure_network;
 
@@ -353,7 +353,7 @@ else
 
     MOUNT_ARGS="-t $MOUNT_TYPE"
 
-    if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
+    if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
       read -p "Network username ($DEFAULT_USERNAME): " USERNAME
       if [ -z "$USERNAME" ]; then
         USERNAME="$DEFAULT_USERNAME"
@@ -431,7 +431,7 @@ if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   read answer
   echo ""
 
-  if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
+  if [ "$answer" = "y" -o "$answer" = "Y" ]; then
     find . -maxdepth 1 -type f -exec rm -vf {} \;
   fi
 fi

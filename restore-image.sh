@@ -1,6 +1,6 @@
 # !/bin/bash
 
-MY_VERSION="3.07b"
+MY_VERSION="3.07c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: October 5, 2012
@@ -94,7 +94,7 @@ configure_network()
             printf "Setup interface $CUR_IF statically (Y/N)? "
             
             read answer
-            if [ "$answer" = "n" ] || [ "$answer" = "N" ]; then
+            if [ "$answer" = "n" -o "$answer" = "N" ]; then
               continue
             fi
             
@@ -381,7 +381,7 @@ if [ -n "$USER_TARGET_NODEV" ]; then
   fi
 fi
 
-if [ "$NETWORK" != "none" ] && [ -n "$NETWORK" ] && [ "$NONET" != "1" ]; then
+if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NONET" != "1" ]; then
   # Setup network (interface)
   configure_network;
 
@@ -415,7 +415,7 @@ else
 
     MOUNT_ARGS="-t $MOUNT_TYPE"
 
-    if [ -n "$NETWORK" ] && [ "$NETWORK" != "none" ] && [ -n "$DEFAULT_USERNAME" ]; then
+    if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
       read -p "Network username ($DEFAULT_USERNAME): " USERNAME
       if [ -z "$USERNAME" ]; then
         USERNAME="$DEFAULT_USERNAME"
@@ -628,7 +628,7 @@ for FN in partitions.*; do
   fi
   
   # Check for partition restore
-  if [ -n "$PARTITIONS_FOUND" ] && [ $CLEAN -eq 0 ] && [ $PT_WRITE -eq 0 ]; then
+  if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
     printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
     echo "To override this you must specify --clean or --pt. Press any key to continue or CTRL-C to abort..." >&2
     read -n1
