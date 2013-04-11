@@ -1,10 +1,10 @@
 # !/bin/bash
 
-MY_VERSION="3.07c"
+MY_VERSION="3.08"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 5, 2012
-# (C) Copyright 2004-2012 by Arno van Amersfoort
+# Last update: April 11, 2013
+# (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -228,6 +228,7 @@ show_help()
   echo "--clean                     - Always write MBR/partition table/swap space even if device is not empty (USE WITH CARE!)"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
   echo "--nonet|-n                  - Don't try to setup networking"
+  echo "--nopostsh|--nosh           - Don't execute any post image shell scripts"
 }
 
 
@@ -328,6 +329,7 @@ NONET=0
 NOCONF=0
 MBR_WRITE=0
 PT_WRITE=0
+NO_POST_SH=0
 
 # Check arguments
 unset IFS
@@ -347,6 +349,7 @@ for arg in $*; do
       --noconf) NOCONF=1;;
       --mbr) MBR_WRITE=1;;
       --pt) PT_WRITE=1;;
+      --nopostsh|--nosh) NO_POST_SH=1;;
       --help|-h) show_help; exit 3;;
       *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
     esac
@@ -413,27 +416,39 @@ else
     # Unmount mount point to be used
     umount "$IMAGE_ROOT" 2>/dev/null
 
-    MOUNT_ARGS="-t $MOUNT_TYPE"
-
     if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
-      read -p "Network username ($DEFAULT_USERNAME): " USERNAME
-      if [ -z "$USERNAME" ]; then
-        USERNAME="$DEFAULT_USERNAME"
+      while true; do
+        read -p "Network username ($DEFAULT_USERNAME): " USERNAME
+        if [ -z "$USERNAME" ]; then
+          USERNAME="$DEFAULT_USERNAME"
+        fi
+
+        echo "* Using network username $USERNAME"
+        
+        # Replace username in our mount arguments (it's a little dirty, I know ;-))
+        MOUNT_ARGS="-t $MOUNT_TYPE -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
+
+        echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
+        IFS=' '
+        if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
+          echo ""
+          printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT!\n\033[0m" >&2
+          echo ""
+        else
+          break; # All done: break
+        fi
+      done
+    else
+      MOUNT_ARGS="-t $MOUNT_TYPE"
+
+      echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
+      IFS=' '
+      if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 6
       fi
-
-      echo "* Using network username $USERNAME"
-      
-      # Replace username in our mount arguments (it's a little dirty, I know ;-))
-      MOUNT_ARGS="$MOUNT_ARGS -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
-    fi
-
-    echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
-    IFS=' '
-    if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
-      echo ""
-      printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-      echo ""
-      exit 6
     fi
   else
     # Reset mount device since we didn't mount
@@ -485,22 +500,23 @@ else
 
       if echo "$IMAGE_DIR" |grep -q "/$"; then
         continue;
-      elif [ ! -d "$IMAGE_DIR" ]; then
+      fi
+      
+      if [ ! -d "$IMAGE_DIR" ]; then
         printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
         IMAGE_DIR="$IMAGE_ROOT"
-      else
-        break;
+        continue;
       fi
+      
+      # Make the image dir our working directory
+      if ! cd "$IMAGE_DIR"; then
+        printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
+        continue;
+      fi
+
+      break; # All done: break
     done
   fi
-fi
-
-# Make the image dir our working directory
-if ! cd "$IMAGE_DIR"; then
-  echo ""
-  printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR! Quitting...\n\033[0m" >&2
-  echo ""
-  do_exit 7
 fi
 
 echo "* Using image name: $IMAGE_DIR"
@@ -765,13 +781,15 @@ done
 TARGET_DEVICE="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
-unset IFS
-for script in *.sh; do
-  if [ -f "$script" ]; then
-    # Source script:
-    . ./"$script"
-  fi
-done
+if [ $NO_POST_SH -eq 0 ]; then
+  unset IFS
+  for script in *.sh; do
+    if [ -f "$script" ]; then
+      # Source script:
+      . ./"$script"
+    fi
+  done
+fi
 
 echo ""
 
