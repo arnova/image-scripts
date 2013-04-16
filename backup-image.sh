@@ -207,9 +207,15 @@ sanity_check()
 }
 
 
+get_partitions_with_size()
+{
+  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
+}
+
+
 get_partitions()
 {
-  cat /proc/partitions |awk '{ print $NF }' |sed -e '1,2d' -e 's,^/dev/,,'
+  get_partitions_with_size |awk '{ print $1 }'
 }
 
 
@@ -531,8 +537,7 @@ for PART in $BACKUP_PARTITIONS; do
     pc)   TARGET_FILE="$PART.pc.gz"
           PARTCLONE=`partclone_detect "/dev/$PART"`
           printf "****** Using $PARTCLONE (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          $PARTCLONE -c -s "/dev/$PART" |gzip -c >"$TARGET_FILE"
-          retval=$?
+          $PARTCLONE -c -s "/dev/$PART" || retval=1 |gzip -c || retval=1 >"$TARGET_FILE"
           ;;
     fsa)  TARGET_FILE="$PART.fsa"
           printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
@@ -541,8 +546,7 @@ for PART in $BACKUP_PARTITIONS; do
           ;;
     ddgz) TARGET_FILE="$PART.dd.gz"
           printf "****** Using dd (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          dd if="/dev/$PART" bs=4096 |gzip -c >"$TARGET_FILE"
-          retval=$?
+          dd if="/dev/$PART" bs=4096 || retval=1 |gzip -c || retval=1 >"$TARGET_FILE"
           ;;
   esac
     

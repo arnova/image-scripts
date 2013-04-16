@@ -143,6 +143,7 @@ configure_network()
 
 
 # Wrapper for partclone to autodetect filesystem and select the proper partclone.*
+# $1 = device to inspect
 partclone_detect()
 {
   local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
@@ -203,14 +204,20 @@ sanity_check()
 #  check_binary fsarchiver
 #  check_binary partimage
 #  check_binary partclone.restore
+#  check_binary gdisk
+#  check_binary sgdisk
+}
 
 
+get_partitions_with_size()
+{
+  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
 }
 
 
 get_partitions()
 {
-  cat /proc/partitions |awk '{ print $NF }' |sed -e '1,2d' -e 's,^/dev/,,'
+  get_partitions_with_size |awk '{ print $1 }'
 }
 
 
@@ -756,11 +763,9 @@ for IMAGE_FILE in $IMAGE_FILES; do
     retval=$?
   elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
     PARTCLONE=`partclone_detect "/dev/$TARGET_PART_NODEV"`
-    zcat "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
-    retval=$?
+    zcat "$IMAGE_FILE" || retval=1 |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV" || retval=1
   else
-    gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
-    retval=$?
+    gunzip -c "$IMAGE_FILE" || retval=1 |dd of="/dev/$TARGET_PART_NODEV" bs=4096 || retval=1
   fi
 
   if [ $retval -ne 0 ]; then
