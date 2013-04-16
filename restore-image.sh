@@ -214,7 +214,6 @@ get_partitions_with_size()
   cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
 }
 
-
 get_partitions()
 {
   get_partitions_with_size |awk '{ print $1 }'
@@ -763,9 +762,17 @@ for IMAGE_FILE in $IMAGE_FILES; do
     retval=$?
   elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
     PARTCLONE=`partclone_detect "/dev/$TARGET_PART_NODEV"`
-    zcat "$IMAGE_FILE" || retval=1 |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV" || retval=1
+    zcat "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
+    retval=$?
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      retval=1
+    fi
   else
-    gunzip -c "$IMAGE_FILE" || retval=1 |dd of="/dev/$TARGET_PART_NODEV" bs=4096 || retval=1
+    gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
+    retval=$?
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      retval=1
+    fi
   fi
 
   if [ $retval -ne 0 ]; then
