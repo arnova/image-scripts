@@ -214,6 +214,7 @@ get_partitions_with_size()
   cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
 }
 
+
 get_partitions()
 {
   get_partitions_with_size |awk '{ print $1 }'
