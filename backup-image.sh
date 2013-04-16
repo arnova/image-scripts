@@ -219,6 +219,33 @@ get_partitions()
 }
 
 
+# mkdir + sanity check (cd) access to it
+mkdir_safe()
+{
+  local IMAGE_DIR="$1"
+
+  if ! mkdir -p "$IMAGE_DIR"; then
+    echo ""
+    printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($IMAGE_DIR)!\n\033[0m" >&2
+    return 1
+  fi
+
+  if [ ! -d "$IMAGE_DIR" ]; then
+    echo ""
+    printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist!\n\033[0m" >&2
+    return 2
+  fi
+
+  if ! cd "$IMAGE_DIR"; then
+    echo ""
+    printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
+    return 3
+  fi
+  
+  return 0
+}
+
+
 show_help()
 {
   echo "Usage: backup-image.sh [options] [image-name]"
@@ -342,6 +369,10 @@ if echo "$IMAGE_NAME" |grep -q '^[\./]'; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
   
+  if ! mkdir_safe "$IMAGE_DIR"; then
+    do_exit 7
+  fi
+
   # Reset mount device since we've been overruled
   MOUNT_DEVICE=""
 else
@@ -406,43 +437,49 @@ else
         printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
         continue;
       fi
-
-      if ! mkdir -p "$IMAGE_DIR"; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Unable to create target image directory ($IMAGE_DIR)!\n\033[0m" >&2
-        continue;
-      fi
-
-      if [ ! -d "$IMAGE_DIR" ]; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist!\n\033[0m" >&2
-        continue;
-      fi
-
-      if ! cd "$IMAGE_DIR"; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
-        continue;
-      fi
     
+      IMAGE_DIR="$IMAGE_NAME"
+  
+      if [ -n "$IMAGE_BACKUP_DIR" ]; then
+        IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
+      fi
+
+      if [ -n "$IMAGE_ROOT" ]; then
+        IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
+      fi
+
+      if ! mkdir_safe "$IMAGE_DIR"; then
+        continue;
+      fi
+  
       echo ""
       break; # All sane: break loop
     done
-  fi
-
-  IMAGE_DIR="$IMAGE_NAME"
+  else
+    IMAGE_DIR="$IMAGE_NAME"
   
-  if [ -n "$IMAGE_BACKUP_DIR" ]; then
-    IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
+    if [ -n "$IMAGE_BACKUP_DIR" ]; then
+      IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
+    fi
+
+    if [ -n "$IMAGE_ROOT" ]; then
+      IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
+    fi
+    
+    if ! mkdir_safe "$IMAGE_DIR"; then
+      do_exit 7;
+    fi
   fi
 
-  if [ -n "$IMAGE_ROOT" ]; then
-    IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
-  fi
 fi
 
 echo "* Using image name: $IMAGE_DIR"
 echo "* Image working directory: $(pwd)"
+
+if ! pwd |grep -q "$IMAGE_DIR$"; then
+  printf "\033[40m\033[1;31mERROR: Unable to access image directory ($IMAGE_DIR)!\n\033[0m" >&2
+  do_exit 7
+fi
 
 # Make sure target directory is empty
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then

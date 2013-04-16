@@ -221,6 +221,25 @@ get_partitions()
 }
 
 
+chdir_safe()
+{
+  local IMAGE_DIR="$1"
+  
+  if [ ! -d "$IMAGE_DIR" ]; then
+    printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
+    return 1
+  fi
+  
+  # Make the image dir our working directory
+  if ! cd "$IMAGE_DIR"; then
+    printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
+    return 2
+  fi
+
+  return 0
+}
+
+
 show_help()
 {
   echo "Usage: restore-image.sh [options] [image-name]"
@@ -408,6 +427,10 @@ if echo "$IMAGE_NAME" |grep -q '^[\./]'; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
   
+  if ! chdir_safe "$IMAGE_DIR"; then
+    do_exit 7
+  fi
+  
   # Reset mount device since we've been overruled
   MOUNT_DEVICE=""
 else
@@ -470,8 +493,7 @@ else
       IMAGE_DIR="$IMAGE_NAME"
     fi
     
-    if [ ! -d "$IMAGE_DIR" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist! Quitting...\n\033[0m" >&2
+    if ! chdir_safe "$IMAGE_DIR"; then
       do_exit 7
     fi
   else
@@ -509,18 +531,11 @@ else
         continue;
       fi
       
-      if [ ! -d "$IMAGE_DIR" ]; then
-        printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
+      if ! chdir_safe "$IMAGE_DIR"; then
         IMAGE_DIR="$IMAGE_ROOT"
         continue;
       fi
       
-      # Make the image dir our working directory
-      if ! cd "$IMAGE_DIR"; then
-        printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
-        continue;
-      fi
-
       break; # All done: break
     done
   fi
@@ -528,6 +543,11 @@ fi
 
 echo "* Using image name: $IMAGE_DIR"
 echo "* Image working directory: $(pwd)"
+
+if ! pwd |grep -q "$IMAGE_DIR$"; then
+  printf "\033[40m\033[1;31mERROR: Unable to access image directory ($IMAGE_DIR)!\n\033[0m" >&2
+  do_exit 7
+fi
 
 if [ -e "description.txt" ]; then
   echo "--------------------------------------------------------------------------------"
