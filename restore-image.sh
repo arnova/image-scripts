@@ -549,15 +549,6 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
   do_exit 7
 fi
 
-if [ -e "description.txt" ]; then
-  echo "--------------------------------------------------------------------------------"
-  cat "description.txt"
-  echo "--------------------------------------------------------------------------------"
-  echo "Press any key to continue"
-  read -n 1
-  echo ""
-fi
-
 IMAGE_FILES=""
 if [ -n "$PARTITIONS_NODEV" ]; then
   IFS=' '
@@ -576,6 +567,7 @@ else
   for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
     # Add item to list
     IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
+    echo "* Using image \"${basename "$ITEM")\" for device /dev/$PART"
   done
 fi
 
@@ -583,6 +575,16 @@ if [ -z "$IMAGE_FILES" ]; then
   printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m" >&2
   do_exit 5
 fi
+
+if [ -e "description.txt" ]; then
+  echo "--------------------------------------------------------------------------------"
+  cat "description.txt"
+fi
+
+echo "--------------------------------------------------------------------------------"
+echo "Press any key to continue"
+read -n 1
+echo ""
 
 # Restore MBR/track0/partitions
 TARGET_NODEV=""
