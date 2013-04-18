@@ -278,6 +278,7 @@ PARTITIONS=""
 IMAGE_PROGRAM=""
 NONET=0
 NOCONF=0
+GZIP_COMPRESSION=1
 
 # Check arguments
 unset IFS
@@ -290,6 +291,7 @@ for arg in $*; do
   else
     case "$ARGNAME" in
       --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+      --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
       --conf|-c) CONF="$ARGVAL";;
       --fsa) IMAGE_PROGRAM="fsa";;
       --ddgz) IMAGE_PROGRAM="ddgz";;
@@ -574,7 +576,7 @@ for PART in $BACKUP_PARTITIONS; do
     pc)   TARGET_FILE="$PART.pc.gz"
           PARTCLONE=`partclone_detect "/dev/$PART"`
           printf "****** Using $PARTCLONE (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          $PARTCLONE -c -s "/dev/$PART" |gzip -1 -c >"$TARGET_FILE"
+          $PARTCLONE -c -s "/dev/$PART" |gzip -$GZIP_COMPRESSION -c >"$TARGET_FILE"
           retval=$?
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             retval=1
@@ -587,7 +589,7 @@ for PART in $BACKUP_PARTITIONS; do
           ;;
     ddgz) TARGET_FILE="$PART.dd.gz"
           printf "****** Using dd (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          dd if="/dev/$PART" bs=4096 |gzip -1 -c >"$TARGET_FILE"
+          dd if="/dev/$PART" bs=4096 |gzip -$GZIP_COMPRESSION -c >"$TARGET_FILE"
           retval=$?
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             retval=1
