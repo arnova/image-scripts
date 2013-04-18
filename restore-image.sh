@@ -541,6 +541,7 @@ else
   fi
 fi
 
+echo "--------------------------------------------------------------------------------"
 echo "* Using image name: $IMAGE_DIR"
 echo "* Image working directory: $(pwd)"
 
@@ -567,7 +568,8 @@ else
   for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
     # Add item to list
     IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
-    echo "* Using image \"$(basename "$ITEM")\" for device /dev/$PART"
+    PART="$(echo "$ITEM" |sed 's/\..*//')"
+    echo "* Using image file \"$(basename "$ITEM")\" for device /dev/$PART"
   done
 fi
 
