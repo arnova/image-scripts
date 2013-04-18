@@ -202,7 +202,7 @@ sanity_check()
 
   [ "$IMAGE_PROGRAM" = "fsa" ] && check_binary fsarchiver
   [ "$IMAGE_PROGRAM" = "pi" ] && check_binary partimage
-  [ "$IMAGE_PROGRAM" = "pc" ] && check_binary partclone.dd
+  [ "$IMAGE_PROGRAM" = "pc" ] && check_binary partclone.dd partclone.ntfs partclone.fat partclone.extfs gzip
   [ "$IMAGE_PROGRAM" = "ddgz" ] && check_binary gzip
 }
 
@@ -257,7 +257,7 @@ show_help()
   echo "--noconf                    - Don't read the config file"
   echo "--fsa                       - Use fsarchiver for imaging"
   echo "--pi                        - Use partimage for imaging"
-  echo "--pc                        - Use partclone for imaging"
+  echo "--pc                        - Use partclone + gzip for imaging"
   echo "--ddgz                      - Use dd + gzip for imaging"
   echo "--nonet|-n                  - Don't try to setup networking"
 }
@@ -574,7 +574,7 @@ for PART in $BACKUP_PARTITIONS; do
     pc)   TARGET_FILE="$PART.pc.gz"
           PARTCLONE=`partclone_detect "/dev/$PART"`
           printf "****** Using $PARTCLONE (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          $PARTCLONE -c -s "/dev/$PART" |gzip -c >"$TARGET_FILE"
+          $PARTCLONE -c -s "/dev/$PART" |gzip -1 -c >"$TARGET_FILE"
           retval=$?
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             retval=1
@@ -587,7 +587,7 @@ for PART in $BACKUP_PARTITIONS; do
           ;;
     ddgz) TARGET_FILE="$PART.dd.gz"
           printf "****** Using dd (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          dd if="/dev/$PART" bs=4096 |gzip -c >"$TARGET_FILE"
+          dd if="/dev/$PART" bs=4096 |gzip -1 -c >"$TARGET_FILE"
           retval=$?
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             retval=1
