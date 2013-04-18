@@ -642,10 +642,10 @@ if [ -n "$SUCCESS" ]; then
 fi
 
 # Check integrity of gzip-files:
-if [ -n "$(find . -maxdepth 1 -type f -iname "*.gz" 2>/dev/null)" ]; then
+if [ -n "$(find . -maxdepth 1 -type f -iname "*\.gz*" 2>/dev/null)" ]; then
   echo ""
   echo "Verifying gzip images (CTRL-C to break):"
-  gzip -tv *.gz
+  gzip -tv *\.gz*
 fi
 
 # Exit (+unmount)
