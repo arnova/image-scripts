@@ -567,7 +567,7 @@ else
   for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
     # Add item to list
     IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
-    echo "* Using image \"${basename "$ITEM")\" for device /dev/$PART"
+    echo "* Using image \"$(basename "$ITEM")\" for device /dev/$PART"
   done
 fi
 
