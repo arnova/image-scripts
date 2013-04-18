@@ -671,8 +671,9 @@ for FN in partitions.*; do
       do_exit 5
     fi
     PARTPROBE=1
-    echo ""
   fi
+  
+  echo ""
   
   # Check for partition restore
   if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
