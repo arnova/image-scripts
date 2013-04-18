@@ -321,7 +321,7 @@ if [ -z "$IMAGE_PROGRAM" ]; then
 fi
 
 # Sanity check compression
-if [ -z "$GZIP_COMPRESSION" || $GZIP_COMPRESSION -lt 1 || $GZIP_COMPRESSION -gt 9 ]; then
+if [ -z "$GZIP_COMPRESSION" -o $GZIP_COMPRESSION -lt 1 -o $GZIP_COMPRESSION -gt 9 ]; then
   GZIP_COMPRESSION=1
 fi
 
