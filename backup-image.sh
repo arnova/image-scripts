@@ -254,6 +254,7 @@ show_help()
   echo "--help|-h                   - Print this help"
   echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all)"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
+  echo "--compression|-z=level      - Set gzip compression level (when used). 1=Low but fast (default), 9=High but slow"
   echo "--noconf                    - Don't read the config file"
   echo "--fsa                       - Use fsarchiver for imaging"
   echo "--pi                        - Use partimage for imaging"
@@ -317,6 +318,11 @@ if [ -z "$IMAGE_PROGRAM" ]; then
   else
     IMAGE_PROGRAM="pc"
   fi
+fi
+
+# Sanity check compression
+if [ -z "$GZIP_COMPRESSION" || $GZIP_COMPRESSION -lt 1 || $GZIP_COMPRESSION -gt 9 ]; then
+  GZIP_COMPRESSION=1
 fi
 
 # Translate "long" names to short
