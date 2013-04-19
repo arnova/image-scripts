@@ -201,6 +201,7 @@ sanity_check()
   check_binary dd
   check_binary mount
   check_binary umount
+#  check_binary unpigz
 #  check_binary fsarchiver
 #  check_binary partimage
 #  check_binary partclone.restore
@@ -791,13 +792,13 @@ for IMAGE_FILE in $IMAGE_FILES; do
     retval=$?
   elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
     PARTCLONE=`partclone_detect "/dev/$TARGET_PART_NODEV"`
-    zcat "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
+    pigz -d -c "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
     retval=$?
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       retval=1
     fi
   else
-    gunzip -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
+    pigz -d -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
     retval=$?
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       retval=1
@@ -844,10 +845,7 @@ if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
 fi
 
-# Show result to user
-if [ -n "$SUCCESS" ]; then
-  echo "* Partitions restored successfully: $SUCCESS"
-fi
+echo "* Partitions restored successfully: $SUCCESS"
 
 # Exit (+unmount)
 do_exit 0

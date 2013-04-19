@@ -202,8 +202,8 @@ sanity_check()
 
   [ "$IMAGE_PROGRAM" = "fsa" ] && check_binary fsarchiver
   [ "$IMAGE_PROGRAM" = "pi" ] && check_binary partimage
-  [ "$IMAGE_PROGRAM" = "pc" ] && check_binary partclone.dd partclone.ntfs partclone.fat partclone.extfs gzip
-  [ "$IMAGE_PROGRAM" = "ddgz" ] && check_binary gzip
+  [ "$IMAGE_PROGRAM" = "pc" ] && check_binary partclone.dd partclone.ntfs partclone.fat partclone.extfs pigz
+  [ "$IMAGE_PROGRAM" = "ddgz" ] && check_binary pigz
 }
 
 
@@ -254,12 +254,12 @@ show_help()
   echo "--help|-h                   - Print this help"
   echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all)"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
-  echo "--compression|-z=level      - Set gzip compression level (when used). 1=Low but fast (default), 9=High but slow"
+  echo "--compression|-z=level      - Set pigz compression level (when used). 1=Low but fast (default), 9=High but slow"
   echo "--noconf                    - Don't read the config file"
   echo "--fsa                       - Use fsarchiver for imaging"
   echo "--pi                        - Use partimage for imaging"
-  echo "--pc                        - Use partclone + gzip for imaging"
-  echo "--ddgz                      - Use dd + gzip for imaging"
+  echo "--pc                        - Use partclone + pigz for imaging"
+  echo "--ddgz                      - Use dd + pigz for imaging"
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
 }
@@ -280,7 +280,7 @@ PARTITIONS=""
 IMAGE_PROGRAM=""
 NONET=0
 NOCONF=0
-GZIP_COMPRESSION=1
+PIGZ_COMPRESSION=1
 NO_MOUNT=0
 
 # Check arguments
@@ -294,7 +294,7 @@ for arg in $*; do
   else
     case "$ARGNAME" in
       --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
-      --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
+      --compression|-z) PIGZ_COMPRESSION="$ARGVAL";;
       --conf|-c) CONF="$ARGVAL";;
       --fsa) IMAGE_PROGRAM="fsa";;
       --ddgz) IMAGE_PROGRAM="ddgz";;
@@ -324,8 +324,8 @@ if [ -z "$IMAGE_PROGRAM" ]; then
 fi
 
 # Sanity check compression
-if [ -z "$GZIP_COMPRESSION" -o $GZIP_COMPRESSION -lt 1 -o $GZIP_COMPRESSION -gt 9 ]; then
-  GZIP_COMPRESSION=1
+if [ -z "$PIGZ_COMPRESSION" -o $PIGZ_COMPRESSION -lt 1 -o $PIGZ_COMPRESSION -gt 9 ]; then
+  PIGZ_COMPRESSION=1
 fi
 
 # Translate "long" names to short
@@ -590,8 +590,8 @@ for PART in $BACKUP_PARTITIONS; do
           ;;
     pc)   TARGET_FILE="$PART.pc.gz"
           PARTCLONE=`partclone_detect "/dev/$PART"`
-          printf "****** Using $PARTCLONE (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          $PARTCLONE -c -s "/dev/$PART" |gzip -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+          printf "****** Using $PARTCLONE (+pigz) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+          $PARTCLONE -c -s "/dev/$PART" |pigz --independent -$GZIP_COMPRESSION -c >"$TARGET_FILE"
           retval=$?
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             retval=1
@@ -603,8 +603,8 @@ for PART in $BACKUP_PARTITIONS; do
           retval=$?
           ;;
     ddgz) TARGET_FILE="$PART.dd.gz"
-          printf "****** Using dd (+gzip) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          dd if="/dev/$PART" bs=4096 |gzip -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+          printf "****** Using dd (+pigz) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+          dd if="/dev/$PART" bs=4096 |pigz --independent -$GZIP_COMPRESSION -c >"$TARGET_FILE"
           retval=$?
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             retval=1
@@ -645,16 +645,13 @@ if [ -n "$FAILED" ]; then
   echo "* Partitions FAILED to backup: $FAILED"
 fi
 
-# Show result to user
-if [ -n "$SUCCESS" ]; then
-  echo "* Partitions backuped successfully: $SUCCESS"
-fi
+echo "* Partitions backuped successfully: $SUCCESS"
 
-# Check integrity of gzip-files:
+# Check integrity of pigz-files:
 if [ -n "$(find . -maxdepth 1 -type f -iname "*\.gz*" 2>/dev/null)" ]; then
   echo ""
-  echo "Verifying gzip images (CTRL-C to break):"
-  gzip -tv *\.gz*
+  echo "Verifying .gz images (CTRL-C to break):"
+  pigz -tv *\.gz*
 fi
 
 # Exit (+unmount)
