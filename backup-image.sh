@@ -481,6 +481,7 @@ else
 
 fi
 
+echo "--------------------------------------------------------------------------------"
 echo "* Using image name: $IMAGE_DIR"
 echo "* Image working directory: $(pwd)"
 
@@ -513,11 +514,16 @@ for PART in $PARTITIONS; do
   fi
 done
 
-echo "* Partitions to backup: $BACKUP_PARTITIONS"
-
 if [ -n "$IGNORE_PARTITIONS" ]; then
   echo "* Partitions to ignore: $IGNORE_PARTITIONS"
 fi
+
+if [ -n "$BACKUP_PARTITIONS" ]; then
+  echo "* Partitions to backup: $BACKUP_PARTITIONS"
+else
+  printf "\033[40m\033[1;31mERROR: No partitions to backup!\n\033[0m" >&2
+fi
+
 echo ""
 
 read -p "Please enter description: " DESCRIPTION
@@ -567,7 +573,7 @@ for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
   fi
 done
 
-echo ""
+echo "--------------------------------------------------------------------------------"
 
 # Backup all specified partitions:
 unset IFS
