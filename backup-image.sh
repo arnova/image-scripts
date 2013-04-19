@@ -261,6 +261,7 @@ show_help()
   echo "--pc                        - Use partclone + gzip for imaging"
   echo "--ddgz                      - Use dd + gzip for imaging"
   echo "--nonet|-n                  - Don't try to setup networking"
+  echo "--nomount|-m                - Don't mount anything"
 }
 
 
@@ -280,6 +281,7 @@ IMAGE_PROGRAM=""
 NONET=0
 NOCONF=0
 GZIP_COMPRESSION=1
+NO_MOUNT=0
 
 # Check arguments
 unset IFS
@@ -299,6 +301,7 @@ for arg in $*; do
       --pi) IMAGE_PROGRAM="pi";;
       --pc) IMAGE_PROGRAM="pc";;
       --nonet|-n) NONET=1;;
+      --nomount|-m NO_MOUNT=1;;
       --noconf) NOCONF=1;;
       --help) show_help; exit 3;;
       *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
@@ -373,7 +376,7 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if echo "$IMAGE_NAME" |grep -q '^[\./]'; then
+if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
   

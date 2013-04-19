@@ -240,24 +240,6 @@ chdir_safe()
 }
 
 
-show_help()
-{
-  echo "Usage: restore-image.sh [options] [image-name]"
-  echo ""
-  echo "Options:"
-  echo "--help|-h                   - Print this help"
-  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions)"
-  echo "--conf|-c={config_file}     - Specify alternate configuration file"
-  echo "--noconf                    - Don't read the config file"
-  echo "--mbr                       - Always write a new MBR (from track0.*)"
-  echo "--pt                        - Always write a new partition table (from partition.*)"
-  echo "--clean                     - Always write MBR/partition table/swap space even if device is not empty (USE WITH CARE!)"
-  echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
-  echo "--nonet|-n                  - Don't try to setup networking"
-  echo "--nopostsh|--nosh           - Don't execute any post image shell scripts"
-}
-
-
 # Function which waits till the kernel ACTUALLY re-read the partition table
 partwait()
 {
@@ -338,6 +320,25 @@ partprobe()
 }
 
 
+show_help()
+{
+  echo "Usage: restore-image.sh [options] [image-name]"
+  echo ""
+  echo "Options:"
+  echo "--help|-h                   - Print this help"
+  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions)"
+  echo "--conf|-c={config_file}     - Specify alternate configuration file"
+  echo "--noconf                    - Don't read the config file"
+  echo "--mbr                       - Always write a new MBR (from track0.*)"
+  echo "--pt                        - Always write a new partition table (from partition.*)"
+  echo "--clean                     - Always write MBR/partition table/swap space even if device is not empty (USE WITH CARE!)"
+  echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
+  echo "--nonet|-n                  - Don't try to setup networking"
+  echo "--nomount|-m                - Don't mount anything"
+  echo "--nopostsh|--nosh           - Don't execute any post image shell scripts"
+}
+
+
 #######################
 # Program entry point #
 #######################
@@ -356,6 +357,7 @@ NOCONF=0
 MBR_WRITE=0
 PT_WRITE=0
 NO_POST_SH=0
+NO_MOUNT=0
 
 # Check arguments
 unset IFS
@@ -372,6 +374,7 @@ for arg in $*; do
       --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
       --nonet|-n) NONET=1;;
+      --nomount|-m NO_MOUNT=1;;
       --noconf) NOCONF=1;;
       --mbr) MBR_WRITE=1;;
       --pt) PT_WRITE=1;;
@@ -423,7 +426,7 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if echo "$IMAGE_NAME" |grep -q '^[\./]'; then
+if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
   # Assume absolute path
   IMAGE_DIR="$IMAGE_NAME"
   
