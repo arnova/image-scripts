@@ -1,6 +1,6 @@
 # !/bin/bash
 
-MY_VERSION="3.08a"
+MY_VERSION="3.10-BETA"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: April 17, 2013
@@ -321,6 +321,366 @@ partprobe()
 }
 
 
+set_image_dir()
+{
+  if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
+    # Assume absolute path
+    IMAGE_DIR="$IMAGE_NAME"
+    
+    if ! chdir_safe "$IMAGE_DIR"; then
+      do_exit 7
+    fi
+    
+    # Reset mount device since we've been overruled
+    MOUNT_DEVICE=""
+  else
+    if [ -n "$MOUNT_DEVICE" -a -n "$IMAGE_ROOT" ]; then
+      # Create mount point
+      if ! mkdir -p "$IMAGE_ROOT"; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 7
+      fi
+
+      # Unmount mount point to be used
+      umount "$IMAGE_ROOT" 2>/dev/null
+
+      if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
+        while true; do
+          read -p "Network username ($DEFAULT_USERNAME): " USERNAME
+          if [ -z "$USERNAME" ]; then
+            USERNAME="$DEFAULT_USERNAME"
+          fi
+
+          echo "* Using network username $USERNAME"
+          
+          # Replace username in our mount arguments (it's a little dirty, I know ;-))
+          MOUNT_ARGS="-t $MOUNT_TYPE -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
+
+          echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
+          IFS=' '
+          if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
+            echo ""
+            printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT!\n\033[0m" >&2
+            echo ""
+          else
+            break; # All done: break
+          fi
+        done
+      else
+        MOUNT_ARGS="-t $MOUNT_TYPE"
+
+        echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
+        IFS=' '
+        if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
+          echo ""
+          printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+          echo ""
+          exit 6
+        fi
+      fi
+    else
+      # Reset mount device since we didn't mount
+      MOUNT_DEVICE=""
+    fi
+
+    # The IMAGE_NAME was set from the commandline:
+    if [ -n "$IMAGE_NAME" ]; then
+      if [ -n "$IMAGE_ROOT" ]; then
+        IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
+      else
+        IMAGE_DIR="$IMAGE_NAME"
+      fi
+      
+      if ! chdir_safe "$IMAGE_DIR"; then
+        do_exit 7
+      fi
+    else
+      if [ -z "$IMAGE_ROOT" ]; then
+        # Default to the cwd
+        IMAGE_ROOT="."
+      fi
+      
+      IMAGE_DIR="$IMAGE_ROOT"
+      
+      # Ask user for IMAGE_NAME:
+      while true; do
+        echo "* Showing contents of the image root directory ($IMAGE_DIR):"
+        IFS=$EOL
+        find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+          echo "$(basename "$ITEM")"
+        done
+
+        printf "\nImage to use ($IMAGE_RESTORE_DEFAULT): "
+        read IMAGE_NAME
+        
+        if [ -z "$IMAGE_NAME" -a -n "$IMAGE_RESTORE_DEFAULT" ]; then
+          IMAGE_NAME="$IMAGE_RESTORE_DEFAULT"
+        fi
+        
+        if [ -z "$IMAGE_NAME" ]; then
+          printf "\033[40m\033[1;31m\nERROR: No image directory specified!\n\n\033[0m" >&2
+          continue;
+        fi
+
+        # Set the directory where the image(s) are
+        IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
+
+        if echo "$IMAGE_DIR" |grep -q "/$"; then
+          continue;
+        fi
+        
+        if ! chdir_safe "$IMAGE_DIR"; then
+          IMAGE_DIR="$IMAGE_ROOT"
+          continue;
+        fi
+        
+        break; # All done: break
+      done
+    fi
+  fi
+}
+
+
+restore_partitions()
+{
+  # Restore the actual image(s):
+  unset IFS
+  for IMAGE_FILE in $IMAGE_FILES; do
+    # Strip extension so we get the actual device name
+    PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+
+    # We want another target device than specified in the image name?:
+    if [ -n "$USER_TARGET_NODEV" ]; then
+      NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
+      TARGET_PART_NODEV="$(get_partitions |grep -E -x -e "${USER_TARGET_NODEV}p?${NUM}")"
+    else
+      TARGET_PART_NODEV="$PARTITION"
+    fi
+
+    echo "* Selected partition: /dev/$TARGET_PART_NODEV. Using image file: $IMAGE_FILE"
+    retval=0
+    if echo "$IMAGE_FILE" |grep -q "\.fsa$"; then
+      fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PART_NODEV"
+      retval=$?
+    elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
+      partimage -b restore "/dev/$TARGET_PART_NODEV" "$IMAGE_FILE"
+      retval=$?
+    elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
+      PARTCLONE=`partclone_detect "/dev/$TARGET_PART_NODEV"`
+      pigz -d -c "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
+      retval=$?
+      if [ ${PIPESTATUS[0]} -ne 0 ]; then
+        retval=1
+      fi
+    else
+      pigz -d -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
+      retval=$?
+      if [ ${PIPESTATUS[0]} -ne 0 ]; then
+        retval=1
+      fi
+    fi
+
+    if [ $retval -ne 0 ]; then
+      FAILED="${FAILED}${FAILED:+ }${TARGET_PART_NODEV}"
+      printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PART_NODEV.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
+      read -n1
+    else
+      SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PART_NODEV}"
+      echo "****** $IMAGE_FILE restored to /dev/$TARGET_PART_NODEV ******"
+    fi
+    echo ""
+  done
+}
+
+
+restore_disks()
+{
+  # Restore MBR/track0/partitions
+  TARGET_NODEV=""
+  unset IFS
+  for FN in partitions.*; do
+    HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
+
+    # If no target drive specified use default drive from image:
+    if [ -n "$USER_TARGET_NODEV" ]; then
+      TARGET_NODEV="$USER_TARGET_NODEV"
+    else
+      if [ -z "$TARGET_NODEV" ]; then
+        # Extract drive name from file
+        TARGET_NODEV="$HDD_NAME"
+      fi
+    fi
+
+    # Check if target device exists
+    if ! get_partitions |grep -q -x "$TARGET_NODEV"; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
+      echo ""
+      do_exit 5
+    fi
+
+    # Check if DMA is enabled for device
+    check_dma "/dev/$TARGET_NODEV"
+
+    # Check whether device already contains partitions
+    PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
+    
+    IFS=$EOL
+    for PART in $PARTITIONS_FOUND; do
+      # (Try) to unmount all partitions on this device
+      if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
+        if ! umount /dev/$PART >/dev/null; then
+          echo ""
+          printf "\033[40m\033[1;31mERROR: Unable to umount /dev/$PART. Wrong target device specified? Quitting...\n\033[0m" >&2
+          echo ""
+          do_exit 5
+        fi
+      fi
+
+      # Disable all swaps on this device
+      if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
+        if ! swapoff /dev/$PART >/dev/null; then
+          echo ""
+          printf "\033[40m\033[1;31mERROR: Unable to swapoff /dev/$PART. Wrong target device specified? Quitting...\n\033[0m" >&2
+          echo ""
+          do_exit 5
+        fi
+      fi
+    done
+    
+    # Flag in case we update the mbr/partition table so we know we need to have the kernel to re-probe
+    PARTPROBE=0
+
+    # Check for MBR restore
+    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ]; then
+      if [ -f "track0.${HDD_NAME}" ]; then
+        DD_SOURCE="track0.${HDD_NAME}"
+      else
+        echo "WARNING: No track0.${HDD_NAME} found. MBR will be zeroed instead!" >&2
+        DD_SOURCE="/dev/zero"
+      fi
+
+      echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
+      
+      if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
+        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
+        retval=$?
+      else
+        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=1 count=32256 2>&1`
+        retval=$?
+      fi
+      
+      if [ $retval -ne 0 ]; then
+        if [ -n "$result" ]; then
+          echo "$result" >&2
+        fi
+        printf "\033[40m\033[1;31mERROR: Track0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+      PARTPROBE=1
+    fi
+    
+    echo ""
+    
+    # Check for partition restore
+    if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
+      printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
+      echo "To override this you must specify --clean or --pt. Press any key to continue or CTRL-C to abort..." >&2
+      read -n1
+      echo ""
+    else
+      if [ -f "partitions.$HDD_NAME" ]; then
+        echo "* Updating partition table on /dev/$TARGET_NODEV"
+        sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
+        retval=$?
+          
+        if [ $retval -ne 0 ]; then
+          printf "\033[40m\033[1;31mPartition table restore failed($retval). Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+        PARTPROBE=1
+        echo ""
+      fi
+    fi
+    
+    if [ $PARTPROBE -eq 1 ]; then
+      # Re-read partition table
+      partprobe "/dev/$TARGET_NODEV"
+      retval=$?
+      if [ $retval -ne 0 ]; then
+        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed($retval)!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
+        read -n1
+        echo ""
+      fi
+    fi
+    
+    if [ $CLEAN -eq 1 ]; then
+      # Create swap on swap partitions
+      IFS=$EOL
+      sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
+        PART="$(echo "$LINE" |awk '{ print $1 }')"
+        if ! mkswap $PART; then
+          printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
+        fi
+      done
+    fi
+  done
+}
+
+verify_target()
+{
+  # Test whether the target partition(s) exist and have the correct geometry:
+  local MISMATCH=0
+  unset IFS
+  for IMAGE_FILE in $IMAGE_FILES; do
+    # Strip extension so we get the actual device name
+    PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+    
+    # Do we want another target device than specified in the image name?:
+    if [ -n "$USER_TARGET_NODEV" ]; then
+      NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
+      SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${USER_TARGET_NODEV}p?${NUM}[[:blank:]]"`
+      if [ -z "$SFDISK_TARGET_PART" ]; then
+        printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+    else
+      SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
+      if [ -z "$SFDISK_TARGET_PART" ]; then
+        printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+    fi
+
+    ## Match partition with what we have stored in our partitions file
+    SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
+    if [ -z "$SFDISK_SOURCE_PART" ]; then
+      printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m" >&2
+      do_exit 5
+    fi
+
+    echo "* Source partition: $SFDISK_SOURCE_PART"
+    echo "* Target partition: $SFDISK_TARGET_PART"
+    echo ""
+
+    if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
+      MISMATCH=1
+    fi
+  done
+
+  if [ $MISMATCH -ne 0 ]; then
+    printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m" >&2
+    read -n1
+    echo ""
+    return 1
+  fi
+  
+  return 0
+}
+
+
 show_help()
 {
   echo "Usage: restore-image.sh [options] [image-name]"
@@ -340,66 +700,73 @@ show_help()
 }
 
 
+load_config()
+{
+  # Set environment variables to default
+  CONF="$DEFAULT_CONF"
+  IMAGE_NAME=""
+  SUCCESS=""
+  FAILED=""
+  USER_TARGET_NODEV=""
+  PARTITIONS_NODEV=""
+  CLEAN=0
+  NONET=0
+  NOCONF=0
+  MBR_WRITE=0
+  PT_WRITE=0
+  NO_POST_SH=0
+  NO_MOUNT=0
+
+  # Check arguments
+  unset IFS
+  for arg in $*; do
+    ARGNAME=`echo "$arg" |cut -d= -f1`
+    ARGVAL=`echo "$arg" |cut -d= -f2`
+
+    if [ -z "$(echo "$ARGNAME" |grep '^-')" ]; then
+      IMAGE_NAME="$ARGVAL"
+    else
+      case "$ARGNAME" in
+        --clean|-c) CLEAN=1;;
+        --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
+        --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+        --conf|-c) CONF="$ARGVAL";;
+        --nonet|-n) NONET=1;;
+        --nomount|-m) NO_MOUNT=1;;
+        --noconf) NOCONF=1;;
+        --mbr) MBR_WRITE=1;;
+        --pt) PT_WRITE=1;;
+        --nopostsh|--nosh) NO_POST_SH=1;;
+        --help|-h) show_help; exit 3;;
+        *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
+      esac
+    fi
+  done
+
+  # Check if configuration file exists
+  if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
+    # Source the configuration
+    . "$CONF"
+  fi
+
+  # Translate "long" names to short
+  if   [ "$IMAGE_PROGRAM" = "fsarchiver" ]; then
+    IMAGE_PROGRAM="fsa"
+  elif [ "$IMAGE_PROGRAM" = "partimage" ]; then
+    IMAGE_PROGRAM="pi"
+  elif [ "$IMAGE_PROGRAM" = "partclone" ]; then
+    IMAGE_PROGRAM="pc"
+  fi
+}
+
+
 #######################
 # Program entry point #
 #######################
 echo "Image RESTORE Script v$MY_VERSION - Written by Arno van Amersfoort"
 
-# Set environment variables to default
-CONF="$DEFAULT_CONF"
-IMAGE_NAME=""
-SUCCESS=""
-FAILED=""
-USER_TARGET_NODEV=""
-PARTITIONS_NODEV=""
-CLEAN=0
-NONET=0
-NOCONF=0
-MBR_WRITE=0
-PT_WRITE=0
-NO_POST_SH=0
-NO_MOUNT=0
-
-# Check arguments
-unset IFS
-for arg in $*; do
-  ARGNAME=`echo "$arg" |cut -d= -f1`
-  ARGVAL=`echo "$arg" |cut -d= -f2`
-
-  if [ -z "$(echo "$ARGNAME" |grep '^-')" ]; then
-    IMAGE_NAME="$ARGVAL"
-  else
-    case "$ARGNAME" in
-      --clean|-c) CLEAN=1;;
-      --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
-      --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
-      --conf|-c) CONF="$ARGVAL";;
-      --nonet|-n) NONET=1;;
-      --nomount|-m NO_MOUNT=1;;
-      --noconf) NOCONF=1;;
-      --mbr) MBR_WRITE=1;;
-      --pt) PT_WRITE=1;;
-      --nopostsh|--nosh) NO_POST_SH=1;;
-      --help|-h) show_help; exit 3;;
-      *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
-    esac
-  fi
-done
-
-# Check if configuration file exists
-if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
-  # Source the configuration
-  . "$CONF"
-fi
-
-# Translate "long" names to short
-if   [ "$IMAGE_PROGRAM" = "fsarchiver" ]; then
-  IMAGE_PROGRAM="fsa"
-elif [ "$IMAGE_PROGRAM" = "partimage" ]; then
-  IMAGE_PROGRAM="pi"
-elif [ "$IMAGE_PROGRAM" = "partclone" ]; then
-  IMAGE_PROGRAM="pc"
-fi
+# Load configuration from file/commandline
+load_config;
 
 # Sanity check environment
 sanity_check;
@@ -427,128 +794,13 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
-  # Assume absolute path
-  IMAGE_DIR="$IMAGE_NAME"
-  
-  if ! chdir_safe "$IMAGE_DIR"; then
-    do_exit 7
-  fi
-  
-  # Reset mount device since we've been overruled
-  MOUNT_DEVICE=""
-else
-  if [ -n "$MOUNT_DEVICE" -a -n "$IMAGE_ROOT" ]; then
-    # Create mount point
-    if ! mkdir -p "$IMAGE_ROOT"; then
-      echo ""
-      printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-      echo ""
-      exit 7
-    fi
-
-    # Unmount mount point to be used
-    umount "$IMAGE_ROOT" 2>/dev/null
-
-    if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
-      while true; do
-        read -p "Network username ($DEFAULT_USERNAME): " USERNAME
-        if [ -z "$USERNAME" ]; then
-          USERNAME="$DEFAULT_USERNAME"
-        fi
-
-        echo "* Using network username $USERNAME"
-        
-        # Replace username in our mount arguments (it's a little dirty, I know ;-))
-        MOUNT_ARGS="-t $MOUNT_TYPE -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
-
-        echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
-        IFS=' '
-        if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
-          echo ""
-          printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT!\n\033[0m" >&2
-          echo ""
-        else
-          break; # All done: break
-        fi
-      done
-    else
-      MOUNT_ARGS="-t $MOUNT_TYPE"
-
-      echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
-      IFS=' '
-      if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-        echo ""
-        exit 6
-      fi
-    fi
-  else
-    # Reset mount device since we didn't mount
-    MOUNT_DEVICE=""
-  fi
-
-  # The IMAGE_NAME was set from the commandline:
-  if [ -n "$IMAGE_NAME" ]; then
-    if [ -n "$IMAGE_ROOT" ]; then
-      IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
-    else
-      IMAGE_DIR="$IMAGE_NAME"
-    fi
-    
-    if ! chdir_safe "$IMAGE_DIR"; then
-      do_exit 7
-    fi
-  else
-    if [ -z "$IMAGE_ROOT" ]; then
-      # Default to the cwd
-      IMAGE_ROOT="."
-    fi
-    
-    IMAGE_DIR="$IMAGE_ROOT"
-    
-    # Ask user for IMAGE_NAME:
-    while true; do
-      echo "* Showing contents of the image root directory ($IMAGE_DIR):"
-      IFS=$EOL
-      find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
-        echo "$(basename "$ITEM")"
-      done
-
-      printf "\nImage to use ($IMAGE_RESTORE_DEFAULT): "
-      read IMAGE_NAME
-      
-      if [ -z "$IMAGE_NAME" -a -n "$IMAGE_RESTORE_DEFAULT" ]; then
-        IMAGE_NAME="$IMAGE_RESTORE_DEFAULT"
-      fi
-      
-      if [ -z "$IMAGE_NAME" ]; then
-        printf "\033[40m\033[1;31m\nERROR: No image directory specified!\n\n\033[0m" >&2
-        continue;
-      fi
-
-      # Set the directory where the image(s) are
-      IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
-
-      if echo "$IMAGE_DIR" |grep -q "/$"; then
-        continue;
-      fi
-      
-      if ! chdir_safe "$IMAGE_DIR"; then
-        IMAGE_DIR="$IMAGE_ROOT"
-        continue;
-      fi
-      
-      break; # All done: break
-    done
-  fi
-fi
+set_image_dir;
 
 echo "--------------------------------------------------------------------------------"
 echo "* Using image name: $IMAGE_DIR"
 echo "* Image working directory: $(pwd)"
 
+# Make sure we're in the correct working directory:
 if ! pwd |grep -q "$IMAGE_DIR$"; then
   printf "\033[40m\033[1;31mERROR: Unable to access image directory ($IMAGE_DIR)!\n\033[0m" >&2
   do_exit 7
@@ -592,229 +844,14 @@ echo "Press any key to continue"
 read -n 1
 echo ""
 
-# Restore MBR/track0/partitions
-TARGET_NODEV=""
-unset IFS
-for FN in partitions.*; do
-  HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
+# Restore MBR/partition tables + setup swap
+restore_disks;
 
-  # If no target drive specified use default drive from image:
-  if [ -n "$USER_TARGET_NODEV" ]; then
-    TARGET_NODEV="$USER_TARGET_NODEV"
-  else
-    if [ -z "$TARGET_NODEV" ]; then
-      # Extract drive name from file
-      TARGET_NODEV="$HDD_NAME"
-    fi
-  fi
-
-  # Check if target device exists
-  if ! get_partitions |grep -q -x "$TARGET_NODEV"; then
-    echo ""
-    printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
-    echo ""
-    do_exit 5
-  fi
-
-  # Check if DMA is enabled for device
-  check_dma "/dev/$TARGET_NODEV"
-
-  # Check whether device already contains partitions
-  PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
-  
-  IFS=$EOL
-  for PART in $PARTITIONS_FOUND; do
-    # (Try) to unmount all partitions on this device
-    if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
-      if ! umount /dev/$PART >/dev/null; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Unable to umount /dev/$PART. Wrong target device specified? Quitting...\n\033[0m" >&2
-        echo ""
-        do_exit 5
-      fi
-    fi
-
-    # Disable all swaps on this device
-    if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
-      if ! swapoff /dev/$PART >/dev/null; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Unable to swapoff /dev/$PART. Wrong target device specified? Quitting...\n\033[0m" >&2
-        echo ""
-        do_exit 5
-      fi
-    fi
-  done
-  
-  # Flag in case we update the mbr/partition table so we know we need to have the kernel to re-probe
-  PARTPROBE=0
-
-  # Check for MBR restore
-  if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ]; then
-    if [ -f "track0.${HDD_NAME}" ]; then
-      DD_SOURCE="track0.${HDD_NAME}"
-    else
-      echo "WARNING: No track0.${HDD_NAME} found. MBR will be zeroed instead!" >&2
-      DD_SOURCE="/dev/zero"
-    fi
-
-    echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
-    
-    if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
-      result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
-      retval=$?
-    else
-      result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=1 count=32256 2>&1`
-      retval=$?
-    fi
-    
-    if [ $retval -ne 0 ]; then
-      if [ -n "$result" ]; then
-        echo "$result" >&2
-      fi
-      printf "\033[40m\033[1;31mERROR: Track0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
-      do_exit 5
-    fi
-    PARTPROBE=1
-  fi
-  
-  echo ""
-  
-  # Check for partition restore
-  if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
-    printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
-    echo "To override this you must specify --clean or --pt. Press any key to continue or CTRL-C to abort..." >&2
-    read -n1
-    echo ""
-  else
-    if [ -f "partitions.$HDD_NAME" ]; then
-      echo "* Updating partition table on /dev/$TARGET_NODEV"
-      sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
-      retval=$?
-        
-      if [ $retval -ne 0 ]; then
-        printf "\033[40m\033[1;31mPartition table restore failed($retval). Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-      PARTPROBE=1
-      echo ""
-    fi
-  fi
-  
-  if [ $PARTPROBE -eq 1 ]; then
-    # Re-read partition table
-    partprobe "/dev/$TARGET_NODEV"
-    retval=$?
-    if [ $retval -ne 0 ]; then
-      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed($retval)!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
-      read -n1
-      echo ""
-    fi
-  fi
-  
-  if [ $CLEAN -eq 1 ]; then
-    # Create swap on swap partitions
-    IFS=$EOL
-    sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
-      PART="$(echo "$LINE" |awk '{ print $1 }')"
-      if ! mkswap $PART; then
-        printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
-      fi
-    done
-  fi
-done
-
-# Test whether the target partition(s) exist and have the correct geometry:
-MISMATCH=0
-unset IFS
-for IMAGE_FILE in $IMAGE_FILES; do
-  # Strip extension so we get the actual device name
-  PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
-  
-  # Do we want another target device than specified in the image name?:
-  if [ -n "$USER_TARGET_NODEV" ]; then
-    NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${USER_TARGET_NODEV}p?${NUM}[[:blank:]]"`
-    if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
-      do_exit 5
-    fi
-  else
-    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
-    if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\033[0m" >&2
-      do_exit 5
-    fi
-  fi
-
-  ## Match partition with what we have stored in our partitions file
-  SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
-  if [ -z "$SFDISK_SOURCE_PART" ]; then
-    printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m" >&2
-    do_exit 5
-  fi
-
-  echo "* Source partition: $SFDISK_SOURCE_PART"
-  echo "* Target partition: $SFDISK_TARGET_PART"
-  echo ""
-
-  if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
-    MISMATCH=1
-  fi
-done
-
-if [ $MISMATCH -ne 0 ]; then
-  printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m" >&2
-  read -n1
-  echo ""
-fi
+# Make sure the target is sane
+verify_target;
  
-# Restore the actual image(s):
-unset IFS
-for IMAGE_FILE in $IMAGE_FILES; do
-  # Strip extension so we get the actual device name
-  PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
-
-  # We want another target device than specified in the image name?:
-  if [ -n "$USER_TARGET_NODEV" ]; then
-    NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-    TARGET_PART_NODEV="$(get_partitions |grep -E -x -e "${USER_TARGET_NODEV}p?${NUM}")"
-  else
-    TARGET_PART_NODEV="$PARTITION"
-  fi
-
-  echo "* Selected partition: /dev/$TARGET_PART_NODEV. Using image file: $IMAGE_FILE"
-  retval=0
-  if echo "$IMAGE_FILE" |grep -q "\.fsa$"; then
-    fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PART_NODEV"
-    retval=$?
-  elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
-    partimage -b restore "/dev/$TARGET_PART_NODEV" "$IMAGE_FILE"
-    retval=$?
-  elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
-    PARTCLONE=`partclone_detect "/dev/$TARGET_PART_NODEV"`
-    pigz -d -c "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
-    retval=$?
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-      retval=1
-    fi
-  else
-    pigz -d -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
-    retval=$?
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-      retval=1
-    fi
-  fi
-
-  if [ $retval -ne 0 ]; then
-    FAILED="${FAILED}${FAILED:+ }${TARGET_PART_NODEV}"
-    printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PART_NODEV.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
-    read -n1
-  else
-    SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PART_NODEV}"
-    echo "****** $IMAGE_FILE restored to /dev/$TARGET_PART_NODEV ******"
-  fi
-  echo ""
-done
+# Restore images to partitions
+restore_partitions;
 
 # Reset terminal
 #reset

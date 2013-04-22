@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.08a"
+MY_VERSION="3.10-BETA"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: April 17, 2013
@@ -246,6 +246,239 @@ mkdir_safe()
 }
 
 
+set_image_dir()
+{
+  if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
+    # Assume absolute path
+    IMAGE_DIR="$IMAGE_NAME"
+    
+    if ! mkdir_safe "$IMAGE_DIR"; then
+      do_exit 7
+    fi
+
+    # Reset mount device since we've been overruled
+    MOUNT_DEVICE=""
+  else
+    if [ -n "$MOUNT_DEVICE" -a -n "$IMAGE_ROOT" ]; then
+      # Create mount point
+      if ! mkdir -p "$IMAGE_ROOT"; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 7
+      fi
+
+      # Unmount mount point to be used
+      umount "$IMAGE_ROOT" 2>/dev/null
+
+      if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
+        while true; do
+          read -p "Network username ($DEFAULT_USERNAME): " USERNAME
+          if [ -z "$USERNAME" ]; then
+            USERNAME="$DEFAULT_USERNAME"
+          fi
+
+          echo "* Using network username $USERNAME"
+          
+          # Replace username in our mount arguments (it's a little dirty, I know ;-))
+          MOUNT_ARGS="-t $MOUNT_TYPE -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
+
+          echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
+          IFS=' '
+          if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
+            echo ""
+            printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT!\n\033[0m" >&2
+            echo ""
+          else
+            break; # All done: break
+          fi
+        done
+      else
+        MOUNT_ARGS="-t $MOUNT_TYPE"
+
+        echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
+        IFS=' '
+        if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
+          echo ""
+          printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
+          echo ""
+          exit 6
+        fi
+      fi
+    else
+      # Reset mount device since we didn't mount
+      MOUNT_DEVICE=""
+    fi
+
+    if [ -z "$IMAGE_NAME" ]; then
+      while true; do
+        printf "\nImage name (directory) to use: "
+        read IMAGE_NAME
+        
+        if [ -z "$IMAGE_NAME" ]; then
+          echo ""
+          printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
+          continue;
+        fi
+      
+        IMAGE_DIR="$IMAGE_NAME"
+    
+        if [ -n "$IMAGE_BACKUP_DIR" ]; then
+          IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
+        fi
+
+        if [ -n "$IMAGE_ROOT" ]; then
+          IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
+        fi
+
+        if ! mkdir_safe "$IMAGE_DIR"; then
+          continue;
+        fi
+    
+        echo ""
+        break; # All sane: break loop
+      done
+    else
+      IMAGE_DIR="$IMAGE_NAME"
+    
+      if [ -n "$IMAGE_BACKUP_DIR" ]; then
+        IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
+      fi
+
+      if [ -n "$IMAGE_ROOT" ]; then
+        IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
+      fi
+      
+      if ! mkdir_safe "$IMAGE_DIR"; then
+        do_exit 7;
+      fi
+    fi
+  fi
+}
+
+
+check_target()
+{
+  # Check if target device exists
+  if [ -n "$USER_SOURCE_NODEV" ]; then
+    unset IFS
+    for DEVICE in $USER_SOURCE_NODEV; do
+      if ! get_partitions |grep -q -x "$DEVICE"; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified source device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      else
+        # Does the device contain partitions?
+        if get_partitions |grep -E -q -x "$DEVICE""p?[0-9]+"; then
+          PARTITIONS="${PARTITIONS}$(sfdisk -d /dev/$DEVICE 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+        else
+          PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${DEVICE}"
+        fi
+      fi
+    done
+  else
+    # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
+    PARTITIONS="${PARTITIONS}$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+  fi
+}
+
+
+backup_partitions()
+{
+  # Backup all specified partitions:
+  unset IFS
+  for PART in $BACKUP_PARTITIONS; do
+    retval=0
+    case "$IMAGE_PROGRAM" in
+      pi)   TARGET_FILE="$PART.img.gz"
+            printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
+            retval=$?
+            ;;
+      pc)   TARGET_FILE="$PART.pc.gz"
+            PARTCLONE=`partclone_detect "/dev/$PART"`
+            printf "****** Using $PARTCLONE (+pigz) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            $PARTCLONE -c -s "/dev/$PART" |pigz --independent -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            retval=$?
+            if [ ${PIPESTATUS[0]} -ne 0 ]; then
+              retval=1
+            fi
+            ;;
+      fsa)  TARGET_FILE="$PART.fsa"
+            printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
+            retval=$?
+            ;;
+      ddgz) TARGET_FILE="$PART.dd.gz"
+            printf "****** Using dd (+pigz) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            dd if="/dev/$PART" bs=4096 |pigz --independent -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            retval=$?
+            if [ ${PIPESTATUS[0]} -ne 0 ]; then
+              retval=1
+            fi
+            ;;
+    esac
+      
+    echo ""
+    if [ $retval -ne 0 ]; then
+      FAILED="${FAILED}${FAILED:+ }$PART"
+      printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
+      read -n1
+    else
+      SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
+      echo "****** Backuped /dev/$PART to $TARGET_FILE ******"
+    fi
+    echo ""
+  done
+}
+
+
+backup_disks()
+{
+  # Scan all devices/HDDs
+  local HDD=""
+  IFS=$EOL
+  for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
+    if echo "$LINE" |grep -q '^# '; then
+      HDD="$(echo "$LINE" |sed 's,.*/dev/,,')"
+    else
+      if [ -n "$HDD" ]; then
+        unset IFS
+        for PART in $BACKUP_PARTITIONS; do
+          if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
+            echo "* Including /dev/$HDD for backup"
+            
+            # Check if DMA is enabled for HDD
+            check_dma /dev/$HDD
+
+            # Dump hdd info for all disks in the current system
+            result=`dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 2>&1`
+            retval=$?
+            if [ $retval -ne 0 ]; then
+              echo "$result" >&2
+              printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD failed($retval)! Quitting...\n\033[0m" >&2
+              do_exit 8
+            fi
+
+            if ! sfdisk -d /dev/$HDD > "partitions.$HDD"; then
+              printf "\033[40m\033[1;31mERROR: Partition table backup failed! Quitting...\n\033[0m" >&2
+              do_exit 9
+            fi
+
+            # Dump fdisk -l info to file
+            fdisk -l /dev/$HDD >"fdisk.$HDD"
+
+            # Mark HDD as done
+            HDD=""
+          fi
+        done
+      fi
+    fi
+  done
+}
+
+
 show_help()
 {
   echo "Usage: backup-image.sh [options] [image-name]"
@@ -265,103 +498,89 @@ show_help()
 }
 
 
+load_config()
+{
+  # Set environment variables to default
+  CONF="$DEFAULT_CONF"
+  IMAGE_NAME=""
+  SUCCESS=""
+  FAILED=""
+  USER_SOURCE_NODEV=""
+  PARTITIONS=""
+  IMAGE_PROGRAM=""
+  NONET=0
+  NOCONF=0
+  PIGZ_COMPRESSION=1
+  NO_MOUNT=0
+
+  # Check arguments
+  unset IFS
+  for arg in $*; do
+    ARGNAME=`echo "$arg" |cut -d= -f1`
+    ARGVAL=`echo "$arg" |cut -d= -f2`
+
+    if [ -z "$(echo "$ARGNAME" |grep '^-')" ]; then
+      IMAGE_NAME="$ARGVAL"
+    else
+      case "$ARGNAME" in
+        --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+        --compression|-z) PIGZ_COMPRESSION="$ARGVAL";;
+        --conf|-c) CONF="$ARGVAL";;
+        --fsa) IMAGE_PROGRAM="fsa";;
+        --ddgz) IMAGE_PROGRAM="ddgz";;
+        --pi) IMAGE_PROGRAM="pi";;
+        --pc) IMAGE_PROGRAM="pc";;
+        --nonet|-n) NONET=1;;
+        --nomount|-m) NO_MOUNT=1;;
+        --noconf) NOCONF=1;;
+        --help) show_help; exit 3;;
+        *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
+      esac
+    fi
+  done
+
+  # Check if configuration file exists
+  if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
+    # Source the configuration
+    . "$CONF"
+  fi
+
+  if [ -z "$IMAGE_PROGRAM" ]; then
+    if [ -n "$DEFAULT_IMAGE_PROGRAM" ]; then
+      IMAGE_PROGRAM="$DEFAULT_IMAGE_PROGRAM"
+    else
+      IMAGE_PROGRAM="pc"
+    fi
+  fi
+
+  # Sanity check compression
+  if [ -z "$PIGZ_COMPRESSION" -o $PIGZ_COMPRESSION -lt 1 -o $PIGZ_COMPRESSION -gt 9 ]; then
+    PIGZ_COMPRESSION=1
+  fi
+
+  # Translate "long" names to short
+  if   [ "$IMAGE_PROGRAM" = "fsarchiver" ]; then
+    IMAGE_PROGRAM="fsa"
+  elif [ "$IMAGE_PROGRAM" = "partimage" ]; then
+    IMAGE_PROGRAM="pi"
+  elif [ "$IMAGE_PROGRAM" = "partclone" ]; then
+    IMAGE_PROGRAM="pc"
+  fi
+}
+
+
 #######################
 # Program entry point #
 #######################
 echo "Image BACKUP Script v$MY_VERSION - Written by Arno van Amersfoort"
 
-# Set environment variables to default
-CONF="$DEFAULT_CONF"
-IMAGE_NAME=""
-SUCCESS=""
-FAILED=""
-USER_SOURCE_NODEV=""
-PARTITIONS=""
-IMAGE_PROGRAM=""
-NONET=0
-NOCONF=0
-PIGZ_COMPRESSION=1
-NO_MOUNT=0
-
-# Check arguments
-unset IFS
-for arg in $*; do
-  ARGNAME=`echo "$arg" |cut -d= -f1`
-  ARGVAL=`echo "$arg" |cut -d= -f2`
-
-  if [ -z "$(echo "$ARGNAME" |grep '^-')" ]; then
-    IMAGE_NAME="$ARGVAL"
-  else
-    case "$ARGNAME" in
-      --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
-      --compression|-z) PIGZ_COMPRESSION="$ARGVAL";;
-      --conf|-c) CONF="$ARGVAL";;
-      --fsa) IMAGE_PROGRAM="fsa";;
-      --ddgz) IMAGE_PROGRAM="ddgz";;
-      --pi) IMAGE_PROGRAM="pi";;
-      --pc) IMAGE_PROGRAM="pc";;
-      --nonet|-n) NONET=1;;
-      --nomount|-m NO_MOUNT=1;;
-      --noconf) NOCONF=1;;
-      --help) show_help; exit 3;;
-      *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
-    esac
-  fi
-done
-
-# Check if configuration file exists
-if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
-  # Source the configuration
-  . "$CONF"
-fi
-
-if [ -z "$IMAGE_PROGRAM" ]; then
-  if [ -n "$DEFAULT_IMAGE_PROGRAM" ]; then
-    IMAGE_PROGRAM="$DEFAULT_IMAGE_PROGRAM"
-  else
-    IMAGE_PROGRAM="pc"
-  fi
-fi
-
-# Sanity check compression
-if [ -z "$PIGZ_COMPRESSION" -o $PIGZ_COMPRESSION -lt 1 -o $PIGZ_COMPRESSION -gt 9 ]; then
-  PIGZ_COMPRESSION=1
-fi
-
-# Translate "long" names to short
-if   [ "$IMAGE_PROGRAM" = "fsarchiver" ]; then
-  IMAGE_PROGRAM="fsa"
-elif [ "$IMAGE_PROGRAM" = "partimage" ]; then
-  IMAGE_PROGRAM="pi"
-elif [ "$IMAGE_PROGRAM" = "partclone" ]; then
-  IMAGE_PROGRAM="pc"
-fi
+# Load configuration from file/commandline
+load_config;
 
 # Sanity check environment
 sanity_check;
 
-# Check if target device exists
-if [ -n "$USER_SOURCE_NODEV" ]; then
-  unset IFS
-  for DEVICE in $USER_SOURCE_NODEV; do
-    if ! get_partitions |grep -q -x "$DEVICE"; then
-      echo ""
-      printf "\033[40m\033[1;31mERROR: Specified source device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
-      echo ""
-      exit 5
-    else
-      # Does the device contain partitions?
-      if get_partitions |grep -E -q -x "$DEVICE""p?[0-9]+"; then
-        PARTITIONS="${PARTITIONS}$(sfdisk -d /dev/$DEVICE 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
-      else
-        PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${DEVICE}"
-      fi
-    fi
-  done
-else
-  # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-  PARTITIONS="${PARTITIONS}$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
-fi
+check_target;
 
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NONET" != "1" ]; then
   # Setup network (interface)
@@ -376,118 +595,13 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
-  # Assume absolute path
-  IMAGE_DIR="$IMAGE_NAME"
-  
-  if ! mkdir_safe "$IMAGE_DIR"; then
-    do_exit 7
-  fi
-
-  # Reset mount device since we've been overruled
-  MOUNT_DEVICE=""
-else
-  if [ -n "$MOUNT_DEVICE" -a -n "$IMAGE_ROOT" ]; then
-    # Create mount point
-    if ! mkdir -p "$IMAGE_ROOT"; then
-      echo ""
-      printf "\033[40m\033[1;31mERROR: Unable to create directory for mount point $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-      echo ""
-      exit 7
-    fi
-
-    # Unmount mount point to be used
-    umount "$IMAGE_ROOT" 2>/dev/null
-
-    if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
-      while true; do
-        read -p "Network username ($DEFAULT_USERNAME): " USERNAME
-        if [ -z "$USERNAME" ]; then
-          USERNAME="$DEFAULT_USERNAME"
-        fi
-
-        echo "* Using network username $USERNAME"
-        
-        # Replace username in our mount arguments (it's a little dirty, I know ;-))
-        MOUNT_ARGS="-t $MOUNT_TYPE -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
-
-        echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
-        IFS=' '
-        if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
-          echo ""
-          printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT!\n\033[0m" >&2
-          echo ""
-        else
-          break; # All done: break
-        fi
-      done
-    else
-      MOUNT_ARGS="-t $MOUNT_TYPE"
-
-      echo "* Mounting $MOUNT_DEVICE on $IMAGE_ROOT with arguments \"$MOUNT_ARGS\""
-      IFS=' '
-      if ! mount $MOUNT_ARGS "$MOUNT_DEVICE" "$IMAGE_ROOT"; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT! Quitting...\n\033[0m" >&2
-        echo ""
-        exit 6
-      fi
-    fi
-  else
-    # Reset mount device since we didn't mount
-    MOUNT_DEVICE=""
-  fi
-
-  if [ -z "$IMAGE_NAME" ]; then
-    while true; do
-      printf "\nImage name (directory) to use: "
-      read IMAGE_NAME
-      
-      if [ -z "$IMAGE_NAME" ]; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
-        continue;
-      fi
-    
-      IMAGE_DIR="$IMAGE_NAME"
-  
-      if [ -n "$IMAGE_BACKUP_DIR" ]; then
-        IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
-      fi
-
-      if [ -n "$IMAGE_ROOT" ]; then
-        IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
-      fi
-
-      if ! mkdir_safe "$IMAGE_DIR"; then
-        continue;
-      fi
-  
-      echo ""
-      break; # All sane: break loop
-    done
-  else
-    IMAGE_DIR="$IMAGE_NAME"
-  
-    if [ -n "$IMAGE_BACKUP_DIR" ]; then
-      IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
-    fi
-
-    if [ -n "$IMAGE_ROOT" ]; then
-      IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
-    fi
-    
-    if ! mkdir_safe "$IMAGE_DIR"; then
-      do_exit 7;
-    fi
-  fi
-
-fi
+set_image_dir;
 
 echo "--------------------------------------------------------------------------------"
 echo "* Using image name: $IMAGE_DIR"
 echo "* Image working directory: $(pwd)"
 
+# Make sure we're in the correct working directory:
 if ! pwd |grep -q "$IMAGE_DIR$"; then
   printf "\033[40m\033[1;31mERROR: Unable to access image directory ($IMAGE_DIR)!\n\033[0m" >&2
   do_exit 7
@@ -525,6 +639,7 @@ if [ -n "$BACKUP_PARTITIONS" ]; then
   echo "* Partitions to backup: $BACKUP_PARTITIONS"
 else
   printf "\033[40m\033[1;31mERROR: No partitions to backup!\n\033[0m" >&2
+  do_exit 8;
 fi
 
 echo ""
@@ -535,94 +650,13 @@ if [ -n "$DESCRIPTION" ]; then
 fi
 echo ""
 
-# Scan all devices/HDDs
-HDD=""
-IFS=$EOL
-for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
-  if echo "$LINE" |grep -q '^# '; then
-    HDD="$(echo "$LINE" |sed 's,.*/dev/,,')"
-  else
-    if [ -n "$HDD" ]; then
-      unset IFS
-      for PART in $BACKUP_PARTITIONS; do
-        if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
-          echo "* Including /dev/$HDD for backup"
-          
-          # Check if DMA is enabled for HDD
-          check_dma /dev/$HDD
-
-          # Dump hdd info for all disks in the current system
-          result=`dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 2>&1`
-          retval=$?
-          if [ $retval -ne 0 ]; then
-            echo "$result" >&2
-            printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD failed($retval)! Quitting...\n\033[0m" >&2
-            do_exit 8
-          fi
-
-          if ! sfdisk -d /dev/$HDD > "partitions.$HDD"; then
-            printf "\033[40m\033[1;31mERROR: Partition table backup failed! Quitting...\n\033[0m" >&2
-            do_exit 9
-          fi
-
-          # Dump fdisk -l info to file
-          fdisk -l /dev/$HDD >"fdisk.$HDD"
-
-          # Mark HDD as done
-          HDD=""
-        fi
-      done
-    fi
-  fi
-done
+# Backup disk partitions/MBR's etc. :
+backup_disks;
 
 echo "--------------------------------------------------------------------------------"
 
-# Backup all specified partitions:
-unset IFS
-for PART in $BACKUP_PARTITIONS; do
-  retval=0
-  case "$IMAGE_PROGRAM" in
-    pi)   TARGET_FILE="$PART.img.gz"
-          printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
-          retval=$?
-          ;;
-    pc)   TARGET_FILE="$PART.pc.gz"
-          PARTCLONE=`partclone_detect "/dev/$PART"`
-          printf "****** Using $PARTCLONE (+pigz) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          $PARTCLONE -c -s "/dev/$PART" |pigz --independent -$GZIP_COMPRESSION -c >"$TARGET_FILE"
-          retval=$?
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            retval=1
-          fi
-          ;;
-    fsa)  TARGET_FILE="$PART.fsa"
-          printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
-          retval=$?
-          ;;
-    ddgz) TARGET_FILE="$PART.dd.gz"
-          printf "****** Using dd (+pigz) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-          dd if="/dev/$PART" bs=4096 |pigz --independent -$GZIP_COMPRESSION -c >"$TARGET_FILE"
-          retval=$?
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            retval=1
-          fi
-          ;;
-  esac
-    
-  echo ""
-  if [ $retval -ne 0 ]; then
-    FAILED="${FAILED}${FAILED:+ }$PART"
-    printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
-    read -n1
-  else
-    SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
-    echo "****** Backuped /dev/$PART to $TARGET_FILE ******"
-  fi
-  echo ""
-done
+# Backup selected partitions to images
+backup_partitions;
 
 # Reset terminal
 #reset
