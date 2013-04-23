@@ -781,8 +781,7 @@ check_image_files()
                     GZIP="gzip"
                   fi
                   ;;
-      ddgz      ) check_command_error gzip
-                  if check_command pigz; then
+      ddgz      ) if check_command pigz; then
                     GZIP="pigz"
                   elif check_command_error gzip; then
                     GZIP="gzip"
