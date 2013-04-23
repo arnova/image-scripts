@@ -250,7 +250,8 @@ sanity_check()
   check_command_error sfdisk
   check_command_error fdisk
   check_command_error dd
-  
+  check_command_error gzip
+
   [ "$NO_NET" != "0" ] && check_command_error ifconfig
   [ "$NO_MOUNT" != "0" ] && check_command_error mount
   [ "$NO_MOUNT" != "0" ] && check_command_error umount
@@ -261,7 +262,7 @@ sanity_check()
   if [ "$IMAGE_PROGRAM" = "pc" -o "$IMAGE_PROGRAM" = "ddgz" ]; then
     if check_command pigz; then
       GZIP="pigz"
-    elif check_command_error gzip; then
+    else
       GZIP="gzip"
     fi
   fi
@@ -464,7 +465,7 @@ backup_partitions()
             ;;
       pc)   TARGET_FILE="$PART.pc.gz"
             PARTCLONE=`partclone_detect "/dev/$PART"`
-            printf "****** Using $PARTCLONE (+$GZIP) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
             $PARTCLONE -c -s "/dev/$PART" |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
@@ -477,7 +478,7 @@ backup_partitions()
             retval=$?
             ;;
       ddgz) TARGET_FILE="$PART.dd.gz"
-            printf "****** Using dd (+$GZIP) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            printf "****** Using dd (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
             dd if="/dev/$PART" bs=4096 |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
@@ -751,7 +752,8 @@ echo "* Partitions backuped successfully: $SUCCESS"
 if [ -n "$(find . -maxdepth 1 -type f -iname "*\.gz*" 2>/dev/null)" ]; then
   echo ""
   echo "Verifying .gz images (CTRL-C to break):"
-  $GZIP -tv *\.gz*
+  # Use gzip here as pigz seems to hang on broken archives:
+  gzip -tv *\.gz*
 fi
 
 # Exit (+unmount)
