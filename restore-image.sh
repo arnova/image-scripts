@@ -142,21 +142,6 @@ configure_network()
 }
 
 
-# Wrapper for partclone to autodetect filesystem and select the proper partclone.*
-# $1 = device to inspect
-partclone_detect()
-{
-  local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
-  case $TYPE in
-    # TODO: On Linux we only support ext2/3/4 for now. For eg. btrfs we may need to probe using "fsck -N" or "file -s -b"
-    7|17)                           echo "partclone.ntfs";;
-    1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
-    fd|83)                          echo "partclone.extfs";;
-    *)                              echo "partclone.dd";;
-  esac
-}
-
-
 # Check if DMA is enabled for HDD
 check_dma()
 {
@@ -522,7 +507,7 @@ restore_partitions()
       partimage)  partimage -b restore "/dev/$TARGET_PART_NODEV" "$IMAGE_FILE"
                   retval=$?
                   ;;
-      partclone)  $GZIP -d -c "$IMAGE_FILE" |partclone.restore -r -s - -o "/dev/$TARGET_PART_NODEV"
+      partclone)  $GZIP -d -c "$IMAGE_FILE" |partclone.restore -s - -o "/dev/$TARGET_PART_NODEV"
                   retval=$?
                   if [ ${PIPESTATUS[0]} -ne 0 ]; then
                     retval=1
@@ -744,20 +729,33 @@ check_image_files()
     for PART in $PARTITIONS_NODEV; do
       IFS=$EOL
       ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.dd.gz" -o -iname "$PART.pc.gz")"
+
       if [ -z "$ITEM" ]; then
         printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m" >&2
         do_exit 5
       fi
-      
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
+
+      if [ $(echo "$ITEM" |wc -l) -gt 1 ]; then
+        echo "$ITEM"
+        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition /dev/$PART! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+
+      IMAGE_FILE=`basename "$ITEM"`
+
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
+
+      echo "* Using image file \"${ITEM}\" for device /dev/$PART"
     done
   else
     IFS=$EOL
     for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
+      IMAGE_FILE=`basename "$ITEM"`
       # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
-      PART="$(echo "$ITEM" |sed 's/\..*//')"
-      echo "* Using image file \"$(basename "$ITEM")\" for device /dev/$PART"
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
+
+      PART="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+      echo "* Using image file \"${IMAGE_FILE}\" for device /dev/$PART"
     done
   fi
 
