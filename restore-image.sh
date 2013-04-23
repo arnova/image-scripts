@@ -172,13 +172,51 @@ check_dma()
 }
 
 
-check_binary()
+# Check whether a certain command is available
+check_command()
 {
-  if ! which "$1" >/dev/null 2>&1; then
-    printf "\033[40m\033[1;31mERROR: Binary \"$1\" does not exist or is not executable!\033[0m\n" >&2
-    printf "\033[40m\033[1;31m       Please, make sure that it is (properly) installed!\033[0m\n" >&2
+  local path IFS
+
+  IFS=' '
+  for cmd in $*; do
+    if which "$cmd" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  
+  return 1
+}
+
+
+# Check whether a binary is available and if not, generate an error and stop program execution
+check_command_error()
+{
+  local IFS=' '
+
+  if ! check_command "$@"; then
+    printf "\033[40m\033[1;31mERROR  : Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
+    printf "\033[40m\033[1;31m         Please investigate. Quitting...\033[0m\n" >&2
+    echo ""
     exit 2
   fi
+}
+
+
+# Check whether a binary is available and if not, generate a warning but continue program execution
+check_command_warning()
+{
+  local retval IFS=' '
+
+  check_command "$@"
+  retval=$?
+
+  if [ $retval -ne 0 ]; then
+    printf "\033[40m\033[1;31mWARNING: Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
+    printf "\033[40m\033[1;31m         Please investigate. This *may* be a problem!\033[0m\n" >&2
+    echo ""
+  fi
+
+  return $retval
 }
 
 
@@ -190,23 +228,21 @@ sanity_check()
     exit 1
   fi
 
-  check_binary awk
-  check_binary find
-  check_binary ifconfig
-  check_binary sed
-  check_binary grep
-  check_binary mkswap
-  check_binary sfdisk
-  check_binary fdisk
-  check_binary dd
-  check_binary mount
-  check_binary umount
-#  check_binary unpigz
-#  check_binary fsarchiver
-#  check_binary partimage
-#  check_binary partclone.restore
-#  check_binary gdisk
-#  check_binary sgdisk
+  check_command_error awk
+  check_command_error find
+  check_command_error ifconfig
+  check_command_error sed
+  check_command_error grep
+  check_command_error mkswap
+  check_command_error sfdisk
+  check_command_error fdisk
+  check_command_error dd
+  check_command_error mount
+  check_command_error umount
+
+# TODO: Need to do this for GPT implementation  
+#  check_command_error gdisk
+#  check_command_error sgdisk
 }
 
 
@@ -443,6 +479,24 @@ set_image_dir()
 }
 
 
+image_type_detect()
+{
+  local IMAGE_FILE="$1"
+
+  if echo "$IMAGE_FILE" |grep -q "\.fsa$"; then
+    echo "fsarchiver"
+  elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
+    echo "partimage"
+  elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
+    echo "partclone"
+  elif echo "$IMAGE_FILE" |grep -q "\.dd\.gz$"; then
+    echo "ddgz"
+  else
+    echo "unknown"
+  fi
+}
+
+
 restore_partitions()
 {
   # Restore the actual image(s):
@@ -460,27 +514,27 @@ restore_partitions()
     fi
 
     echo "* Selected partition: /dev/$TARGET_PART_NODEV. Using image file: $IMAGE_FILE"
-    retval=0
-    if echo "$IMAGE_FILE" |grep -q "\.fsa$"; then
-      fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PART_NODEV"
-      retval=$?
-    elif echo "$IMAGE_FILE" |grep -q "\.img\.gz"; then
-      partimage -b restore "/dev/$TARGET_PART_NODEV" "$IMAGE_FILE"
-      retval=$?
-    elif echo "$IMAGE_FILE" |grep -q "\.pc\.gz$"; then
-      PARTCLONE=`partclone_detect "/dev/$TARGET_PART_NODEV"`
-      pigz -d -c "$IMAGE_FILE" |$PARTCLONE -r -s - -o "/dev/$TARGET_PART_NODEV"
-      retval=$?
-      if [ ${PIPESTATUS[0]} -ne 0 ]; then
-        retval=1
-      fi
-    else
-      pigz -d -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
-      retval=$?
-      if [ ${PIPESTATUS[0]} -ne 0 ]; then
-        retval=1
-      fi
-    fi
+    local retval=1
+    case image_type_detect "$IMAGE_FILE" in
+      fsarchiver) fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PART_NODEV"
+                  retval=$?
+                  ;;
+      partimage)  partimage -b restore "/dev/$TARGET_PART_NODEV" "$IMAGE_FILE"
+                  retval=$?
+                  ;;
+      partclone)  $GZIP -d -c "$IMAGE_FILE" |partclone.restore -r -s - -o "/dev/$TARGET_PART_NODEV"
+                  retval=$?
+                  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                    retval=1
+                  fi
+                  ;;
+      ddgz)       $GZIP -d -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
+                  retval=$?
+                  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                    retval=1
+                  fi
+                  ;;
+    esac
 
     if [ $retval -ne 0 ]; then
       FAILED="${FAILED}${FAILED:+ }${TARGET_PART_NODEV}"
@@ -629,6 +683,7 @@ restore_disks()
   done
 }
 
+
 verify_target()
 {
   # Test whether the target partition(s) exist and have the correct geometry:
@@ -681,6 +736,63 @@ verify_target()
 }
 
 
+check_image_files()
+{
+  IMAGE_FILES=""
+  if [ -n "$PARTITIONS_NODEV" ]; then
+    IFS=' '
+    for PART in $PARTITIONS_NODEV; do
+      IFS=$EOL
+      ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.dd.gz" -o -iname "$PART.pc.gz")"
+      if [ -z "$ITEM" ]; then
+        printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+      
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
+    done
+  else
+    IFS=$EOL
+    for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
+      # Add item to list
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
+      PART="$(echo "$ITEM" |sed 's/\..*//')"
+      echo "* Using image file \"$(basename "$ITEM")\" for device /dev/$PART"
+    done
+  fi
+
+  if [ -z "$IMAGE_FILES" ]; then
+    printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m" >&2
+    do_exit 5
+  fi
+
+  # Make sure the proper binaries are available
+  IFS=' '
+  for IMAGE_FILE in $IMAGE_FILES; do
+    case image_type_detect $IMAGE_FILE in
+      fsarchiver) check_command_error fsarchiver
+                  ;;
+      partimage ) check_command_error partimage
+                  ;;
+      partclone ) check_command_error partclone.restore
+                  if check_command pigz; then
+                    GZIP="pigz"
+                  elif check_command_error gzip; then
+                    GZIP="gzip"
+                  fi
+                  ;;
+      ddgz      ) check_command_error gzip
+                  if check_command pigz; then
+                    GZIP="pigz"
+                  elif check_command_error gzip; then
+                    GZIP="gzip"
+                  fi
+                  ;;
+    esac
+  done
+}
+
+
 show_help()
 {
   echo "Usage: restore-image.sh [options] [image-name]"
@@ -710,8 +822,8 @@ load_config()
   USER_TARGET_NODEV=""
   PARTITIONS_NODEV=""
   CLEAN=0
-  NONET=0
-  NOCONF=0
+  NO_NET=0
+  NO_CONF=0
   MBR_WRITE=0
   PT_WRITE=0
   NO_POST_SH=0
@@ -731,9 +843,9 @@ load_config()
         --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
         --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
         --conf|-c) CONF="$ARGVAL";;
-        --nonet|-n) NONET=1;;
+        --nonet|-n) NO_NET=1;;
         --nomount|-m) NO_MOUNT=1;;
-        --noconf) NOCONF=1;;
+        --noconf) NO_CONF=1;;
         --mbr) MBR_WRITE=1;;
         --pt) PT_WRITE=1;;
         --nopostsh|--nosh) NO_POST_SH=1;;
@@ -744,7 +856,7 @@ load_config()
   done
 
   # Check if configuration file exists
-  if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
+  if [ $NO_CONF -eq 0 -a -e "$CONF" ]; then
     # Source the configuration
     . "$CONF"
   fi
@@ -781,7 +893,7 @@ if [ -n "$USER_TARGET_NODEV" ]; then
   fi
 fi
 
-if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NONET" != "1" ]; then
+if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Setup network (interface)
   configure_network;
 
@@ -806,33 +918,7 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
   do_exit 7
 fi
 
-IMAGE_FILES=""
-if [ -n "$PARTITIONS_NODEV" ]; then
-  IFS=' '
-  for PART in $PARTITIONS_NODEV; do
-    IFS=$EOL
-    ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.dd.gz" -o -iname "$PART.pc.gz")"
-    if [ -z "$ITEM" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m" >&2
-      do_exit 5
-    fi
-    
-    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
-  done
-else
-  IFS=$EOL
-  for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
-    # Add item to list
-    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }$(basename "$ITEM")"
-    PART="$(echo "$ITEM" |sed 's/\..*//')"
-    echo "* Using image file \"$(basename "$ITEM")\" for device /dev/$PART"
-  done
-fi
-
-if [ -z "$IMAGE_FILES" ]; then
-  printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m" >&2
-  do_exit 5
-fi
+check_image_files;
 
 if [ -e "description.txt" ]; then
   echo "--------------------------------------------------------------------------------"

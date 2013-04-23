@@ -145,14 +145,19 @@ configure_network()
 # Wrapper for partclone to autodetect filesystem and select the proper partclone.*
 partclone_detect()
 {
+  local PARTCLONE_BIN=""
   local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
   case $TYPE in
     # TODO: On Linux we only support ext2/3/4 for now. For eg. btrfs we may need to probe using "fsck -N" or "file -s -b"
-    7|17)                           echo "partclone.ntfs";;
-    1|4|6|b|c|e|11|14|16|1b|1c|1e)  echo "partclone.fat";;
-    fd|83)                          echo "partclone.extfs";;
-    *)                              echo "partclone.dd";;
+    7|17)                           PARTCLONE_BIN="partclone.ntfs";;
+    1|4|6|b|c|e|11|14|16|1b|1c|1e)  PARTCLONE_BIN="partclone.fat";;
+    fd|83)                          PARTCLONE_BIN="partclone.extfs";;
+    *)                              PARTCLONE_BIN="partclone.dd";;
   esac
+
+  check_command_error "$PARTCLONE_BIN"
+
+  echo "$PARTCLONE_BIN"
 }
 
 
@@ -171,13 +176,62 @@ check_dma()
 }
 
 
-check_binary()
+# Check whether a certain command is available
+check_command()
 {
-  if ! which "$1" >/dev/null 2>&1; then
-    printf "\033[40m\033[1;31mERROR: Binary \"$1\" does not exist or is not executable!\033[0m\n" >&2
-    printf "\033[40m\033[1;31m       Please, make sure that it is (properly) installed!\033[0m\n" >&2
+  local path IFS
+
+  IFS=' '
+  for cmd in $*; do
+    case "$cmd" in
+      /*) path="" ;;
+      ip|tc|modprobe|sysctl) path="/sbin/" ;;
+      sed|cat|date|uname) path="/bin/" ;;
+      *) path="/usr/bin/" ;;
+    esac
+
+    if [ -x "$path$cmd" ]; then
+      return 0
+    fi
+
+    if which "$cmd" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  
+  return 1
+}
+
+
+# Check whether a binary is available and if not, generate an error and stop program execution
+check_command_error()
+{
+  local IFS=' '
+
+  if ! check_command "$@"; then
+    printf "\033[40m\033[1;31mERROR  : Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
+    printf "\033[40m\033[1;31m         Please investigate. Quitting...\033[0m\n" >&2
+    echo ""
     exit 2
   fi
+}
+
+
+# Check whether a binary is available and if not, generate a warning but continue program execution
+check_command_warning()
+{
+  local retval IFS=' '
+
+  check_command "$@"
+  retval=$?
+
+  if [ $retval -ne 0 ]; then
+    printf "\033[40m\033[1;31mWARNING: Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
+    printf "\033[40m\033[1;31m         Please investigate. This *may* be a problem!\033[0m\n" >&2
+    echo ""
+  fi
+
+  return $retval
 }
 
 
@@ -189,21 +243,33 @@ sanity_check()
     exit 1
   fi
 
-  check_binary awk
-  check_binary find
-  check_binary ifconfig
-  check_binary sed
-  check_binary grep
-  check_binary sfdisk
-  check_binary fdisk
-  check_binary dd
-  check_binary mount
-  check_binary umount
+  check_command_error awk
+  check_command_error find
+  check_command_error sed
+  check_command_error grep
+  check_command_error sfdisk
+  check_command_error fdisk
+  check_command_error dd
+  
+  [ "$NO_NET" != "0" ] && check_command_error ifconfig
+  [ "$NO_MOUNT" != "0" ] && check_command_error mount
+  [ "$NO_MOUNT" != "0" ] && check_command_error umount
 
-  [ "$IMAGE_PROGRAM" = "fsa" ] && check_binary fsarchiver
-  [ "$IMAGE_PROGRAM" = "pi" ] && check_binary partimage
-  [ "$IMAGE_PROGRAM" = "pc" ] && check_binary partclone.dd partclone.ntfs partclone.fat partclone.extfs pigz
-  [ "$IMAGE_PROGRAM" = "ddgz" ] && check_binary pigz
+  [ "$IMAGE_PROGRAM" = "fsa" ] && check_command_error fsarchiver
+  [ "$IMAGE_PROGRAM" = "pi" ] && check_command_error partimage
+  
+  if [ "$IMAGE_PROGRAM" = "pc" -o "$IMAGE_PROGRAM" = "ddgz" ]; then
+    if check_command pigz; then
+      GZIP="pigz"
+    elif check_command_error gzip; then
+      GZIP="gzip"
+    fi
+  fi
+
+  if [ "$IMAGE_PROGRAM" = "pc" ]; then
+    # This is a dummy test for partclone, the actual binary test is in the wrapper
+    check_command_error partclone.restore 
+  fi
 }
 
 
@@ -398,8 +464,8 @@ backup_partitions()
             ;;
       pc)   TARGET_FILE="$PART.pc.gz"
             PARTCLONE=`partclone_detect "/dev/$PART"`
-            printf "****** Using $PARTCLONE (+pigz) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            $PARTCLONE -c -s "/dev/$PART" |pigz --independent -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            printf "****** Using $PARTCLONE (+$GZIP) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            $PARTCLONE -c -s "/dev/$PART" |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
               retval=1
@@ -411,8 +477,8 @@ backup_partitions()
             retval=$?
             ;;
       ddgz) TARGET_FILE="$PART.dd.gz"
-            printf "****** Using dd (+pigz) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            dd if="/dev/$PART" bs=4096 |pigz --independent -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            printf "****** Using dd (+$GZIP) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            dd if="/dev/$PART" bs=4096 |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
               retval=1
@@ -487,12 +553,12 @@ show_help()
   echo "--help|-h                   - Print this help"
   echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all)"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
-  echo "--compression|-z=level      - Set pigz compression level (when used). 1=Low but fast (default), 9=High but slow"
+  echo "--compression|-z=level      - Set gzip/pigz compression level (when used). 1=Low but fast (default), 9=High but slow"
   echo "--noconf                    - Don't read the config file"
   echo "--fsa                       - Use fsarchiver for imaging"
   echo "--pi                        - Use partimage for imaging"
-  echo "--pc                        - Use partclone + pigz for imaging"
-  echo "--ddgz                      - Use dd + pigz for imaging"
+  echo "--pc                        - Use partclone + gzip/pigz for imaging"
+  echo "--ddgz                      - Use dd + gzip/pigz for imaging"
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
 }
@@ -508,9 +574,9 @@ load_config()
   USER_SOURCE_NODEV=""
   PARTITIONS=""
   IMAGE_PROGRAM=""
-  NONET=0
-  NOCONF=0
-  PIGZ_COMPRESSION=1
+  NO_NET=0
+  NO_CONF=0
+  GZIP_COMPRESSION=1
   NO_MOUNT=0
 
   # Check arguments
@@ -524,15 +590,15 @@ load_config()
     else
       case "$ARGNAME" in
         --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
-        --compression|-z) PIGZ_COMPRESSION="$ARGVAL";;
+        --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
         --conf|-c) CONF="$ARGVAL";;
         --fsa) IMAGE_PROGRAM="fsa";;
         --ddgz) IMAGE_PROGRAM="ddgz";;
         --pi) IMAGE_PROGRAM="pi";;
         --pc) IMAGE_PROGRAM="pc";;
-        --nonet|-n) NONET=1;;
+        --nonet|-n) NO_NET=1;;
         --nomount|-m) NO_MOUNT=1;;
-        --noconf) NOCONF=1;;
+        --noconf) NO_CONF=1;;
         --help) show_help; exit 3;;
         *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
       esac
@@ -540,7 +606,7 @@ load_config()
   done
 
   # Check if configuration file exists
-  if [ $NOCONF -eq 0 -a -e "$CONF" ]; then
+  if [ $NO_CONF -eq 0 -a -e "$CONF" ]; then
     # Source the configuration
     . "$CONF"
   fi
@@ -554,8 +620,8 @@ load_config()
   fi
 
   # Sanity check compression
-  if [ -z "$PIGZ_COMPRESSION" -o $PIGZ_COMPRESSION -lt 1 -o $PIGZ_COMPRESSION -gt 9 ]; then
-    PIGZ_COMPRESSION=1
+  if [ -z "$GZIP_COMPRESSION" -o $GZIP_COMPRESSION -lt 1 -o $GZIP_COMPRESSION -gt 9 ]; then
+    GZIP_COMPRESSION=1
   fi
 
   # Translate "long" names to short
@@ -582,7 +648,7 @@ sanity_check;
 
 check_target;
 
-if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NONET" != "1" ]; then
+if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Setup network (interface)
   configure_network;
 
@@ -681,11 +747,11 @@ fi
 
 echo "* Partitions backuped successfully: $SUCCESS"
 
-# Check integrity of pigz-files:
+# Check integrity of .gz-files:
 if [ -n "$(find . -maxdepth 1 -type f -iname "*\.gz*" 2>/dev/null)" ]; then
   echo ""
   echo "Verifying .gz images (CTRL-C to break):"
-  pigz -tv *\.gz*
+  $GZIP -tv *\.gz*
 fi
 
 # Exit (+unmount)
