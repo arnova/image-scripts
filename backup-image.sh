@@ -586,24 +586,21 @@ load_config()
     ARGNAME=`echo "$arg" |cut -d= -f1`
     ARGVAL=`echo "$arg" |cut -d= -f2`
 
-    if [ -z "$(echo "$ARGNAME" |grep '^-')" ]; then
-      IMAGE_NAME="$ARGVAL"
-    else
-      case "$ARGNAME" in
-        --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
-        --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
-        --conf|-c) CONF="$ARGVAL";;
-        --fsa) IMAGE_PROGRAM="fsa";;
-        --ddgz) IMAGE_PROGRAM="ddgz";;
-        --pi) IMAGE_PROGRAM="pi";;
-        --pc) IMAGE_PROGRAM="pc";;
-        --nonet|-n) NO_NET=1;;
-        --nomount|-m) NO_MOUNT=1;;
-        --noconf) NO_CONF=1;;
-        --help) show_help; exit 3;;
-        *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
-      esac
-    fi
+    case "$ARGNAME" in
+      --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+      --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
+      --conf|-c) CONF="$ARGVAL";;
+      --fsa) IMAGE_PROGRAM="fsa";;
+      --ddgz) IMAGE_PROGRAM="ddgz";;
+      --pi) IMAGE_PROGRAM="pi";;
+      --pc) IMAGE_PROGRAM="pc";;
+      --nonet|-n) NO_NET=1;;
+      --nomount|-m) NO_MOUNT=1;;
+      --noconf) NO_CONF=1;;
+      --help) show_help; exit 3;;
+      -*) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
+       *) IMAGE_NAME="$ARGVAL"
+    esac
   done
 
   # Check if configuration file exists
@@ -642,7 +639,7 @@ load_config()
 echo "Image BACKUP Script v$MY_VERSION - Written by Arno van Amersfoort"
 
 # Load configuration from file/commandline
-load_config;
+load_config $*;
 
 # Sanity check environment
 sanity_check;

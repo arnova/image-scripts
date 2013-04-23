@@ -515,7 +515,7 @@ restore_partitions()
 
     echo "* Selected partition: /dev/$TARGET_PART_NODEV. Using image file: $IMAGE_FILE"
     local retval=1
-    case image_type_detect "$IMAGE_FILE" in
+    case $(image_type_detect "$IMAGE_FILE") in
       fsarchiver) fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PART_NODEV"
                   retval=$?
                   ;;
@@ -769,7 +769,7 @@ check_image_files()
   # Make sure the proper binaries are available
   IFS=' '
   for IMAGE_FILE in $IMAGE_FILES; do
-    case image_type_detect $IMAGE_FILE in
+    case $(image_type_detect "$IMAGE_FILE") in
       fsarchiver) check_command_error fsarchiver
                   ;;
       partimage ) check_command_error partimage
@@ -834,24 +834,21 @@ load_config()
     ARGNAME=`echo "$arg" |cut -d= -f1`
     ARGVAL=`echo "$arg" |cut -d= -f2`
 
-    if [ -z "$(echo "$ARGNAME" |grep '^-')" ]; then
-      IMAGE_NAME="$ARGVAL"
-    else
-      case "$ARGNAME" in
-        --clean|-c) CLEAN=1;;
-        --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
-        --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
-        --conf|-c) CONF="$ARGVAL";;
-        --nonet|-n) NO_NET=1;;
-        --nomount|-m) NO_MOUNT=1;;
-        --noconf) NO_CONF=1;;
-        --mbr) MBR_WRITE=1;;
-        --pt) PT_WRITE=1;;
-        --nopostsh|--nosh) NO_POST_SH=1;;
-        --help|-h) show_help; exit 3;;
-        *) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
-      esac
-    fi
+    case "$ARGNAME" in
+      --clean|-c) CLEAN=1;;
+      --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
+      --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+      --conf|-c) CONF="$ARGVAL";;
+      --nonet|-n) NO_NET=1;;
+      --nomount|-m) NO_MOUNT=1;;
+      --noconf) NO_CONF=1;;
+      --mbr) MBR_WRITE=1;;
+      --pt) PT_WRITE=1;;
+      --nopostsh|--nosh) NO_POST_SH=1;;
+      --help|-h) show_help; exit 3;;
+      -*) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
+      *) IMAGE_NAME="$ARGVAL"
+    esac
   done
 
   # Check if configuration file exists
@@ -877,7 +874,7 @@ load_config()
 echo "Image RESTORE Script v$MY_VERSION - Written by Arno van Amersfoort"
 
 # Load configuration from file/commandline
-load_config;
+load_config $*;
 
 # Sanity check environment
 sanity_check;
