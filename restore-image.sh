@@ -369,7 +369,8 @@ set_image_dir()
 
       if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
         while true; do
-          read -p "Network username ($DEFAULT_USERNAME): " USERNAME
+          printf "Network username ($DEFAULT_USERNAME): "
+          read USERNAME
           if [ -z "$USERNAME" ]; then
             USERNAME="$DEFAULT_USERNAME"
           fi
@@ -523,8 +524,8 @@ restore_partitions()
 
     if [ $retval -ne 0 ]; then
       FAILED="${FAILED}${FAILED:+ }${TARGET_PART_NODEV}"
-      printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PART_NODEV.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
-      read -n1
+      printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PART_NODEV.\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+      read dummy
     else
       SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PART_NODEV}"
       echo "****** $IMAGE_FILE restored to /dev/$TARGET_PART_NODEV ******"
@@ -565,10 +566,16 @@ restore_disks()
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
-    
+
+    if [ $CLEAN -eq 1 ]; then
+      CHECK_PARTITIONS="$PARTITIONS_FOUND"
+    else
+      CHECK_PARTITIONS="$PARTITIONS_NODEV"
+    fi
+
     IFS=$EOL
-    for PART in $PARTITIONS_FOUND; do
-      # (Try) to unmount all partitions on this device
+    for PART in $CHECK_PARTITIONS; do
+      # (Try) to unmount partitions on target device
       if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
         if ! umount /dev/$PART >/dev/null; then
           echo ""
@@ -593,7 +600,7 @@ restore_disks()
     PARTPROBE=0
 
     # Check for MBR restore
-    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ]; then
+    if [ $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ]; then
       if [ -f "track0.${HDD_NAME}" ]; then
         DD_SOURCE="track0.${HDD_NAME}"
       else
@@ -626,8 +633,8 @@ restore_disks()
     # Check for partition restore
     if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
       printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
-      echo "To override this you must specify --clean or --pt. Press any key to continue or CTRL-C to abort..." >&2
-      read -n1
+      echo "To override this you must specify --clean or --pt. Press <enter> to continue or CTRL-C to abort..." >&2
+      read dummy
       echo ""
     else
       if [ -f "partitions.$HDD_NAME" ]; then
@@ -649,8 +656,8 @@ restore_disks()
       partprobe "/dev/$TARGET_NODEV"
       retval=$?
       if [ $retval -ne 0 ]; then
-        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed($retval)!\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
-        read -n1
+        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed($retval)!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+        read dummy
         echo ""
       fi
     fi
@@ -711,8 +718,8 @@ verify_target()
   done
 
   if [ $MISMATCH -ne 0 ]; then
-    printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source! Press any key to continue or CTRL-C to quit...\n\033[0m" >&2
-    read -n1
+    printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source! Press <enter> to continue or CTRL-C to quit...\n\033[0m" >&2
+    read dummy
     echo ""
     return 1
   fi
@@ -920,8 +927,8 @@ if [ -e "description.txt" ]; then
 fi
 
 echo "--------------------------------------------------------------------------------"
-echo "Press any key to continue"
-read -n 1
+echo "Press <enter> to continue"
+read dummy
 echo ""
 
 # Restore MBR/partition tables + setup swap

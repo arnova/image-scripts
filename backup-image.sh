@@ -340,7 +340,8 @@ set_image_dir()
 
       if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
         while true; do
-          read -p "Network username ($DEFAULT_USERNAME): " USERNAME
+          printf "Network username ($DEFAULT_USERNAME): "
+          read USERNAME
           if [ -z "$USERNAME" ]; then
             USERNAME="$DEFAULT_USERNAME"
           fi
@@ -486,12 +487,12 @@ backup_partitions()
             fi
             ;;
     esac
-      
+
     echo ""
     if [ $retval -ne 0 ]; then
       FAILED="${FAILED}${FAILED:+ }$PART"
-      printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress any key to continue or CTRL-C to abort...\n\033[0m" >&2
-      read -n1
+      printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+      read dummy
     else
       SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
       echo "****** Backuped /dev/$PART to $TARGET_FILE ******"
@@ -708,7 +709,8 @@ fi
 
 echo ""
 
-read -p "Please enter description: " DESCRIPTION
+printf "Please enter description: "
+read DESCRIPTION
 if [ -n "$DESCRIPTION" ]; then
   echo "$DESCRIPTION" >"description.txt"
 fi
