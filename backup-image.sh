@@ -469,9 +469,7 @@ backup_partitions()
             printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
             $PARTCLONE -c -s "/dev/$PART" |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
-            if [ ${PIPESTATUS[0]} -ne 0 ]; then
-              retval=1
-            fi
+            # FIXME: need to check the piped commands
             ;;
       fsa)  TARGET_FILE="$PART.fsa"
             printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
@@ -482,9 +480,7 @@ backup_partitions()
             printf "****** Using dd (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
             dd if="/dev/$PART" bs=4096 |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
-            if [ ${PIPESTATUS[0]} -ne 0 ]; then
-              retval=1
-            fi
+            # FIXME: need to check the piped commands
             ;;
     esac
 

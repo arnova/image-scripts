@@ -510,15 +510,11 @@ restore_partitions()
                   ;;
       partclone)  $GZIP -d -c "$IMAGE_FILE" |partclone.restore -s - -o "/dev/$TARGET_PART_NODEV"
                   retval=$?
-                  if [ ${PIPESTATUS[0]} -ne 0 ]; then
-                    retval=1
-                  fi
+                  # FIXME: need to check the piped commands
                   ;;
       ddgz)       $GZIP -d -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
                   retval=$?
-                  if [ ${PIPESTATUS[0]} -ne 0 ]; then
-                    retval=1
-                  fi
+                  # FIXME: need to check the piped commands
                   ;;
     esac
 
