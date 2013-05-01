@@ -459,6 +459,11 @@ backup_partitions()
   for PART in $BACKUP_PARTITIONS; do
     retval=0
     case "$IMAGE_PROGRAM" in
+      fsa)  TARGET_FILE="$PART.fsa"
+            printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
+            retval=$?
+            ;;
       pi)   TARGET_FILE="$PART.img.gz"
             printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
             partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
@@ -467,20 +472,19 @@ backup_partitions()
       pc)   TARGET_FILE="$PART.pc.gz"
             PARTCLONE=`partclone_detect "/dev/$PART"`
             printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            $PARTCLONE -c -s "/dev/$PART" |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            { $PARTCLONE -c -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
-            # FIXME: need to check the piped commands
-            ;;
-      fsa)  TARGET_FILE="$PART.fsa"
-            printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
-            retval=$?
+            if [ $retval -eq 0 ]; then
+              retval=`cat /tmp/.partclone.exitcode`
+            fi
             ;;
       ddgz) TARGET_FILE="$PART.dd.gz"
             printf "****** Using dd (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            dd if="/dev/$PART" bs=4096 |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            { dd if="/dev/$PART" bs=4096; echo $? >/tmp/.dd.exitcode } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
-            # FIXME: need to check the piped commands
+            if [ $retval -eq 0 ]; then
+              retval=`cat /tmp/.dd.exitcode`
+            fi
             ;;
     esac
 

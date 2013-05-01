@@ -508,13 +508,17 @@ restore_partitions()
       partimage)  partimage -b restore "/dev/$TARGET_PART_NODEV" "$IMAGE_FILE"
                   retval=$?
                   ;;
-      partclone)  $GZIP -d -c "$IMAGE_FILE" |partclone.restore -s - -o "/dev/$TARGET_PART_NODEV"
+      partclone)  { $GZIP -d -c "$IMAGE_FILE"; echo $? >/tmp/.gzip.exitcode } |partclone.restore -s - -o "/dev/$TARGET_PART_NODEV"
                   retval=$?
-                  # FIXME: need to check the piped commands
+                  if [ $retval -eq 0 ]; then
+                    retval=`cat /tmp/.gzip.exitcode`
+                  fi
                   ;;
-      ddgz)       $GZIP -d -c "$IMAGE_FILE" |dd of="/dev/$TARGET_PART_NODEV" bs=4096
+      ddgz)       { $GZIP -d -c "$IMAGE_FILE"; echo $? >/tmp/.gzip.exitcode } |dd of="/dev/$TARGET_PART_NODEV" bs=4096
                   retval=$?
-                  # FIXME: need to check the piped commands
+                  if [ $retval -eq 0 ]; then
+                    retval=`cat /tmp/.gzip.exitcode`
+                  fi
                   ;;
     esac
 
