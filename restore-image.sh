@@ -847,8 +847,18 @@ load_config()
       --pt) PT_WRITE=1;;
       --nopostsh|--nosh) NO_POST_SH=1;;
       --help|-h) show_help; exit 3;;
-      -*) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
-      *) IMAGE_NAME="$ARGVAL"
+      -*) echo "Bad argument: $ARGNAME" >&2
+          show_help
+          exit 4
+          ;;
+       *) if [ -z "$IMAGE_NAME" ]; then
+            IMAGE_NAME="$ARGVAL"
+          else
+            echo "Bad command syntax" >&2
+            help;
+            exit 4
+          fi
+          ;;
     esac
   done
 
