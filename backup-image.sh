@@ -472,7 +472,7 @@ backup_partitions()
       pc)   TARGET_FILE="$PART.pc.gz"
             PARTCLONE=`partclone_detect "/dev/$PART"`
             printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            { $PARTCLONE -c -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            $PARTCLONE -c -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
             if [ $retval -eq 0 ]; then
               retval=`cat /tmp/.partclone.exitcode`
@@ -480,7 +480,7 @@ backup_partitions()
             ;;
       ddgz) TARGET_FILE="$PART.dd.gz"
             printf "****** Using dd (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            { dd if="/dev/$PART" bs=4096; echo $? >/tmp/.dd.exitcode } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            dd if="/dev/$PART" bs=4096; echo $? >/tmp/.dd.exitcode |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
             if [ $retval -eq 0 ]; then
               retval=`cat /tmp/.dd.exitcode`
