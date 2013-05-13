@@ -287,6 +287,32 @@ get_partitions()
 }
 
 
+parted_list()
+{
+  local DEV="$1"
+  local FOUND=0
+  local MATCH=0
+  IFS=$EOL
+  for LINE in `parted -l`; do
+    if echo "$LINE" |grep -q '^Disk '; then
+      # Match disk
+      if echo "$LINE" |grep -q "^Disk /dev/$DEV: "; then
+        FOUND=1
+        MATCH=1
+      else
+        MATCH=0
+      fi
+    elif [ $MATCH -eq 1 ]; then
+      echo "$LINE"
+    fi
+  done
+
+  if [ $FOUND -eq 0 ]; then
+    echo "WARNING: Parted was unable to retrieve information for device /dev/$DEV!" >&2
+  fi
+}
+
+
 # mkdir + sanity check (cd) access to it
 mkdir_safe()
 {
@@ -541,7 +567,8 @@ backup_disks()
             # Dump fdisk -l info to file
             fdisk -l /dev/$HDD >"fdisk.$HDD"
 
-            parted -l /dev/$HDD >"parted.$HDD"
+            # Use wrapped function to only get info for this device
+            parted_list /dev/$HDD >"parted.$HDD"
 
             # Mark HDD as done
             HDD=""
