@@ -530,10 +530,13 @@ backup_disks()
               do_exit 8
             fi
 
-            if ! sfdisk -d /dev/$HDD > "partitions.$HDD"; then
+            if ! sfdisk -d /dev/$HDD > "sfdisk.$HDD"; then
               printf "\033[40m\033[1;31mERROR: Partition table backup failed! Quitting...\n\033[0m" >&2
               do_exit 9
             fi
+
+            # Legacy. Must be removed in future releases
+            cp "sfdisk.$HDD" "partitions.$HDD"
 
             # Dump fdisk -l info to file
             fdisk -l /dev/$HDD >"fdisk.$HDD"
