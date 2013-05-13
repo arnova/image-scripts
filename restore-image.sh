@@ -68,7 +68,7 @@ configure_network()
         echo "* Skipped auto config for interface: $CUR_IF"
         continue;
       fi
-      IP_TEST=`echo "$IF_INFO" |grep -i ' inet ' |sed 's/^ *//g'`
+      IP_TEST=`echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g'`
     fi
 
     if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
@@ -94,7 +94,7 @@ configure_network()
           fi
         fi
       fi
-            
+
       if echo "$NETWORK" |grep -q -e 'static'; then
         printf "Setup interface $CUR_IF statically (Y/N)? "
             
