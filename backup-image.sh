@@ -251,6 +251,7 @@ sanity_check()
   check_command_error fdisk
   check_command_error dd
   check_command_error gzip
+  check_command_error parted
 
   [ "$NO_NET" != "0" ] && check_command_error ifconfig
   [ "$NO_MOUNT" != "0" ] && check_command_error mount
@@ -536,6 +537,8 @@ backup_disks()
 
             # Dump fdisk -l info to file
             fdisk -l /dev/$HDD >"fdisk.$HDD"
+
+            parted -l /dev/$HDD >"parted.$HDD"
 
             # Mark HDD as done
             HDD=""
