@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA"
+MY_VERSION="3.10-BETA2"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: April 17, 2013
+# Last update: May 13, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -53,90 +53,90 @@ ctrlc_handler()
 # Setup the ethernet interface
 configure_network()
 {
-  local CUR_IF=""
-  local IP_SET=""
-  local MAC_ADDR=""
-
   IFS=$EOL
-  for LINE in $(ifconfig -a 2>/dev/null); do
-    if echo "$LINE" |grep -q -i 'Link encap'; then
-      CUR_IF="$(echo "$LINE" |grep -i 'link encap:ethernet' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan' |cut -f1 -d' ')"
-      MAC_ADDR="$(echo "$LINE" |awk '{ print $NF }')"
-    elif echo "$LINE" |grep -q -i 'inet addr:.*Bcast.*Mask.*'; then
-      IP_SET="$(echo "$LINE" |sed 's/^ *//g')"
-    elif echo "$LINE" |grep -q -i '.*RX packets.*'; then
-      if [ -n "$CUR_IF" ]; then
-        if [ -z "$IP_SET" ] || ! ifconfig 2>/dev/null |grep -q -e "^$CUR_IF[[:blank:]]"; then
-          echo "* Network interface $CUR_IF is not active (yet)"
+  for CUR_IF in `ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan'`; do
+    IF_INFO=`ifconfig $CUR_IF`
+    MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
+    IP_TEST=""
+    if [ -n "$MAC_ADDR" ]; then 
+      # Old style ifconfig
+      IP_TEST=`echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g')`
+    else
+      # Check for new style ifconfig
+      MAC_ADDR=`echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }'`
+      if [ -z "$MAC_ADDR" ]; then
+        echo "* Skipped auto config for interface: $CUR_IF"
+        continue;
+      fi
+      IP_TEST=`echo "$IF_INFO" |grep -i ' inet ' |sed 's/^ *//g'`
+    fi
+
+    if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
+      echo "* Network interface $CUR_IF is not active (yet)"
           
-          if echo "$NETWORK" |grep -q -e 'dhcp'; then
-            if which dhcpcd >/dev/null 2>&1; then
-              printf "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
-              # Run dhcpcd to get a dynamic IP
-              if ! dhcpcd -L $CUR_IF; then
-                echo "FAILED!"
-              else
-                echo "OK"
-                continue
-              fi
-            elif which dhclient >/dev/null 2>&1; then
-              printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
-              if ! dhclient -v -1 $CUR_IF; then
-                echo "FAILED!"
-              else
-                echo "OK"
-                continue
-              fi
-            fi
+      if echo "$NETWORK" |grep -q -e 'dhcp'; then
+        if which dhclient >/dev/null 2>&1; then
+          printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
+          if ! dhclient -v -1 $CUR_IF; then
+            echo "FAILED!"
+          else
+            echo "OK"
+            continue
           fi
-            
-          if echo "$NETWORK" |grep -q -e 'static'; then
-            printf "Setup interface $CUR_IF statically (Y/N)? "
-            
-            read answer
-            if [ "$answer" = "n" -o "$answer" = "N" ]; then
-              continue
-            fi
-            
-            echo ""
-            echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
-            printf "IP address ($IPADDRESS)?: "
-            read USER_IPADDRESS
-            if [ -z "$USER_IPADDRESS" ]; then
-              USER_IPADDRESS="$IPADDRESS"
-              if [ -z "$USER_IPADDRESS" ]; then
-                echo "* Skipping configuration of $CUR_IF"
-                continue
-              fi
-            fi
-
-            printf "Netmask ($NETMASK)?: "
-            read USER_NETMASK
-            if [ -z "$USER_NETMASK" ]; then
-              USER_NETMASK="$NETMASK"
-            fi
-
-            printf "Gateway ($GATEWAY)?: "
-            read USER_GATEWAY
-            if [ -z "$USER_GATEWAY" ]; then
-              USER_GATEWAY="$GATEWAY"
-            fi
-
-            echo "* Configuring static IP: $USER_IPADDRESS / $USER_NETMASK"
-            ifconfig $CUR_IF down
-            ifconfig $CUR_IF inet $USER_IPADDRESS netmask $USER_NETMASK up
-            if [ -n "$USER_GATEWAY" ]; then
-              route add default gw $USER_GATEWAY
-            fi
+        elif which dhcpcd >/dev/null 2>&1; then
+          printf "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
+          # Run dhcpcd to get a dynamic IP
+          if ! dhcpcd -L $CUR_IF; then
+            echo "FAILED!"
+          else
+            echo "OK"
+            continue
           fi
-        else
-          echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
-          echo "  $IP_SET"
         fi
       fi
-      CUR_IF=""
-      IP_SET=""
-      MAC_ADDR=""
+            
+      if echo "$NETWORK" |grep -q -e 'static'; then
+        printf "Setup interface $CUR_IF statically (Y/N)? "
+            
+        read answer
+        if [ "$answer" = "n" -o "$answer" = "N" ]; then
+          continue
+        fi
+            
+        echo ""
+        echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
+        printf "IP address ($IPADDRESS)?: "
+        read USER_IPADDRESS
+        if [ -z "$USER_IPADDRESS" ]; then
+          USER_IPADDRESS="$IPADDRESS"
+          if [ -z "$USER_IPADDRESS" ]; then
+            echo "* Skipping configuration of $CUR_IF"
+            continue
+          fi
+        fi
+
+        printf "Netmask ($NETMASK)?: "
+        read USER_NETMASK
+        if [ -z "$USER_NETMASK" ]; then
+          USER_NETMASK="$NETMASK"
+        fi
+
+        printf "Gateway ($GATEWAY)?: "
+        read USER_GATEWAY
+        if [ -z "$USER_GATEWAY" ]; then
+          USER_GATEWAY="$GATEWAY"
+        fi
+
+        echo "* Configuring static IP: $USER_IPADDRESS / $USER_NETMASK"
+        ifconfig $CUR_IF down
+        ifconfig $CUR_IF inet $USER_IPADDRESS netmask $USER_NETMASK up
+        if [ -n "$USER_GATEWAY" ]; then
+          route add default gw $USER_GATEWAY
+        fi
+      fi
+    else
+      echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
+      echo "  $IP_TEST"
     fi
   done
 }
