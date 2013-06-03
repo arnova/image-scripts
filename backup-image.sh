@@ -296,7 +296,7 @@ parted_list()
   for LINE in `parted -l`; do
     if echo "$LINE" |grep -q '^Disk '; then
       # Match disk
-      if echo "$LINE" |grep -q "^Disk /dev/$DEV: "; then
+      if echo "$LINE" |grep -q "^Disk $DEV: "; then
         FOUND=1
         MATCH=1
       else
@@ -308,7 +308,7 @@ parted_list()
   done
 
   if [ $FOUND -eq 0 ]; then
-    echo "WARNING: Parted was unable to retrieve information for device /dev/$DEV!" >&2
+    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
   fi
 }
 
