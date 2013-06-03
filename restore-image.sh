@@ -3,7 +3,7 @@
 MY_VERSION="3.10-BETA2"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 13, 2013
+# Last update: June 3, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -628,14 +628,11 @@ restore_disks()
       PARTPROBE=1
     fi
     
-    echo ""
-    
     # Check for partition restore
     if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
       printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
-      echo "To override this you must specify --clean or --pt. Press <enter> to continue or CTRL-C to abort..." >&2
+      printf "To override this you must specify --clean or --pt. Press <enter> to continue or CTRL-C to abort...\n" >&2
       read dummy
-      echo ""
     else
       if [ -f "partitions.$HDD_NAME" ]; then
         echo "* Updating partition table on /dev/$TARGET_NODEV"
@@ -644,10 +641,10 @@ restore_disks()
           
         if [ $retval -ne 0 ]; then
           printf "\033[40m\033[1;31mPartition table restore failed($retval). Quitting...\n\033[0m" >&2
+          echo ""
           do_exit 5
         fi
         PARTPROBE=1
-        echo ""
       fi
     fi
     
@@ -658,7 +655,6 @@ restore_disks()
       if [ $retval -ne 0 ]; then
         printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed($retval)!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
         read dummy
-        echo ""
       fi
     fi
     
@@ -697,6 +693,7 @@ verify_target()
       SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
       if [ -z "$SFDISK_TARGET_PART" ]; then
         printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\033[0m" >&2
+        echo ""
         do_exit 5
       fi
     fi
@@ -705,6 +702,7 @@ verify_target()
     SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
     if [ -z "$SFDISK_SOURCE_PART" ]; then
       printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m" >&2
+      echo ""
       do_exit 5
     fi
 
@@ -720,7 +718,6 @@ verify_target()
   if [ $MISMATCH -ne 0 ]; then
     printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source! Press <enter> to continue or CTRL-C to quit...\n\033[0m" >&2
     read dummy
-    echo ""
     return 1
   fi
   
@@ -939,7 +936,6 @@ fi
 echo "--------------------------------------------------------------------------------"
 echo "Press <enter> to continue"
 read dummy
-echo ""
 
 # Restore MBR/partition tables + setup swap
 restore_disks;
