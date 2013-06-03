@@ -60,7 +60,7 @@ configure_network()
     IP_TEST=""
     if [ -n "$MAC_ADDR" ]; then 
       # Old style ifconfig
-      IP_TEST=`echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g')`
+      IP_TEST=`echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g'`
     else
       # Check for new style ifconfig
       MAC_ADDR=`echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }'`
@@ -367,7 +367,7 @@ set_image_dir()
       # Unmount mount point to be used
       umount "$IMAGE_ROOT" 2>/dev/null
 
-      if [ -n "$NETWORK" -a "$NETWORK" != "none" -a -n "$DEFAULT_USERNAME" ]; then
+      if [ -n "$SERVER" -a -n "$DEFAULT_USERNAME" ]; then
         while true; do
           printf "Network username ($DEFAULT_USERNAME): "
           read USERNAME
