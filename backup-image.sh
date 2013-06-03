@@ -632,12 +632,15 @@ load_config()
       --nomount|-m) NO_MOUNT=1;;
       --noconf) NO_CONF=1;;
       --help) show_help; exit 3;;
-      -*) echo "Bad argument: $ARGNAME"; show_help; exit 4;;
+      -*) echo "Bad argument: $ARGNAME"
+          show_help
+          exit 4
+          ;;
        *) if [ -z "$IMAGE_NAME" ]; then
             IMAGE_NAME="$ARGVAL"
           else
             echo "Bad command syntax" >&2
-            help;
+            show_help
             exit 4
           fi
           ;;

@@ -862,7 +862,7 @@ load_config()
             IMAGE_NAME="$ARGVAL"
           else
             echo "Bad command syntax" >&2
-            help;
+            show_help;
             exit 4
           fi
           ;;
