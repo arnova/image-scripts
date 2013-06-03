@@ -674,6 +674,11 @@ restore_disks()
 
 verify_target()
 {
+  if [ -z "$IMAGE_FILES" ]; then
+    return 1 # Nothing to do
+  fi
+
+  echo ""
   # Test whether the target partition(s) exist and have the correct geometry:
   local MISMATCH=0
   unset IFS
@@ -708,19 +713,20 @@ verify_target()
 
     echo "* Source partition: $SFDISK_SOURCE_PART"
     echo "* Target partition: $SFDISK_TARGET_PART"
-    echo ""
 
     if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
       MISMATCH=1
     fi
   done
 
+  echo ""
+
   if [ $MISMATCH -ne 0 ]; then
     printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source! Press <enter> to continue or CTRL-C to quit...\n\033[0m" >&2
     read dummy
     return 1
   fi
-  
+
   return 0
 }
 
