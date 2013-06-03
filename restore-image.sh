@@ -138,6 +138,8 @@ configure_network()
       echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
       echo "  $IP_TEST"
     fi
+
+    echo ""
   done
 }
 
@@ -914,6 +916,7 @@ if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Try to sync time against the server used, if ntpdate is available
   if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
     ntpdate "$SERVER"
+    echo ""
   fi
 fi
 
