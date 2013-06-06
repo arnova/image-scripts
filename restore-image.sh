@@ -1016,7 +1016,11 @@ if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
 fi
 
-echo "* Partitions restored successfully: $SUCCESS"
+if [ -z "$SUCCESS" ]; then
+  echo "* Partitions restored successfully: none"
+else
+  echo "* Partitions restored successfully: $SUCCESS"
+fi
 
 # Exit (+unmount)
 do_exit 0
