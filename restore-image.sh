@@ -952,7 +952,19 @@ fi
 if [ -n "$PARTITIONS_NODEV" -a "$PARTITIONS_NODEV" != "none" ]; then
   check_image_files;
 else
-  echo "* Skipping partition image restoration, as requested..."
+  echo "* NOTE: Skipping partition image restoration"
+fi
+
+if [ $PT_WRITE -eq 1 ]; then
+  echo "* WARNING: Always updating partition tables enabled!" >&2
+fi
+
+if [ $MBR_WRITE -eq 1 ]; then
+  echo "* WARNING: Always updating MBR/track0 enabled!" >&2
+fi
+
+if [ $CLEAN -eq 1 ]; then
+  echo "* WARNING: Always updating MBR/track0 & partition table enabled!" >&2
 fi
 
 if [ -e "description.txt" ]; then
