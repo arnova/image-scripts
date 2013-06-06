@@ -550,7 +550,7 @@ backup_disks()
             check_dma /dev/$HDD
 
             # Dump hdd info for all disks in the current system
-            result=`dd if=/dev/$HDD of="track0.$HDD" bs=32768 count=1 2>&1`
+            result=`dd if=/dev/$HDD of="track0.$HDD" bs=512 count=63 2>&1`
             retval=$?
             if [ $retval -ne 0 ]; then
               echo "$result" >&2

@@ -630,10 +630,10 @@ restore_disks()
       echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
       
       if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
-        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=32768 count=1 2>&1`
+        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1`
         retval=$?
       else
-        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV seek=512 skip=512 bs=1 count=32256 2>&1`
+        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62 2>&1`
         retval=$?
       fi
       
