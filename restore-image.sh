@@ -949,7 +949,11 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
   do_exit 7
 fi
 
-check_image_files;
+if [ -n "$PARTITIONS_NODEV" -a "$PARTITIONS_NODEV" != "none" ]; then
+  check_image_files;
+else
+  echo "* Skipping partition image restoration, as requested..."
+fi
 
 if [ -e "description.txt" ]; then
   echo "--------------------------------------------------------------------------------"
@@ -969,8 +973,6 @@ verify_target;
 # Restore images to partitions
 if [ -n "$PARTITIONS_NODEV" -a "$PARTITIONS_NODEV" != "none" ]; then
   restore_partitions;
-else
-  echo "* Skipping partition image restoration, as requested..."
 fi
 
 # Reset terminal
