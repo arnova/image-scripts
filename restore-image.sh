@@ -830,6 +830,7 @@ show_help()
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
+  echo "--noimage                   - Don't restore any images, only do partition/MBR operations"
   echo "--nopostsh|--nosh           - Don't execute any post image shell scripts"
 }
 
@@ -850,6 +851,7 @@ load_config()
   PT_WRITE=0
   NO_POST_SH=0
   NO_MOUNT=0
+  NO_IMAGE=0
 
   # Check arguments
   unset IFS
@@ -861,6 +863,7 @@ load_config()
       --clean|-c) CLEAN=1;;
       --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
       --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+      --noimage|--noimages) NO_IMAGE=1;;
       --conf|-c) CONF="$ARGVAL";;
       --nonet|-n) NO_NET=1;;
       --nomount|-m) NO_MOUNT=1;;
@@ -966,7 +969,9 @@ restore_disks;
 verify_target;
  
 # Restore images to partitions
-restore_partitions;
+if [ $NO_IMAGE -eq 0 ]; then
+  restore_partitions;
+fi
 
 # Reset terminal
 #reset
