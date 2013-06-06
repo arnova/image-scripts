@@ -601,14 +601,14 @@ restore_disks()
     if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
       if [ $PT_WRITE -eq 0 ]; then
         printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, it will NOT be updated!\n\033[0m" >&2
-        printf "To override this you must specify --clean or --pt...\n" >&2
-        printf "" > &2
+        echo "To override this you must specify --clean or --pt..." >&2
+        echo "" >&2
       fi
 
       if [ $MBR_WRITE -eq 0 ]; then
         printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, its MBR will NOT be updated!\n\033[0m" >&2
-        printf "To override this you must specify --clean or --mbr...\n" >&2
-        printf "" > &2
+        echo "To override this you must specify --clean or --mbr..." >&2
+        echo "" >&2
       fi
 
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
