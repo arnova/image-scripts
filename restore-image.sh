@@ -3,7 +3,7 @@
 MY_VERSION="3.10-BETA2"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: June 3, 2013
+# Last update: June 6, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -597,12 +597,29 @@ restore_disks()
         fi
       fi
     done
-    
-    # Flag in case we update the mbr/partition table so we know we need to have the kernel to re-probe
+
+    if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
+      if [ $PT_WRITE -eq 0 ]; then
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, it will NOT be updated!\n\033[0m" >&2
+        printf "To override this you must specify --clean or --pt...\n" >&2
+        printf "" > &2
+      fi
+
+      if [ $MBR_WRITE -eq 0 ]; then
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, its MBR will NOT be updated!\n\033[0m" >&2
+        printf "To override this you must specify --clean or --mbr...\n" >&2
+        printf "" > &2
+      fi
+
+      printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
+      read dummy
+    fi
+
+    # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
     # Check for MBR restore
-    if [ $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ]; then
+    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ]; then
       if [ -f "track0.${HDD_NAME}" ]; then
         DD_SOURCE="track0.${HDD_NAME}"
       else
@@ -631,11 +648,7 @@ restore_disks()
     fi
     
     # Check for partition restore
-    if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
-      printf "\033[40m\033[1;31mWARNING: Target device /dev/$TARGET_NODEV already contains a partition table, it will NOT be updated!\n\033[0m" >&2
-      printf "To override this you must specify --clean or --pt. Press <enter> to continue or CTRL-C to abort...\n" >&2
-      read dummy
-    else
+    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 -o $PT_WRITE -eq 1 ]; then
       if [ -f "partitions.$HDD_NAME" ]; then
         echo "* Updating partition table on /dev/$TARGET_NODEV"
         sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
