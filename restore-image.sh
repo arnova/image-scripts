@@ -821,7 +821,7 @@ show_help()
   echo ""
   echo "Options:"
   echo "--help|-h                   - Print this help"
-  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions)"
+  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--noconf                    - Don't read the config file"
   echo "--mbr                       - Always write a new MBR (from track0.*)"
@@ -851,7 +851,6 @@ load_config()
   PT_WRITE=0
   NO_POST_SH=0
   NO_MOUNT=0
-  NO_IMAGE=0
 
   # Check arguments
   unset IFS
@@ -863,7 +862,6 @@ load_config()
       --clean|-c) CLEAN=1;;
       --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
       --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
-      --noimage|--noimages) NO_IMAGE=1;;
       --conf|-c) CONF="$ARGVAL";;
       --nonet|-n) NO_NET=1;;
       --nomount|-m) NO_MOUNT=1;;
@@ -969,8 +967,10 @@ restore_disks;
 verify_target;
  
 # Restore images to partitions
-if [ $NO_IMAGE -eq 0 ]; then
+if [ -n "$PARTITIONS_NODEV" -a "$PARTITIONS_NODEV" != "none" ]; then
   restore_partitions;
+else
+  echo "* Skipping partition image restoration, as requested..."
 fi
 
 # Reset terminal
