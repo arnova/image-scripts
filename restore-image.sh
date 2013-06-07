@@ -540,7 +540,7 @@ restore_partitions()
 restore_disks()
 {
   # Restore MBR/track0/partitions
-  TARGET_NODEV=""
+  local TARGET_NODEV=""
   unset IFS
   for FN in partitions.*; do
     HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
@@ -598,7 +598,12 @@ restore_disks()
       fi
     done
 
-    if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
+    TRACK0_CLEAN=0
+    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
+      TRACK0_CLEAN=1
+    fi
+
+    if [ $TRACK0_CLEAN -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
       if [ $PT_WRITE -eq 0 -a $MBR_WRITE -eq 0 ]; then
         printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table/MBR, it will NOT be updated!\n\033[0m" >&2
         echo "To override this you must specify --clean or --pt --mbr..." >&2
@@ -624,8 +629,8 @@ restore_disks()
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
-    # Check for MBR restore
-    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ]; then
+    # Check for MBR restore. FIXME!::::
+    if [ -o $MBR_WRITE -eq 1 ] || [ $TRACK0_CLEAN -eq 1 ]; then
       if [ -f "track0.${HDD_NAME}" ]; then
         DD_SOURCE="track0.${HDD_NAME}"
       else
@@ -654,7 +659,7 @@ restore_disks()
     fi
     
     # Check for partition restore
-    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 -o $PT_WRITE -eq 1 ]; then
+    if [ -o $PT_WRITE -eq 1 ] || [ $TRACK0_CLEAN -eq 1 ]; then
       if [ -f "partitions.$HDD_NAME" ]; then
         echo "* Updating partition table on /dev/$TARGET_NODEV"
         sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
@@ -685,7 +690,7 @@ restore_disks()
 create_swaps()
 {
   # Run mkswap on swap partitions
-  TARGET_NODEV=""
+  local TARGET_NODEV=""
   unset IFS
   for FN in partitions.*; do
     HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
@@ -1005,9 +1010,7 @@ echo "Press <enter> to continue"
 read dummy
 
 # Restore MBR/partition tables
-if [ $NO_TRACK0 -eq 0 ]; then
-  restore_disks;
-fi
+restore_disks;
 
 if [ $CLEAN -eq 1 ]; then
   create_swaps;
