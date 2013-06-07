@@ -517,7 +517,7 @@ set_image_dir()
       while true; do
         echo "* Showing contents of the image root directory ($IMAGE_DIR):"
         IFS=$EOL
-        find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |while read ITEM; do
+        find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |sort |while read ITEM; do
           echo "$(basename "$ITEM")"
         done
 
@@ -928,7 +928,7 @@ check_image_files()
     done
   else
     IFS=$EOL
-    for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
+    for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
       IMAGE_FILE=`basename "$ITEM"`
       # Add item to list
       IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
