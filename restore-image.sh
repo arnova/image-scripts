@@ -599,16 +599,22 @@ restore_disks()
     done
 
     if [ -n "$PARTITIONS_FOUND" -a $CLEAN -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
-      if [ $PT_WRITE -eq 0 ]; then
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, it will NOT be updated!\n\033[0m" >&2
-        echo "To override this you must specify --clean or --pt..." >&2
+      if [ $PT_WRITE -eq 0 -a $MBR_WRITE -eq 0 ]; then
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table/MBR, it will NOT be updated!\n\033[0m" >&2
+        echo "To override this you must specify --clean or --pt --mbr..." >&2
         echo "" >&2
-      fi
+      else
+        if [ $PT_WRITE -eq 0 ]; then
+          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, it will NOT be updated!\n\033[0m" >&2
+          echo "To override this you must specify --clean or --pt..." >&2
+          echo "" >&2
+        fi
 
-      if [ $MBR_WRITE -eq 0 ]; then
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, its MBR will NOT be updated!\n\033[0m" >&2
-        echo "To override this you must specify --clean or --mbr..." >&2
-        echo "" >&2
+        if [ $MBR_WRITE -eq 0 ]; then
+          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, its MBR will NOT be updated!\n\033[0m" >&2
+          echo "To override this you must specify --clean or --mbr..." >&2
+          echo "" >&2
+        fi
       fi
 
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
@@ -672,17 +678,36 @@ restore_disks()
         read dummy
       fi
     fi
-    
-    if [ $CLEAN -eq 1 ]; then
-      # Create swap on swap partitions
-      IFS=$EOL
-      sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
-        PART="$(echo "$LINE" |awk '{ print $1 }')"
-        if ! mkswap $PART; then
-          printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
-        fi
-      done
+  done
+}
+
+
+create_swaps()
+{
+  # Run mkswap on swap partitions
+  TARGET_NODEV=""
+  unset IFS
+  for FN in partitions.*; do
+    HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
+
+    # If no target drive specified use default drive from image:
+    if [ -n "$USER_TARGET_NODEV" ]; then
+      TARGET_NODEV="$USER_TARGET_NODEV"
+    else
+      if [ -z "$TARGET_NODEV" ]; then
+        # Extract drive name from file
+        TARGET_NODEV="$HDD_NAME"
+      fi
     fi
+
+    # Create swap on swap partitions
+    IFS=$EOL
+    sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
+      PART="$(echo "$LINE" |awk '{ print $1 }')"
+      if ! mkswap $PART; then
+        printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
+      fi
+    done
   done
 }
 
@@ -824,9 +849,10 @@ show_help()
   echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--noconf                    - Don't read the config file"
-  echo "--mbr                       - Always write a new MBR (from track0.*)"
+  echo "--mbr                       - Always write a new track0(MBR) (from track0.*)"
   echo "--pt                        - Always write a new partition table (from partition.*)"
-  echo "--clean                     - Always write MBR/partition table/swap space even if device is not empty (USE WITH CARE!)"
+  echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)"
+  echo "--notrack0                  - Never write track0(MBR)/partition table, even if device is empty"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
@@ -845,6 +871,7 @@ load_config()
   USER_TARGET_NODEV=""
   PARTITIONS_NODEV=""
   CLEAN=0
+  NO_TRACK0=0
   NO_NET=0
   NO_CONF=0
   MBR_WRITE=0
@@ -859,7 +886,8 @@ load_config()
     ARGVAL=`echo "$arg" |cut -d= -f2`
 
     case "$ARGNAME" in
-      --clean|-c) CLEAN=1;;
+      --clean|--track0) CLEAN=1;;
+      --notrack0) NO_TRACK0=1;;
       --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
       --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --conf|-c) CONF="$ARGVAL";;
@@ -964,7 +992,7 @@ if [ $MBR_WRITE -eq 1 ]; then
 fi
 
 if [ $CLEAN -eq 1 ]; then
-  echo "* WARNING: Always updating MBR/track0 & partition table enabled!" >&2
+  echo "* WARNING: Always updating MBR/track0, partition-table & swap-space enabled!" >&2
 fi
 
 if [ -e "description.txt" ]; then
@@ -976,8 +1004,14 @@ echo "--------------------------------------------------------------------------
 echo "Press <enter> to continue"
 read dummy
 
-# Restore MBR/partition tables + setup swap
-restore_disks;
+# Restore MBR/partition tables
+if [ $NO_TRACK0 -eq 0 ]; then
+  restore_disks;
+fi
+
+if [ $CLEAN -eq 1 ]; then
+  create_swaps;
+fi
 
 # Make sure the target is sane
 verify_target;
