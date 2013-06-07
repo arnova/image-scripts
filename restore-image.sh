@@ -230,7 +230,7 @@ sanity_check()
   check_command_error umount
   check_command_error parted
 
-# TODO: Need to do this for GPT implementation  
+# TODO: Need to do this for GPT implementation
 #  check_command_error gdisk
 #  check_command_error sgdisk
 
@@ -690,24 +690,20 @@ restore_disks()
 
     IFS=$EOL
     for PART in $PARTITIONS_FOUND; do
-      # (Try) to unmount partitions on target device
+      # Check for mounted partitions on target device
       if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
-        if ! umount /dev/$PART >/dev/null; then
-          echo ""
-          printf "\033[40m\033[1;31mERROR: Unable to umount /dev/$PART. Wrong target device specified? Quitting...\n\033[0m" >&2
-          echo ""
-          do_exit 5
-        fi
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
+        echo ""
+        do_exit 5
       fi
 
       # Disable all swaps on this device
       if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
-        if ! swapoff /dev/$PART >/dev/null; then
-          echo ""
-          printf "\033[40m\033[1;31mERROR: Unable to swapoff /dev/$PART. Wrong target device specified? Quitting...\n\033[0m" >&2
-          echo ""
-          do_exit 5
-        fi
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART is currently enabled as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
+        echo ""
+        do_exit 5
       fi
     done
 
