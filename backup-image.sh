@@ -550,7 +550,7 @@ backup_disks()
             check_dma /dev/$HDD
 
             # Dump hdd info for all disks in the current system
-            result=`dd if=/dev/$HDD of="track0.$HDD" bs=512 count=63 2>&1`
+            result=`dd if=/dev/$HDD of="track0.$HDD" bs=512 count=2048 2>&1` # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on 4KB disks
             retval=$?
             if [ $retval -ne 0 ]; then
               echo "$result" >&2
@@ -620,7 +620,7 @@ load_config()
   unset IFS
   for arg in $*; do
     ARGNAME=`echo "$arg" |cut -d= -f1`
-    ARGVAL=`echo "$arg" |cut -d= -f2`
+    ARGVAL=`echo "$arg" |cut -d= -f2 -s`
 
     case "$ARGNAME" in
       --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
