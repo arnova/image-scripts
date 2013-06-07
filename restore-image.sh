@@ -629,7 +629,7 @@ restore_disks()
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
-    # Check for MBR restore. FIXME!::::
+    # Check for MBR restore.
     if [ -o $MBR_WRITE -eq 1 ] || [ $TRACK0_CLEAN -eq 1 ]; then
       if [ -f "track0.${HDD_NAME}" ]; then
         DD_SOURCE="track0.${HDD_NAME}"
@@ -982,14 +982,14 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
   do_exit 7
 fi
 
-if [ -n "$PARTITIONS_NODEV" -a "$PARTITIONS_NODEV" != "none" ]; then
-  check_image_files;
-else
+if [ "$PARTITIONS_NODEV" = "none" ]; then
   echo "* NOTE: Skipping partition image restoration"
+else
+  check_image_files;
 fi
 
 if [ $PT_WRITE -eq 1 ]; then
-  echo "* WARNING: Always updating partition tables enabled!" >&2
+  echo "* WARNING: Always updating partition table enabled!" >&2
 fi
 
 if [ $MBR_WRITE -eq 1 ]; then
