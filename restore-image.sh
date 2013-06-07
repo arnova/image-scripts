@@ -1,6 +1,6 @@
 # !/bin/bash
 
-MY_VERSION="3.10-BETA3"
+MY_VERSION="3.10-BETA4"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: June 7, 2013
@@ -1143,7 +1143,7 @@ fi
 
 # Set this for legacy scripts:
 USER_TARGET_NODEV=`echo "$INCLUDED_DEVICES |cut -f1 -d' '` # Pick the first device as target (probably sda)
-TARGET_DEVICE="$TARGET_NODEV"
+TARGET_DEVICE="$USER_TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
 if [ $NO_POST_SH -eq 0 ]; then
