@@ -312,7 +312,7 @@ partprobe()
   local DEVICE="$1"
   local result=""
 
-  printf "(Re)reading partition table on $DEVICE"
+  printf "(Re)reading partition-table on $DEVICE"
   
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   for x in `seq 1 10`; do
@@ -540,19 +540,16 @@ restore_partitions()
 restore_disks()
 {
   # Restore MBR/track0/partitions
-  local TARGET_NODEV=""
   unset IFS
   for FN in partitions.*; do
     HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
 
-    # If no target drive specified use default drive from image:
+    # Extract drive name from file
+    TARGET_NODEV="$HDD_NAME"
+
+    # Overrule target device?:
     if [ -n "$USER_TARGET_NODEV" ]; then
       TARGET_NODEV="$USER_TARGET_NODEV"
-    else
-      if [ -z "$TARGET_NODEV" ]; then
-        # Extract drive name from file
-        TARGET_NODEV="$HDD_NAME"
-      fi
     fi
 
     # Check if target device exists
@@ -562,6 +559,8 @@ restore_disks()
       echo ""
       do_exit 5
     fi
+
+    echo "* Detected (source) device /dev/$TARGET_NODEV"
 
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
@@ -603,20 +602,20 @@ restore_disks()
       TRACK0_CLEAN=1
     fi
 
-    if [ $TRACK0_CLEAN -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
+    if [ $TRACK0_CLEAN -eq 0 ] && [ $NO_TRACK0 -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
       if [ $PT_WRITE -eq 0 -a $MBR_WRITE -eq 0 ]; then
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table/MBR, it will NOT be updated!\n\033[0m" >&2
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table/MBR, it will NOT be updated!\n\033[0m" >&2
         echo "To override this you must specify --clean or --pt --mbr..." >&2
         echo "" >&2
       else
         if [ $PT_WRITE -eq 0 ]; then
-          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, it will NOT be updated!\n\033[0m" >&2
+          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, it will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --pt..." >&2
           echo "" >&2
         fi
 
         if [ $MBR_WRITE -eq 0 ]; then
-          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, its MBR will NOT be updated!\n\033[0m" >&2
+          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --mbr..." >&2
           echo "" >&2
         fi
@@ -661,12 +660,12 @@ restore_disks()
     # Check for partition restore
     if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
       if [ -f "partitions.$HDD_NAME" ]; then
-        echo "* Updating partition table on /dev/$TARGET_NODEV"
+        echo "* Updating partition-table on /dev/$TARGET_NODEV"
         sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
         retval=$?
           
         if [ $retval -ne 0 ]; then
-          printf "\033[40m\033[1;31mPartition table restore failed($retval). Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mPartition-table restore failed($retval). Quitting...\n\033[0m" >&2
           echo ""
           do_exit 5
         fi
@@ -679,7 +678,7 @@ restore_disks()
       partprobe "/dev/$TARGET_NODEV"
       retval=$?
       if [ $retval -ne 0 ]; then
-        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed($retval)!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed($retval)!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
         read dummy
       fi
     fi
@@ -855,9 +854,9 @@ show_help()
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--noconf                    - Don't read the config file"
   echo "--mbr                       - Always write a new track0(MBR) (from track0.*)"
-  echo "--pt                        - Always write a new partition table (from partition.*)"
+  echo "--pt                        - Always write a new partition-table (from partition.*)"
   echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)"
-  echo "--notrack0                  - Never write track0(MBR)/partition table, even if device is empty"
+  echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
@@ -989,7 +988,7 @@ else
 fi
 
 if [ $PT_WRITE -eq 1 ]; then
-  echo "* WARNING: Always updating partition table enabled!" >&2
+  echo "* WARNING: Always updating partition-table enabled!" >&2
 fi
 
 if [ $MBR_WRITE -eq 1 ]; then
