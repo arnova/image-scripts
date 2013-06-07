@@ -630,7 +630,7 @@ restore_disks()
     PARTPROBE=0
 
     # Check for MBR restore.
-    if [ -o $MBR_WRITE -eq 1 ] || [ $TRACK0_CLEAN -eq 1 ]; then
+    if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
       if [ -f "track0.${HDD_NAME}" ]; then
         DD_SOURCE="track0.${HDD_NAME}"
       else
@@ -659,7 +659,7 @@ restore_disks()
     fi
     
     # Check for partition restore
-    if [ -o $PT_WRITE -eq 1 ] || [ $TRACK0_CLEAN -eq 1 ]; then
+    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
       if [ -f "partitions.$HDD_NAME" ]; then
         echo "* Updating partition table on /dev/$TARGET_NODEV"
         sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
