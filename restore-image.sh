@@ -226,10 +226,45 @@ sanity_check()
   check_command_error dd
   check_command_error mount
   check_command_error umount
+  check_command_error parted
 
 # TODO: Need to do this for GPT implementation  
 #  check_command_error gdisk
 #  check_command_error sgdisk
+
+  # Sanity check devices and check if target devices exist
+  IFS=','
+  for ITEM in $DEVICES; do
+    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+    
+    if ! echo "$TARGET_DEVICE_MAP" |grep -q '^/dev/'; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Specified target device $TARGET_DEVICE_MAP should start with /dev/! Quitting...\n\033[0m" >&2
+      echo ""
+      exit 5
+    fi
+
+    TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+    if ! get_partitions |grep -q -x "$TARGET_DEVICE_MAP_NODEV"; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Specified target device /dev/$TARGET_DEVICE_MAP_NODEV does NOT exist! Quitting...\n\033[0m" >&2
+      echo ""
+      exit 5
+    fi
+  done
+
+  # Sanity check partitions
+  IFS=','
+  for ITEM in $PARTITIONS; do
+    TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+    
+    if ! echo "$TARGET_PARTITION_MAP" |grep -q '^/dev/'; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Specified target partition $TARGET_DEVICE_MAP should start with /dev/! Quitting...\n\033[0m" >&2
+      echo ""
+      exit 5
+    fi
+  done
 }
 
 
@@ -242,6 +277,32 @@ get_partitions_with_size()
 get_partitions()
 {
   get_partitions_with_size |awk '{ print $1 }'
+}
+
+
+parted_list()
+{
+  local DEV="$1"
+  local FOUND=0
+  local MATCH=0
+  IFS=$EOL
+  for LINE in `parted -l`; do
+    if echo "$LINE" |grep -q '^Disk '; then
+      # Match disk
+      if echo "$LINE" |grep -q "^Disk $DEV: "; then
+        FOUND=1
+        MATCH=1
+      else
+        MATCH=0
+      fi
+    elif [ $MATCH -eq 1 ]; then
+      echo "$LINE"
+    fi
+  done
+
+  if [ $FOUND -eq 0 ]; then
+    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
+  fi
 }
 
 
@@ -491,32 +552,52 @@ restore_partitions()
   unset IFS
   for IMAGE_FILE in $IMAGE_FILES; do
     # Strip extension so we get the actual device name
-    PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+    IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
 
+    # Set default
+    TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
+    
     # We want another target device than specified in the image name?:
-    if [ -n "$USER_TARGET_NODEV" ]; then
-      NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-      TARGET_PART_NODEV="$(get_partitions |grep -E -x -e "${USER_TARGET_NODEV}p?${NUM}")"
-    else
-      TARGET_PART_NODEV="$PARTITION"
-    fi
+    IFS=','
+    for ITEM in $DEVICES; do
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
+      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
 
-    echo "* Selected partition: /dev/$TARGET_PART_NODEV. Using image file: $IMAGE_FILE"
+      if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
+        NUM="$(echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
+        TARGET_PARTITION="$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP}p?${NUM}")"
+        break;
+      fi
+    done
+
+    # We want another target partition than specified in the image name?:
+    IFS=','
+    for ITEM in $PARTITIONS; do
+      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
+      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+
+      if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
+        TARGET_PARTITION="$TARGET_PARTITION_MAP"
+        break;
+      fi
+    done
+
+    echo "* Selected partition: $TARGET_PARTITION. Using image file: $IMAGE_FILE"
     local retval=1
     case $(image_type_detect "$IMAGE_FILE") in
-      fsarchiver) fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="/dev/$TARGET_PART_NODEV"
+      fsarchiver) fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="$TARGET_PARTITION"
                   retval=$?
                   ;;
-      partimage)  partimage -b restore "/dev/$TARGET_PART_NODEV" "$IMAGE_FILE"
+      partimage)  partimage -b restore "$TARGET_PARTITION" "$IMAGE_FILE"
                   retval=$?
                   ;;
-      partclone)  { $GZIP -d -c "$IMAGE_FILE"; echo $? >/tmp/.gzip.exitcode; } |partclone.restore -s - -o "/dev/$TARGET_PART_NODEV"
+      partclone)  { $GZIP -d -c "$IMAGE_FILE"; echo $? >/tmp/.gzip.exitcode; } |partclone.restore -s - -o "$TARGET_PARTITION"
                   retval=$?
                   if [ $retval -eq 0 ]; then
                     retval=`cat /tmp/.gzip.exitcode`
                   fi
                   ;;
-      ddgz)       { $GZIP -d -c "$IMAGE_FILE"; echo $? >/tmp/.gzip.exitcode; } |dd of="/dev/$TARGET_PART_NODEV" bs=4096
+      ddgz)       { $GZIP -d -c "$IMAGE_FILE"; echo $? >/tmp/.gzip.exitcode; } |dd of="$TARGET_PARTITION" bs=4096
                   retval=$?
                   if [ $retval -eq 0 ]; then
                     retval=`cat /tmp/.gzip.exitcode`
@@ -525,12 +606,12 @@ restore_partitions()
     esac
 
     if [ $retval -ne 0 ]; then
-      FAILED="${FAILED}${FAILED:+ }${TARGET_PART_NODEV}"
-      printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on /dev/$TARGET_PART_NODEV.\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+      FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
+      printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on $TARGET_PARTITION.\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
       read dummy
     else
-      SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PART_NODEV}"
-      echo "****** $IMAGE_FILE restored to /dev/$TARGET_PART_NODEV ******"
+      SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
+      echo "****** $IMAGE_FILE restored to $TARGET_PARTITION ******"
     fi
     echo ""
   done
@@ -539,6 +620,9 @@ restore_partitions()
 
 restore_disks()
 {
+  # Reset global, used by other functions later on:
+  INCLUDED_DEVICES=""
+
   # Restore MBR/track0/partitions
   unset IFS
   for FN in partitions.*; do
@@ -548,9 +632,17 @@ restore_disks()
     TARGET_NODEV="$HDD_NAME"
 
     # Overrule target device?:
-    if [ -n "$USER_TARGET_NODEV" ]; then
-      TARGET_NODEV="$USER_TARGET_NODEV"
-    fi
+    # We want another target device than specified in the image name?:
+    IFS=','
+    for ITEM in $DEVICES; do
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
+      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+
+      if [ "$SOURCE_DEVICE_NODEV" = "$HDD_NAME" ]; then
+        TARGET_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+        break;
+      fi
+    done
 
     # Check if target device exists
     if ! get_partitions |grep -q -x "$TARGET_NODEV"; then
@@ -560,22 +652,18 @@ restore_disks()
       do_exit 5
     fi
 
-    echo "* Detected (source) device /dev/$TARGET_NODEV"
+    echo "* Including (target) device /dev/$TARGET_NODEV"
 
+    INCLUDED_DEVICES="${INCLUDED_DEVICES}/dev/${TARGET_NODEV} "
+    
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
 
-    if [ $CLEAN -eq 1 ]; then
-      CHECK_PARTITIONS="$PARTITIONS_FOUND"
-    else
-      CHECK_PARTITIONS="$PARTITIONS_NODEV"
-    fi
-
     IFS=$EOL
-    for PART in $CHECK_PARTITIONS; do
+    for PART in $PARTITIONS_FOUND; do
       # (Try) to unmount partitions on target device
       if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
         if ! umount /dev/$PART >/dev/null; then
@@ -640,9 +728,12 @@ restore_disks()
       echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
       
       if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
-        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1`
+#        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1`
+        # For clean or empty disks always use complete DD_SOURCE else Grub2 may not work.
+        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV 2>&1` 
         retval=$?
       else
+        # FIXME: Need to detect the empty space before the first partition since Grub2 may be longer than 32256 bytes!
         result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62 2>&1`
         retval=$?
       fi
@@ -686,37 +777,7 @@ restore_disks()
 }
 
 
-create_swaps()
-{
-  # Run mkswap on swap partitions
-  local TARGET_NODEV=""
-  unset IFS
-  for FN in partitions.*; do
-    HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
-
-    # If no target drive specified use default drive from image:
-    if [ -n "$USER_TARGET_NODEV" ]; then
-      TARGET_NODEV="$USER_TARGET_NODEV"
-    else
-      if [ -z "$TARGET_NODEV" ]; then
-        # Extract drive name from file
-        TARGET_NODEV="$HDD_NAME"
-      fi
-    fi
-
-    # Create swap on swap partitions
-    IFS=$EOL
-    sfdisk -d /dev/$TARGET_NODEV 2>/dev/null |grep -i "id=82$" |while read LINE; do
-      PART="$(echo "$LINE" |awk '{ print $1 }')"
-      if ! mkswap $PART; then
-        printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
-      fi
-    done
-  done
-}
-
-
-verify_target()
+verify_target_partitions()
 {
   if [ -z "$IMAGE_FILES" ]; then
     return 1 # Nothing to do
@@ -728,26 +789,43 @@ verify_target()
   unset IFS
   for IMAGE_FILE in $IMAGE_FILES; do
     # Strip extension so we get the actual device name
-    PARTITION="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+    IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+
+    # Set default from image
+    TARGET_NODEV="$IMAGE_PARTITION_NODEV"
+
+    # We want another target device than specified in the image name?:
+    IFS=','
+    for ITEM in $DEVICES; do
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
+      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+
+      if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
+        NUM="$(echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
+        TARGET_PARTITION_NODEV="$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP}p?${NUM}")"
+        break;
+      fi
+    done
+
+    # We want another target partition than specified in the image name?:
+    IFS=','
+    for ITEM in $PARTITIONS; do
+      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
+      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+
+      if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
+        TARGET_PARTITION_NODEV=`echo "$TARGET_PARTITION_MAP" |sed s,'^/dev/',,`
+        break;
+      fi
+    done
     
-    # Do we want another target device than specified in the image name?:
-    if [ -n "$USER_TARGET_NODEV" ]; then
-      NUM="$(echo "$PARTITION" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-      SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${USER_TARGET_NODEV}p?${NUM}[[:blank:]]"`
-      if [ -z "$SFDISK_TARGET_PART" ]; then
-        printf "\033[40m\033[1;31m\nERROR: Target partition $NUM on /dev/$USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-    else
-      SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${PARTITION}[[:blank:]]"`
-      if [ -z "$SFDISK_TARGET_PART" ]; then
-        printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$PARTITION does NOT exist! Quitting...\n\033[0m" >&2
-        echo ""
-        do_exit 5
-      fi
+    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -x "/dev/${TARGET_PARTITION_NODEV}"`
+    if [ -z "$SFDISK_TARGET_PART" ]; then
+      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$TARGET_PARTITION_NODEV does NOT exist! Quitting...\n\033[0m" >&2
+      do_exit 5
     fi
 
-    ## Match partition with what we have stored in our partitions file
+    # Match partition with what we have stored in our partitions file
     SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
     if [ -z "$SFDISK_SOURCE_PART" ]; then
       printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m" >&2
@@ -775,14 +853,33 @@ verify_target()
 }
 
 
+create_swaps()
+{
+  # Run mkswap on swap partitions
+  IFS=' '
+  for DEVICE in $INCLUDED_DEVICES; do
+    # Create swap on swap partitions on all used devices
+    IFS=$EOL
+    sfdisk -d "$DEVICE" 2>/dev/null |grep -i "id=82$" |while read LINE; do
+      PART="$(echo "$LINE" |awk '{ print $1 }')"
+      if ! mkswap $PART; then
+        printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
+      fi
+    done
+  done
+}
+
+
 check_image_files()
 {
   IMAGE_FILES=""
-  if [ -n "$PARTITIONS_NODEV" ]; then
+  if [ -n "$PARTITIONS" ]; then
     IFS=' '
-    for PART in $PARTITIONS_NODEV; do
+    for ITEM in $PARTITIONS; do
+      PART_NODEV=`echo "$ITEM" |cut -f1 -d'>' -s`
+
       IFS=$EOL
-      ITEM="$(find . -maxdepth 1 -type f -iname "$PART.img.gz.000" -o -iname "$PART.fsa" -o -iname "$PART.dd.gz" -o -iname "$PART.pc.gz")"
+      ITEM="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
 
       if [ -z "$ITEM" ]; then
         printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m" >&2
@@ -854,7 +951,7 @@ show_help()
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--noconf                    - Don't read the config file"
   echo "--mbr                       - Always write a new track0(MBR) (from track0.*)"
-  echo "--pt                        - Always write a new partition-table (from partition.*)"
+  echo "--pt                        - Always write a new partition-table (from partitions.*)"
   echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)"
   echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
@@ -872,8 +969,8 @@ load_config()
   IMAGE_NAME=""
   SUCCESS=""
   FAILED=""
-  USER_TARGET_NODEV=""
-  PARTITIONS_NODEV=""
+  DEVICES=""
+  PARTITIONS=""
   CLEAN=0
   NO_TRACK0=0
   NO_NET=0
@@ -887,13 +984,13 @@ load_config()
   unset IFS
   for arg in $*; do
     ARGNAME=`echo "$arg" |cut -d= -f1`
-    ARGVAL=`echo "$arg" |cut -d= -f2`
+    ARGVAL=`echo "$arg" |cut -d= -f2 -s`
 
     case "$ARGNAME" in
       --clean|--track0) CLEAN=1;;
       --notrack0) NO_TRACK0=1;;
-      --dev|-d) USER_TARGET_NODEV=`echo "$ARGVAL" |sed 's|^/dev/||g'`;;
-      --partitions|--partition|--part|-p) PARTITIONS_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+      --dev|-d) DEVICES="$ARGVAL"
+      --partitions|--partition|--part|-p) PARTITIONS="$ARGVAL"
       --conf|-c) CONF="$ARGVAL";;
       --nonet|-n) NO_NET=1;;
       --nomount|-m) NO_MOUNT=1;;
@@ -945,16 +1042,6 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
-# Check if target device exists
-if [ -n "$USER_TARGET_NODEV" ]; then
-  if ! get_partitions |grep -q -x "$USER_TARGET_NODEV"; then
-    echo ""
-    printf "\033[40m\033[1;31mERROR: Specified target device $USER_TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
-    echo ""
-    exit 5
-  fi
-fi
-
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Setup network (interface)
   configure_network;
@@ -981,7 +1068,7 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
   do_exit 7
 fi
 
-if [ "$PARTITIONS_NODEV" = "none" ]; then
+if [ "$PARTITIONS" = "none" ]; then
   echo "* NOTE: Skipping partition image restoration"
 else
   check_image_files;
@@ -1016,10 +1103,10 @@ if [ $CLEAN -eq 1 ]; then
 fi
 
 # Make sure the target is sane
-verify_target;
+verify_target_partitions;
  
 # Restore images to partitions
-if [ -n "$PARTITIONS_NODEV" -a "$PARTITIONS_NODEV" != "none" ]; then
+if [ "$PARTITIONS" != "none" ]; then
   restore_partitions;
 fi
 
@@ -1027,6 +1114,7 @@ fi
 #reset
 
 # Set this for legacy scripts:
+USER_TARGET_NODEV=`echo "$INCLUDED_DEVICES |cut -f1 -d' '` # Pick the first device as target (probably sda)
 TARGET_DEVICE="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
@@ -1042,10 +1130,9 @@ fi
 
 echo ""
 
-# Show current partition status
-for FN in partitions.*; do
-  HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
-  fdisk -l "/dev/$HDD_NAME" |grep "^/"
+# Show current partition status.
+for DEVICE in $INCLUDED_DEVICES; do
+  parted_list "$DEVICE"
 done
 
 if [ -n "$FAILED" ]; then
