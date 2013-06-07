@@ -815,7 +815,7 @@ verify_target_partitions()
     IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
 
     # Set default from image
-    TARGET_NODEV="$IMAGE_PARTITION_NODEV"
+    TARGET_PARTITION_NODEV="$IMAGE_PARTITION_NODEV"
 
     # We want another target device than specified in the image name?:
     IFS=','
@@ -842,22 +842,23 @@ verify_target_partitions()
       fi
     done
     
-    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -x "/dev/${TARGET_PARTITION_NODEV}"`
+    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${TARGET_PARTITION_NODEV}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
       printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$TARGET_PARTITION_NODEV does NOT exist! Quitting...\n\033[0m" >&2
       do_exit 5
     fi
 
-    # Match partition with what we have stored in our partitions file
-    SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${PARTITION}[[:blank:]]"`
-    if [ -z "$SFDISK_SOURCE_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Partition /dev/$PARTITION can not be found in the partitions.* files! Quitting...\n\033[0m" >&2
-      echo ""
-      do_exit 5
-    fi
-
     echo "* Source partition: $SFDISK_SOURCE_PART"
     echo "* Target partition: $SFDISK_TARGET_PART"
+
+    # Match partition with what we have stored in our partitions file
+    SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]"`
+    if [ -z "$SFDISK_SOURCE_PART" ]; then
+      printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$PARTITION can not be found in the partitions.* files!\n\033[0m" >&2
+      echo ""
+      MISMATCH=1
+      continue;
+    fi
 
     if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
       MISMATCH=1
@@ -1012,8 +1013,8 @@ load_config()
     case "$ARGNAME" in
       --clean|--track0) CLEAN=1;;
       --notrack0) NO_TRACK0=1;;
-      --dev|-d) DEVICES="$ARGVAL"
-      --partitions|--partition|--part|-p) PARTITIONS="$ARGVAL"
+      --dev|-d) DEVICES="$ARGVAL";;
+      --partitions|--partition|--part|-p) PARTITIONS="$ARGVAL";;
       --conf|-c) CONF="$ARGVAL";;
       --nonet|-n) NO_NET=1;;
       --nomount|-m) NO_MOUNT=1;;
