@@ -31,6 +31,7 @@ EOL='
 do_exit()
 {
   echo ""
+  echo ""
   
   # Auto unmount?
   if [ "$AUTO_UNMOUNT" = "1" ] && [ -n "$MOUNT_DEVICE" ] && grep -q " $IMAGE_ROOT " /etc/mtab; then
