@@ -235,19 +235,32 @@ sanity_check()
   # Sanity check devices and check if target devices exist
   IFS=','
   for ITEM in $DEVICES; do
+    SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
-    
-    if ! echo "$TARGET_DEVICE_MAP" |grep -q '^/dev/'; then
-      echo ""
-      printf "\033[40m\033[1;31mERROR: Specified target device $TARGET_DEVICE_MAP should start with /dev/! Quitting...\n\033[0m" >&2
-      echo ""
-      exit 5
+
+    if [ -n "$TARGET_DEVICE_MAP" ]; then
+      if ! echo "$TARGET_DEVICE_MAP" |grep -q '^/dev/'; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified target device $TARGET_DEVICE_MAP should start with /dev/! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      fi
+
+      CHECK_DEVICE_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+    else
+      if echo "$SOURCE_DEVICE_NODEV" |grep -q '^/dev/'; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified (source) device $SOURCE_DEVICE_NODEV should exclude /dev/! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      fi
+
+      CHECK_DEVICE_NODEV="$SOURCE_DEVICE_NODEV"
     fi
 
-    TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-    if ! get_partitions |grep -q -x "$TARGET_DEVICE_MAP_NODEV"; then
+    if ! get_partitions |grep -q -x "$CHECK_DEVICE_NODEV"; then
       echo ""
-      printf "\033[40m\033[1;31mERROR: Specified target device /dev/$TARGET_DEVICE_MAP_NODEV does NOT exist! Quitting...\n\033[0m" >&2
+      printf "\033[40m\033[1;31mERROR: Specified (target) device /dev/$CHECK_DEVICE_NODEV does NOT exist! Quitting...\n\033[0m" >&2
       echo ""
       exit 5
     fi
@@ -256,13 +269,23 @@ sanity_check()
   # Sanity check partitions
   IFS=','
   for ITEM in $PARTITIONS; do
+    SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
     TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
     
-    if ! echo "$TARGET_PARTITION_MAP" |grep -q '^/dev/'; then
-      echo ""
-      printf "\033[40m\033[1;31mERROR: Specified target partition $TARGET_DEVICE_MAP should start with /dev/! Quitting...\n\033[0m" >&2
-      echo ""
-      exit 5
+    if [ -n "$TARGET_PARTITION_MAP" ]; then
+      if ! echo "$TARGET_PARTITION_MAP" |grep -q '^/dev/'; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified target partition $TARGET_PARTITION_MAP should start with /dev/! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      fi
+    else
+      if echo "$SOURCE_PARTITION_NODEV" |grep -q '^/dev/'; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified (source) partition $SOURCE_PARTITION_NODEV should exclude /dev/! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      fi
     fi
   done
 }
