@@ -24,7 +24,7 @@ MY_VERSION="3.10-BETA3"
 # ----------------------------------------------------------------------------------------------------------------------
 
 DEFAULT_CONF="$(dirname $0)/image.cnf"
-SEP='~'
+SEP=':'
 EOL='
 '
 
@@ -826,7 +826,7 @@ verify_target_partitions()
       TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
       if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
-        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')`
+        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,'`
         TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
         TARGET_PARTITION="/dev/$(get_partitions |grep -E -x "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
         break;
