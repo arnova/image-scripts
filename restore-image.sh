@@ -24,6 +24,7 @@ MY_VERSION="3.10-BETA3"
 # ----------------------------------------------------------------------------------------------------------------------
 
 DEFAULT_CONF="$(dirname $0)/image.cnf"
+SEP='~'
 EOL='
 '
 
@@ -235,8 +236,8 @@ sanity_check()
   # Sanity check devices and check if target devices exist
   IFS=','
   for ITEM in $DEVICES; do
-    SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
-    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+    SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     if [ -n "$TARGET_DEVICE_MAP" ]; then
       if ! echo "$TARGET_DEVICE_MAP" |grep -q '^/dev/'; then
@@ -269,8 +270,8 @@ sanity_check()
   # Sanity check partitions
   IFS=','
   for ITEM in $PARTITIONS; do
-    SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
-    TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+    SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
     
     if [ -n "$TARGET_PARTITION_MAP" ]; then
       if ! echo "$TARGET_PARTITION_MAP" |grep -q '^/dev/'; then
@@ -583,12 +584,13 @@ restore_partitions()
     # We want another target device than specified in the image name?:
     IFS=','
     for ITEM in $DEVICES; do
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
-      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
       if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
-        NUM="$(echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-        TARGET_PARTITION="$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP}p?${NUM}")"
+        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,'`
+        TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+        TARGET_PARTITION="/dev/$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
         break;
       fi
     done
@@ -596,8 +598,8 @@ restore_partitions()
     # We want another target partition than specified in the image name?:
     IFS=','
     for ITEM in $PARTITIONS; do
-      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
-      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
       if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
         TARGET_PARTITION="$TARGET_PARTITION_MAP"
@@ -658,8 +660,8 @@ restore_disks()
     # We want another target device than specified in the image name?:
     IFS=','
     for ITEM in $DEVICES; do
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
-      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
       if [ "$SOURCE_DEVICE_NODEV" = "$HDD_NAME" ]; then
         TARGET_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
@@ -815,17 +817,18 @@ verify_target_partitions()
     IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
 
     # Set default from image
-    TARGET_PARTITION_NODEV="$IMAGE_PARTITION_NODEV"
+    TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
 
     # We want another target device than specified in the image name?:
     IFS=','
     for ITEM in $DEVICES; do
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
-      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
       if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
-        NUM="$(echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')"
-        TARGET_PARTITION_NODEV="$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP}p?${NUM}")"
+        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,')`
+        TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+        TARGET_PARTITION="/dev/$(get_partitions |grep -E -x "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
         break;
       fi
     done
@@ -833,26 +836,27 @@ verify_target_partitions()
     # We want another target partition than specified in the image name?:
     IFS=','
     for ITEM in $PARTITIONS; do
-      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d'>'`
-      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d'>' -s`
+      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
       if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
-        TARGET_PARTITION_NODEV=`echo "$TARGET_PARTITION_MAP" |sed s,'^/dev/',,`
+        TARGET_PARTITION="$TARGET_PARTITION_MAP"
         break;
       fi
     done
     
-    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^/dev/${TARGET_PARTITION_NODEV}[[:blank:]]"`
+    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^${TARGET_PARTITION}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$TARGET_PARTITION_NODEV does NOT exist! Quitting...\n\033[0m" >&2
+      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$TARGET_PARTITION does NOT exist! Quitting...\n\033[0m" >&2
       do_exit 5
     fi
+
+    SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]"`
 
     echo "* Source partition: $SFDISK_SOURCE_PART"
     echo "* Target partition: $SFDISK_TARGET_PART"
 
     # Match partition with what we have stored in our partitions file
-    SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]"`
     if [ -z "$SFDISK_SOURCE_PART" ]; then
       printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$PARTITION can not be found in the partitions.* files!\n\033[0m" >&2
       echo ""
@@ -898,9 +902,9 @@ check_image_files()
 {
   IMAGE_FILES=""
   if [ -n "$PARTITIONS" ]; then
-    IFS=' '
+    IFS=','
     for ITEM in $PARTITIONS; do
-      PART_NODEV=`echo "$ITEM" |cut -f1 -d'>' -s`
+      PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
 
       IFS=$EOL
       ITEM="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
@@ -920,7 +924,7 @@ check_image_files()
 
       IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
 
-      echo "* Using image file \"${ITEM}\" for device /dev/$PART"
+      echo "* Using image file \"${ITEM}\" for /dev/$PART_NODEV"
     done
   else
     IFS=$EOL
