@@ -695,13 +695,15 @@ check_disks()
     fi
 
     INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}/dev/${TARGET_NODEV} "
-    DEVICE_FILES="${DEVICE_FILES}${SOURCE_DEVICE_NODEV}${SEP}${TARGET_NODEV} "
+    DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
 
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
     
     # Make sure kernel doesn't use old partition table
-    partprobe "/dev/$TARGET_NODEV"
+    if ! partprobe "/dev/$TARGET_NODEV"; then
+      do_exit 5;
+    fi
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
