@@ -713,7 +713,7 @@ check_disks()
       # Disable all swaps on this device
       if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
         echo ""
-        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART is currently enabled as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
+        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
         do_exit 5
       fi
     done
@@ -914,6 +914,21 @@ check_partitions()
         INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${PART_DEV} "
       fi
     fi
+    
+    # Check for mounted partitions on target device
+    if grep -E -q "^${TARGET_PARTITION}[[:blank:]]" /etc/mtab; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
+      do_exit 5
+    fi
+
+    # Disable all swaps on this device
+    if grep -E -q "^${TARGET_PARTITION}[[:blank:]]" /proc/swaps; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
+      do_exit 5
+    fi
+
 
     # FIXME: Move this back to image processing?
     echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
