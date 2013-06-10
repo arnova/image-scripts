@@ -678,7 +678,6 @@ check_disks()
     if ! get_partitions |grep -q -x "$TARGET_NODEV"; then
       echo ""
       printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
-      echo ""
       do_exit 5
     fi
 
@@ -696,7 +695,6 @@ check_disks()
       if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
         echo ""
         printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
-        echo ""
         do_exit 5
       fi
 
@@ -704,7 +702,6 @@ check_disks()
       if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
         echo ""
         printf "\033[40m\033[1;31mERROR: Partition /dev/$PART is currently enabled as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
-        echo ""
         do_exit 5
       fi
     done
