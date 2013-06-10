@@ -669,6 +669,7 @@ check_disks()
   # Restore MBR/track0/partitions
   unset IFS
   # FIXME: need to check track0 + images as well here!?
+  # FIXME, we should exclude disks not in --dev, if specified and consider --clean
   for FN in partitions.*; do
     # Extract drive name from file
     IMAGE_SOURCE_NODEV="$(basename "$FN" |sed s/'.*\.'//)"
@@ -694,50 +695,15 @@ check_disks()
       do_exit 5
     fi
 
-    INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}/dev/${TARGET_NODEV} "
-    DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
-
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
-    
+
     # Make sure kernel doesn't use old partition table
-    if ! partprobe "/dev/$TARGET_NODEV"; then
+    if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
       echo ""
       printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access to target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Quitting...\n\033[0m" >&2
       do_exit 5;
     fi
-
-    # Check whether device already contains partitions
-    PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
-
-    IFS=$EOL
-    for PART in $PARTITIONS_FOUND; do
-      # Check for mounted partitions on target device
-      if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      # Disable all swaps on this device
-      if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-    done
-  done
-}
-
-
-restore_disks()
-{
-  # Restore MBR/track0/partitions
-  unset IFS
-  for ITEM in $DEVICE_FILES; do
-    # Extract drive name from file
-    IMAGE_SOURCE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-    TARGET_NODEV=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
@@ -768,6 +734,56 @@ restore_disks()
 
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
       read dummy
+
+      continue;
+    fi
+
+    INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}/dev/${TARGET_NODEV} "
+    DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
+
+    IFS=$EOL
+    for PART in $PARTITIONS_FOUND; do
+      # Check for mounted partitions on target device
+      if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
+        echo ""
+        if [ $FORCE -eq 1 ]; then
+          printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is mounted!\n\033[0m" >&2
+        else
+          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+      fi
+
+      # Check for swap on target device
+      if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
+        echo ""
+        if [ $FORCE -eq 1 ]; then
+          printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is used as swap!\n\033[0m" >&2
+        else
+          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+      fi
+    done
+  done
+}
+
+
+restore_disks()
+{
+  # Restore MBR/track0/partitions
+  unset IFS
+  for ITEM in $DEVICE_FILES; do
+    # Extract drive name from file
+    IMAGE_SOURCE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    TARGET_NODEV=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+
+    # Check whether device already contains partitions
+    PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
+
+    TRACK0_CLEAN=0
+    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
+      TRACK0_CLEAN=1
     fi
 
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
@@ -926,15 +942,23 @@ check_partitions()
     # Check for mounted partitions on target device
     if grep -E -q "^${TARGET_PARTITION}[[:blank:]]" /etc/mtab; then
       echo ""
-      printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
-      do_exit 5
+      if [ $FORCE -eq 1 ]; then
+        printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is mounted!\n\033[0m" >&2
+      else
+        printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
     fi
 
     # Check for swaps on this device
     if grep -E -q "^${TARGET_PARTITION}[[:blank:]]" /proc/swaps; then
       echo ""
-      printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
-      do_exit 5
+      if [ $FORCE -eq 1 ]; then
+        printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is used as swap!\n\033[0m" >&2
+      else
+        printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
     fi
 
     echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
@@ -1036,6 +1060,7 @@ show_help()
   echo "--mbr                       - Always write a new track0(MBR) (from track0.*)"
   echo "--pt                        - Always write a new partition-table (from partitions.*)"
   echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)"
+  echo "--force                     - Continue, even if there are eg. mounted partitions (USE WITH CARE!)"
   echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty"
   echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
   echo "--nonet|-n                  - Don't try to setup networking"
@@ -1062,6 +1087,7 @@ load_config()
   PT_WRITE=0
   NO_POST_SH=0
   NO_MOUNT=0
+  FORCE=0
 
   # Check arguments
   unset IFS
@@ -1071,6 +1097,7 @@ load_config()
 
     case "$ARGNAME" in
       --clean|--track0) CLEAN=1;;
+      --force) FORCE=1;;
       --notrack0) NO_TRACK0=1;;
       --dev|-d) DEVICES="$ARGVAL";;
       --partitions|--partition|--part|-p) PARTITIONS="$ARGVAL";;
