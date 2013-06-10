@@ -295,15 +295,19 @@ parted_list()
   local DEV="$1"
   local FOUND=0
   local MATCH=0
+
   IFS=$EOL
   for LINE in `parted -l`; do
-    if echo "$LINE" |grep -q '^Disk '; then
+    if echo "$LINE" |grep -q '^Model: '; then
+      MATCH=0
+      MODEL="$LINE"
+    elif echo "$LINE" |grep -q '^Disk '; then
       # Match disk
       if echo "$LINE" |grep -q "^Disk $DEV: "; then
+        echo "$LINE"
+        echo "$MODEL"
         FOUND=1
         MATCH=1
-      else
-        MATCH=0
       fi
     elif [ $MATCH -eq 1 ]; then
       echo "$LINE"

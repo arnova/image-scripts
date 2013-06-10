@@ -32,7 +32,7 @@ do_exit()
 {
   echo ""
   echo ""
-  
+
   # Auto unmount?
   if [ "$AUTO_UNMOUNT" = "1" ] && [ -n "$MOUNT_DEVICE" ] && grep -q " $IMAGE_ROOT " /etc/mtab; then
     # Go to root else we can't umount
@@ -310,15 +310,19 @@ parted_list()
   local DEV="$1"
   local FOUND=0
   local MATCH=0
+
   IFS=$EOL
   for LINE in `parted -l`; do
-    if echo "$LINE" |grep -q '^Disk '; then
+    if echo "$LINE" |grep -q '^Model: '; then
+      MATCH=0
+      MODEL="$LINE"
+    elif echo "$LINE" |grep -q '^Disk '; then
       # Match disk
       if echo "$LINE" |grep -q "^Disk $DEV: "; then
+        echo "$LINE"
+        echo "$MODEL"
         FOUND=1
         MATCH=1
-      else
-        MATCH=0
       fi
     elif [ $MATCH -eq 1 ]; then
       echo "$LINE"
@@ -589,7 +593,7 @@ restore_partitions()
       TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
       if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
-        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,'`
+        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
         TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
         TARGET_PARTITION="/dev/$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
         break;
@@ -644,17 +648,17 @@ restore_partitions()
 }
 
 
-restore_disks()
+check_disks()
 {
   # Reset global, used by other functions later on:
-  INCLUDED_DEVICES=""
+  INCLUDED_TARGET_DEVICES=""
 
   # Restore MBR/track0/partitions
   unset IFS
+  # FIXME: need to check track0 + images as well here!?
   for FN in partitions.*; do
-    HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
-
     # Extract drive name from file
+    HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
     TARGET_NODEV="$HDD_NAME"
 
     # Overrule target device?:
@@ -678,10 +682,8 @@ restore_disks()
       do_exit 5
     fi
 
-    echo "* Including (target) device /dev/$TARGET_NODEV"
+    INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}/dev/${TARGET_NODEV} "
 
-    INCLUDED_DEVICES="${INCLUDED_DEVICES}/dev/${TARGET_NODEV} "
-    
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
 
@@ -706,6 +708,34 @@ restore_disks()
         do_exit 5
       fi
     done
+  done
+}
+
+
+restore_disks()
+{
+  # Restore MBR/track0/partitions
+  unset IFS
+  for FN in partitions.*; do
+    # Extract drive name from file
+    HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
+    TARGET_NODEV="$HDD_NAME"
+
+    # Overrule target device?:
+    # We want another target device than specified in the image name?:
+    IFS=','
+    for ITEM in $DEVICES; do
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+
+      if [ "$SOURCE_DEVICE_NODEV" = "$HDD_NAME" ]; then
+        TARGET_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+        break;
+      fi
+    done
+
+    # Check whether device already contains partitions
+    PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
 
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
@@ -799,7 +829,86 @@ restore_disks()
 }
 
 
-verify_target_partitions()
+check_partitions()
+{
+  if [ -z "$IMAGE_FILES" ]; then
+    return 1 # Nothing to do
+  fi
+
+  echo ""
+  unset IFS
+  for IMAGE_FILE in $IMAGE_FILES; do
+    # Strip extension so we get the actual device name
+    IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+
+    # Set default from image
+    TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
+
+    # We want another target device than specified in the image name?:
+    IFS=','
+    for ITEM in $DEVICES; do
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+
+      if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
+        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
+        TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+        TARGET_PARTITION="/dev/$(get_partitions |grep -E -x "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
+        break;
+      fi
+    done
+
+    # We want another target partition than specified in the image name?:
+    IFS=','
+    for ITEM in $PARTITIONS; do
+      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+
+      if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
+        TARGET_PARTITION="$TARGET_PARTITION_MAP"
+        break;
+      fi
+    done
+    
+    # Check whether we need to add this to our included devices list
+    FOUND=0
+    IFS=' '
+    for DEV in $INCLUDED_TARGET_DEVICES; do
+      # TODO: Use regex
+      if echo "$TARGET_PARTITION" |grep -E -x -q '^${DEV}p?[0-9]+'; then
+        FOUND=1
+        break;
+      fi
+    done
+    
+    if [ $FOUND -eq 0 ]; then
+      NEW_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
+      if [ -z "$NEW_DEV" ]; then
+        echo "* WARNING: Unable to obtain to device for $TARGET_PARTITION" >&2
+      else
+        INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${NEW_DEV} "
+      fi
+    fi
+  done
+
+  echo ""
+
+  return 0
+}
+
+
+show_target_devices()
+{
+  IFS=' '
+  for DEV in $INCLUDED_TARGET_DEVICES; do
+    echo "* Including (target) device $DEV:"
+    parted_list $DEV |grep -e '^Disk ' -e 'Model: '
+    echo ""
+  done
+}
+
+
+test_target_partitions()
 {
   if [ -z "$IMAGE_FILES" ]; then
     return 1 # Nothing to do
@@ -823,7 +932,7 @@ verify_target_partitions()
       TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
       if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
-        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -e 's,^[a-z]*,,' -e 's,^.*p,,'`
+        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
         TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
         TARGET_PARTITION="/dev/$(get_partitions |grep -E -x "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
         break;
@@ -861,7 +970,7 @@ verify_target_partitions()
       continue;
     fi
 
-    if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
+    if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed -r s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
       MISMATCH=1
     fi
   done
@@ -882,7 +991,7 @@ create_swaps()
 {
   # Run mkswap on swap partitions
   IFS=' '
-  for DEVICE in $INCLUDED_DEVICES; do
+  for DEVICE in $INCLUDED_TARGET_DEVICES; do
     # Create swap on swap partitions on all used devices
     IFS=$EOL
     sfdisk -d "$DEVICE" 2>/dev/null |grep -i "id=82$" |while read LINE; do
@@ -1099,6 +1208,15 @@ else
   check_image_files;
 fi
 
+# Check target disks
+check_disks;
+
+# Check target partitions
+check_partitions;
+
+# Show info about target devices to be used
+show_target_devices;
+
 if [ $PT_WRITE -eq 1 ]; then
   echo "* WARNING: Always updating partition-table enabled!" >&2
 fi
@@ -1123,23 +1241,20 @@ read dummy
 # Restore MBR/partition tables
 restore_disks;
 
-if [ $CLEAN -eq 1 ]; then
-  create_swaps;
-fi
-
 # Make sure the target is sane
-verify_target_partitions;
+test_target_partitions;
  
 # Restore images to partitions
 if [ "$PARTITIONS" != "none" ]; then
   restore_partitions;
 fi
 
-# Reset terminal
-#reset
+if [ $CLEAN -eq 1 ]; then
+  create_swaps;
+fi
 
 # Set this for legacy scripts:
-USER_TARGET_NODEV=`echo "$INCLUDED_DEVICES |cut -f1 -d' '` # Pick the first device as target (probably sda)
+USER_TARGET_NODEV=`echo "$INCLUDED_TARGET_DEVICES |cut -f1 -d' '` # Pick the first device as target (probably sda)
 TARGET_DEVICE="$USER_TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
@@ -1156,7 +1271,7 @@ fi
 echo ""
 
 # Show current partition status.
-for DEVICE in $INCLUDED_DEVICES; do
+for DEVICE in $INCLUDED_TARGET_DEVICES; do
   parted_list "$DEVICE"
 done
 
