@@ -575,10 +575,10 @@ image_type_detect()
 }
 
 
-source_to_target_partition_remap()
+image_to_target_remap()
 {
-  local IMAGE_PARTITION_NODEV="$1"
-
+  local IMAGE_PARTITION_NODEV=` echo "$1" |sed 's/\..*//'`
+      
   # Set default
   local TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
 
@@ -660,14 +660,17 @@ check_disks()
 {
   # Reset global, used by other functions later on:
   INCLUDED_TARGET_DEVICES=""
+  
+  # Global used later on when restoring partition-tables etc.
+  DEVICE_FILES=""
 
   # Restore MBR/track0/partitions
   unset IFS
   # FIXME: need to check track0 + images as well here!?
   for FN in partitions.*; do
     # Extract drive name from file
-    HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
-    TARGET_NODEV="$HDD_NAME"
+    IMAGE_SOURCE_NODEV="$(basename "$FN" |sed s/'.*\.'//)"
+    TARGET_NODEV="$IMAGE_SOURCE_NODEV"
 
     # Overrule target device?:
     # We want another target device than specified in the image name?:
@@ -676,7 +679,7 @@ check_disks()
       SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
       TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
-      if [ "$SOURCE_DEVICE_NODEV" = "$HDD_NAME" ]; then
+      if [ "$SOURCE_DEVICE_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
         TARGET_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
         break;
       fi
@@ -690,6 +693,7 @@ check_disks()
     fi
 
     INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}/dev/${TARGET_NODEV} "
+    DEVICE_FILES="${DEVICE_FILES}${SOURCE_DEVICE_NODEV}:${TARGET_NODEV} "
 
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
@@ -721,23 +725,10 @@ restore_disks()
 {
   # Restore MBR/track0/partitions
   unset IFS
-  for FN in partitions.*; do
+  for ITEM in $DEVICE_FILES; do
     # Extract drive name from file
-    HDD_NAME="$(basename "$FN" |sed s/'.*\.'//)"
-    TARGET_NODEV="$HDD_NAME"
-
-    # Overrule target device?:
-    # We want another target device than specified in the image name?:
-    IFS=','
-    for ITEM in $DEVICES; do
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-      if [ "$SOURCE_DEVICE_NODEV" = "$HDD_NAME" ]; then
-        TARGET_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-        break;
-      fi
-    done
+    IMAGE_SOURCE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    TARGET_NODEV=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
@@ -775,10 +766,10 @@ restore_disks()
 
     # Check for MBR restore.
     if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
-      if [ -f "track0.${HDD_NAME}" ]; then
-        DD_SOURCE="track0.${HDD_NAME}"
+      if [ -f "track0.${IMAGE_SOURCE_NODEV}" ]; then
+        DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
       else
-        echo "WARNING: No track0.${HDD_NAME} found. MBR will be zeroed instead!" >&2
+        echo "WARNING: No track0.${IMAGE_SOURCE_NODEV} found. MBR will be zeroed instead!" >&2
         DD_SOURCE="/dev/zero"
       fi
 
@@ -807,9 +798,9 @@ restore_disks()
     
     # Check for partition restore
     if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
-      if [ -f "partitions.$HDD_NAME" ]; then
+      if [ -f "partitions.${IMAGE_SOURCE_NODEV}" ]; then
         echo "* Updating partition-table on /dev/$TARGET_NODEV"
-        sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.$HDD_NAME"
+        sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.${IMAGE_SOURCE_NODEV}"
         retval=$?
           
         if [ $retval -ne 0 ]; then
@@ -857,7 +848,7 @@ check_image_files()
       fi
 
       IMAGE_FILE=`basename "$LOOKUP"`
-      TARGET_PARTITION=`source_to_target_partition_remap "$IMAGE_PARTITION_NODEV"`
+      TARGET_PARTITION=`image_to_target_remap "$IMAGE_FILE"`
       
       # Add item to list
       IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}:${TARGET_PARTITION}"
@@ -867,9 +858,8 @@ check_image_files()
     for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
       # FIXME: Can have multiple images here!
       IMAGE_FILE=`basename "$ITEM"`
-      IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
-      TARGET_PARTITION=`source_to_target_partition_remap "$IMAGE_PARTITION_NODEV"`
-      
+      TARGET_PARTITION=`image_to_target_remap "$IMAGE_FILE"`
+
       # Add item to list
       IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}:${TARGET_PARTITION}"
     done
