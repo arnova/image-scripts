@@ -771,10 +771,9 @@ restore_disks()
 
     # Check for MBR restore.
     if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
-      if [ -f "track0.${IMAGE_SOURCE_NODEV}" ]; then
-        DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
-      else
-        echo "WARNING: No track0.${IMAGE_SOURCE_NODEV} found. MBR will be zeroed instead!" >&2
+      DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
+      if [ ! -f "$DD_SOURCE" ]; then
+        echo "WARNING: No $DD_SOURCE found. MBR will be zeroed instead!" >&2
         DD_SOURCE="/dev/zero"
       fi
 
