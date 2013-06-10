@@ -312,11 +312,11 @@ parted_list()
   local MATCH=0
 
   IFS=$EOL
-  for LINE in `parted -l`; do
+  for LINE in `parted -l 2>/dev/null`; do
     if echo "$LINE" |grep -q '^Model: '; then
       MATCH=0
       MODEL="$LINE"
-    elif echo "$LINE" |grep -q '^Disk '; then
+    elif echo "$LINE" |grep -q '^Disk /dev/'; then
       # Match disk
       if echo "$LINE" |grep -q "^Disk $DEV: "; then
         echo "$LINE"
@@ -941,7 +941,7 @@ show_target_devices()
   IFS=' '
   for DEV in $INCLUDED_TARGET_DEVICES; do
     echo "* Using (target) device $DEV:"
-    parted_list $DEV |grep -e '^Disk ' -e 'Model: '
+    parted_list $DEV |grep -e '^Disk /dev/' -e 'Model: '
     echo ""
   done
 }
@@ -953,7 +953,6 @@ test_target_partitions()
     return 1 # Nothing to do
   fi
 
-  echo ""
   # Test whether the target partition(s) exist and have the correct geometry:
   local MISMATCH=0
   unset IFS
@@ -966,7 +965,7 @@ test_target_partitions()
 
     SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^${TARGET_PARTITION}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$TARGET_PARTITION does NOT exist! Quitting...\n\033[0m" >&2
+      printf "\033[40m\033[1;31m\nERROR: Target partition $TARGET_PARTITION does NOT exist! Quitting...\n\033[0m" >&2
       do_exit 5
     fi
 
@@ -977,13 +976,13 @@ test_target_partitions()
 
     # Match partition with what we have stored in our partitions file
     if [ -z "$SFDISK_SOURCE_PART" ]; then
-      printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$PARTITION can not be found in the partitions.* files!\n\033[0m" >&2
+      printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$IMAGE_PARTITION_NODEV can not be found in the partitions.* files!\n\033[0m" >&2
       echo ""
       MISMATCH=1
       continue;
     fi
 
-    if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed -r s,"^/dev/${PARTITION}[[:blank:]]","",)"; then
+    if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed -r s,"^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]","",)"; then
       MISMATCH=1
     fi
   done
