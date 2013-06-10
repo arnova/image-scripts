@@ -702,6 +702,8 @@ check_disks()
     
     # Make sure kernel doesn't use old partition table
     if ! partprobe "/dev/$TARGET_NODEV"; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access to target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Quitting...\n\033[0m" >&2
       do_exit 5;
     fi
 
