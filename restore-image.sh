@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.10-BETA4"
+MY_VERSION="3.10-BETA5"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: June 7, 2013
+# Last update: June 10, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -922,19 +922,15 @@ check_partitions()
       do_exit 5
     fi
 
-    # Disable all swaps on this device
+    # Check for swaps on this device
     if grep -E -q "^${TARGET_PARTITION}[[:blank:]]" /proc/swaps; then
       echo ""
       printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
       do_exit 5
     fi
 
-
-    # FIXME: Move this back to image processing?
     echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
   done
-
-  echo ""
 
   return 0
 }
@@ -1139,7 +1135,7 @@ trap 'ctrlc_handler' 2
 set_image_dir;
 
 echo "--------------------------------------------------------------------------------"
-echo "* Using image name: $IMAGE_DIR"
+echo "* Image name: $(basename $IMAGE_DIR)"
 echo "* Image working directory: $(pwd)"
 
 # Make sure we're in the correct working directory:
