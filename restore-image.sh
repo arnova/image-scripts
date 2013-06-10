@@ -575,6 +575,43 @@ image_type_detect()
 }
 
 
+source_to_target_partition_remap()
+{
+  local IMAGE_PARTITION_NODEV="$1"
+
+  # Set default
+  local TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
+
+  # We want another target device than specified in the image name?:
+  IFS=','
+  for ITEM in $DEVICES; do
+    SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+
+    if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
+      NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
+      TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+      TARGET_PARTITION="/dev/$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
+      break;
+    fi
+  done
+
+  # We want another target partition than specified in the image name?:
+  IFS=','
+  for ITEM in $PARTITIONS; do
+    SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+
+    if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
+      TARGET_PARTITION="$TARGET_PARTITION_MAP"
+      break;
+    fi
+  done
+  
+  echo "$TARGET_PARTITION"
+}
+
+
 restore_partitions()
 {
   # Restore the actual image(s):
@@ -583,34 +620,7 @@ restore_partitions()
     # Strip extension so we get the actual device name
     IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
 
-    # Set default
-    TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
-    
-    # We want another target device than specified in the image name?:
-    IFS=','
-    for ITEM in $DEVICES; do
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-      if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
-        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
-        TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-        TARGET_PARTITION="/dev/$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
-        break;
-      fi
-    done
-
-    # We want another target partition than specified in the image name?:
-    IFS=','
-    for ITEM in $PARTITIONS; do
-      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-      if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
-        TARGET_PARTITION="$TARGET_PARTITION_MAP"
-        break;
-      fi
-    done
+    TARGET_PARTITION=`source_to_target_partition_remap "$IMAGE_PARTITION_NODEV"`
 
     echo "* Selected partition: $TARGET_PARTITION. Using image file: $IMAGE_FILE"
     local retval=1
@@ -826,46 +836,83 @@ restore_disks()
 }
 
 
-check_partitions()
+check_image_files()
 {
-  if [ -z "$IMAGE_FILES" ]; then
-    return 1 # Nothing to do
+  IMAGE_FILES=""
+  if [ -n "$PARTITIONS" ]; then
+    IFS=','
+    for ITEM in $PARTITIONS; do
+      PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+
+      IFS=$EOL
+      LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
+
+      if [ -z "$LOOKUP" ]; then
+        printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+
+      if [ $(echo "$LOOKUP" |wc -l) -gt 1 ]; then
+        echo "$LOOKUP"
+        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+
+      IMAGE_FILE=`basename "$LOOKUP"`
+
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
+    done
+  else
+    IFS=$EOL
+    for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
+      # FIXME: Can have multiple images here!
+      IMAGE_FILE=`basename "$ITEM"`
+      # Add item to list
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
+    done
   fi
 
-  unset IFS
+  if [ -z "$IMAGE_FILES" ]; then
+    printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m" >&2
+    do_exit 5
+  fi
+
+  # Make sure the proper binaries are available
+  IFS=' '
+  for IMAGE_FILE in $IMAGE_FILES; do
+    case $(image_type_detect "$IMAGE_FILE") in
+      fsarchiver) check_command_error fsarchiver
+                  ;;
+      partimage ) check_command_error partimage
+                  ;;
+      partclone ) check_command_error partclone.restore
+                  if check_command pigz; then
+                    GZIP="pigz"
+                  elif check_command_error gzip; then
+                    GZIP="gzip"
+                  fi
+                  ;;
+      ddgz      ) if check_command pigz; then
+                    GZIP="pigz"
+                  elif check_command_error gzip; then
+                    GZIP="gzip"
+                  fi
+                  ;;
+    esac
+  done
+}
+
+
+check_partitions()
+{
+  IFS=' '
   for IMAGE_FILE in $IMAGE_FILES; do
     # Strip extension so we get the actual device name
     IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
 
     # Set default from image
-    TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
+    TARGET_PARTITION=`source_to_target_partition_rmap "$IMAGE_PARTITION_NODEV"`
 
-    # We want another target device than specified in the image name?:
-    IFS=','
-    for ITEM in $DEVICES; do
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-      if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
-        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
-        TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-        TARGET_PARTITION="/dev/$(get_partitions |grep -E -x "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
-        break;
-      fi
-    done
-
-    # We want another target partition than specified in the image name?:
-    IFS=','
-    for ITEM in $PARTITIONS; do
-      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-      if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
-        TARGET_PARTITION="$TARGET_PARTITION_MAP"
-        break;
-      fi
-    done
-    
     # Check whether we need to add this to our included devices list
     PART_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
     if [ -z "$PART_DEV" ]; then
@@ -875,6 +922,8 @@ check_partitions()
         INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${PART_DEV} "
       fi
     fi
+
+    echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
   done
 
   echo ""
@@ -909,34 +958,8 @@ test_target_partitions()
     IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
 
     # Set default from image
-    TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
+    TARGET_PARTITION=`source_to_target_partition_remap "$IMAGE_PARTITION_NODEV"`
 
-    # We want another target device than specified in the image name?:
-    IFS=','
-    for ITEM in $DEVICES; do
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-      if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
-        NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
-        TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-        TARGET_PARTITION="/dev/$(get_partitions |grep -E -x "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
-        break;
-      fi
-    done
-
-    # We want another target partition than specified in the image name?:
-    IFS=','
-    for ITEM in $PARTITIONS; do
-      SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-      TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-      if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
-        TARGET_PARTITION="$TARGET_PARTITION_MAP"
-        break;
-      fi
-    done
-    
     SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^${TARGET_PARTITION}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
       printf "\033[40m\033[1;31m\nERROR: Target partition /dev/$TARGET_PARTITION does NOT exist! Quitting...\n\033[0m" >&2
@@ -986,77 +1009,6 @@ create_swaps()
         printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi
     done
-  done
-}
-
-
-check_image_files()
-{
-  IMAGE_FILES=""
-  if [ -n "$PARTITIONS" ]; then
-    IFS=','
-    for ITEM in $PARTITIONS; do
-      PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
-
-      IFS=$EOL
-      ITEM="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
-
-      if [ -z "$ITEM" ]; then
-        printf "\033[40m\033[1;31m\nERROR: Image file for partition /dev/$PART could not be located! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      if [ $(echo "$ITEM" |wc -l) -gt 1 ]; then
-        echo "$ITEM"
-        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition /dev/$PART! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      IMAGE_FILE=`basename "$ITEM"`
-
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
-
-      echo "* Using image file \"${ITEM}\" for /dev/$PART_NODEV"
-    done
-  else
-    IFS=$EOL
-    for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
-      IMAGE_FILE=`basename "$ITEM"`
-      # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
-
-      PART="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
-      echo "* Using image file \"${IMAGE_FILE}\" for device /dev/$PART"
-    done
-  fi
-
-  if [ -z "$IMAGE_FILES" ]; then
-    printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m" >&2
-    do_exit 5
-  fi
-
-  # Make sure the proper binaries are available
-  IFS=' '
-  for IMAGE_FILE in $IMAGE_FILES; do
-    case $(image_type_detect "$IMAGE_FILE") in
-      fsarchiver) check_command_error fsarchiver
-                  ;;
-      partimage ) check_command_error partimage
-                  ;;
-      partclone ) check_command_error partclone.restore
-                  if check_command pigz; then
-                    GZIP="pigz"
-                  elif check_command_error gzip; then
-                    GZIP="gzip"
-                  fi
-                  ;;
-      ddgz      ) if check_command pigz; then
-                    GZIP="pigz"
-                  elif check_command_error gzip; then
-                    GZIP="gzip"
-                  fi
-                  ;;
-    esac
   done
 }
 
