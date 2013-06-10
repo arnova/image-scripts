@@ -835,7 +835,6 @@ check_partitions()
     return 1 # Nothing to do
   fi
 
-  echo ""
   unset IFS
   for IMAGE_FILE in $IMAGE_FILES; do
     # Strip extension so we get the actual device name
@@ -873,9 +872,9 @@ check_partitions()
     # Check whether we need to add this to our included devices list
     PART_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
     if [ -z "$PART_DEV" ]; then
-      echo "* WARNING: Unable to obtain to device for $PART_DEV" >&2
+      echo "* WARNING: Unable to obtain to device for partition $PART_DEV" >&2
     else
-      if ! echo "$INCLUDED_TARGET_DEVICES" |grep -q -e '^$PART_DEV ' -e ' $PART_DEV ' -e '$PART_DEV$'; then
+      if ! echo "$INCLUDED_TARGET_DEVICES" |grep -q -e "^$PART_DEV " -e " $PART_DEV " -e " $PART_DEV$" -e "^PART_DEV$"; then
         INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${PART_DEV} "
       fi
     fi
@@ -891,7 +890,7 @@ show_target_devices()
 {
   IFS=' '
   for DEV in $INCLUDED_TARGET_DEVICES; do
-    echo "* Including (target) device $DEV:"
+    echo "* Using (target) device $DEV:"
     parted_list $DEV |grep -e '^Disk ' -e 'Model: '
     echo ""
   done
