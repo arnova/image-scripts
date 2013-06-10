@@ -1128,7 +1128,7 @@ load_config()
           exit 4
           ;;
        *) if [ -z "$IMAGE_NAME" ]; then
-            IMAGE_NAME="$ARGVAL"
+            IMAGE_NAME="$arg"
           else
             echo "Bad command syntax" >&2
             show_help;
