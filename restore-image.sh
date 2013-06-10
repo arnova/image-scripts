@@ -98,13 +98,10 @@ configure_network()
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        printf "Setup interface $CUR_IF statically (Y/N)? "
-            
-        read answer
-        if [ "$answer" = "n" -o "$answer" = "N" ]; then
-          continue
+        if ! get_user_yn "Setup interface $CUR_IF statically (Y/N)? "; then
+          continue;
         fi
-            
+
         echo ""
         echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
         printf "IP address ($IPADDRESS)?: "
@@ -206,6 +203,31 @@ check_command_warning()
   fi
 
   return $retval
+}
+
+
+get_user_yn()
+{
+  printf "$1 "
+
+  read answer_with_case
+  
+  answer=`echo "$answer_with_case" |tr A-Z a-z`
+
+  if [ "$answer" = "y" -o "$answer" = "yes" ]; then
+    return 0
+  fi
+
+  if [ "$answer" = "n" -o "$answer" = "no" ]; then
+    return 1
+  fi
+
+  # Fallback to default
+  if [ "$2" = "y" ]; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 
@@ -838,11 +860,9 @@ restore_disks()
     
     if [ $PARTPROBE -eq 1 ]; then
       # Re-read partition table
-      partprobe "/dev/$TARGET_NODEV"
-      retval=$?
-      if [ $retval -ne 0 ]; then
-        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed($retval)!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
-        read dummy
+      if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
+        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed! Use --force to override.\n\033[0m" >&2
+        do_exit 5;
       fi
     fi
   done
@@ -1022,8 +1042,10 @@ test_target_partitions()
   echo ""
 
   if [ $MISMATCH -ne 0 ]; then
-    printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source! Press <enter> to continue or CTRL-C to quit...\n\033[0m" >&2
-    read dummy
+    printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source!\n\033[0m" >&2
+    if ! get_user_yn "Continue anyway (Y/N)? "; then
+      do_exit 5;
+    fi
     return 1
   fi
 
