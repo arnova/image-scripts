@@ -617,10 +617,8 @@ restore_partitions()
   # Restore the actual image(s):
   unset IFS
   for IMAGE_FILE in $IMAGE_FILES; do
-    # Strip extension so we get the actual device name
-    IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
-
-    TARGET_PARTITION=`source_to_target_partition_remap "$IMAGE_PARTITION_NODEV"`
+    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d'$SEP' -s`
+    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d'$SEP' -s`
 
     echo "* Selected partition: $TARGET_PARTITION. Using image file: $IMAGE_FILE"
     local retval=1
@@ -859,16 +857,21 @@ check_image_files()
       fi
 
       IMAGE_FILE=`basename "$LOOKUP"`
-
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
+      TARGET_PARTITION=`source_to_target_partition_remap "$IMAGE_PARTITION_NODEV"`
+      
+      # Add item to list
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}:${TARGET_PARTITION}"
     done
   else
     IFS=$EOL
     for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
       # FIXME: Can have multiple images here!
       IMAGE_FILE=`basename "$ITEM"`
+      IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+      TARGET_PARTITION=`source_to_target_partition_remap "$IMAGE_PARTITION_NODEV"`
+      
       # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}"
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}:${TARGET_PARTITION}"
     done
   fi
 
@@ -879,7 +882,9 @@ check_image_files()
 
   # Make sure the proper binaries are available
   IFS=' '
-  for IMAGE_FILE in $IMAGE_FILES; do
+  for ITEM in $IMAGE_FILES; do
+    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d'$SEP'`
+    
     case $(image_type_detect "$IMAGE_FILE") in
       fsarchiver) check_command_error fsarchiver
                   ;;
@@ -906,23 +911,21 @@ check_image_files()
 check_partitions()
 {
   IFS=' '
-  for IMAGE_FILE in $IMAGE_FILES; do
-    # Strip extension so we get the actual device name
-    IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
-
-    # Set default from image
-    TARGET_PARTITION=`source_to_target_partition_rmap "$IMAGE_PARTITION_NODEV"`
+  for ITEM in $IMAGE_FILES; do
+    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d'$SEP' -s`
+    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d'$SEP' -s`
 
     # Check whether we need to add this to our included devices list
     PART_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
     if [ -z "$PART_DEV" ]; then
-      echo "* WARNING: Unable to obtain to device for partition $PART_DEV" >&2
+      echo "* WARNING: Unable to obtain to device for partition $TARGET_PARTITION" >&2
     else
       if ! echo "$INCLUDED_TARGET_DEVICES" |grep -q -e "^$PART_DEV " -e " $PART_DEV " -e " $PART_DEV$" -e "^PART_DEV$"; then
         INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${PART_DEV} "
       fi
     fi
 
+    # FIXME: Move this back to image processing?
     echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
   done
 
@@ -953,12 +956,12 @@ test_target_partitions()
   # Test whether the target partition(s) exist and have the correct geometry:
   local MISMATCH=0
   unset IFS
-  for IMAGE_FILE in $IMAGE_FILES; do
+  for ITEM in $IMAGE_FILES; do
+    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d'$SEP' -s`
+    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d'$SEP' -s`
+
     # Strip extension so we get the actual device name
     IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
-
-    # Set default from image
-    TARGET_PARTITION=`source_to_target_partition_remap "$IMAGE_PARTITION_NODEV"`
 
     SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^${TARGET_PARTITION}[[:blank:]]"`
     if [ -z "$SFDISK_TARGET_PART" ]; then
