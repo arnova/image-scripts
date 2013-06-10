@@ -871,22 +871,12 @@ check_partitions()
     done
     
     # Check whether we need to add this to our included devices list
-    FOUND=0
-    IFS=' '
-    for DEV in $INCLUDED_TARGET_DEVICES; do
-      # TODO: Use regex
-      if echo "$TARGET_PARTITION" |grep -E -x -q '^${DEV}p?[0-9]+'; then
-        FOUND=1
-        break;
-      fi
-    done
-    
-    if [ $FOUND -eq 0 ]; then
-      NEW_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
-      if [ -z "$NEW_DEV" ]; then
-        echo "* WARNING: Unable to obtain to device for $TARGET_PARTITION" >&2
-      else
-        INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${NEW_DEV} "
+    PART_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
+    if [ -z "$PART_DEV" ]; then
+      echo "* WARNING: Unable to obtain to device for $PART_DEV" >&2
+    else
+      if ! echo "$INCLUDED_TARGET_DEVICES" |grep -q -e '^$PART_DEV ' -e ' $PART_DEV ' -e '$PART_DEV$'; then
+        INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${PART_DEV} "
       fi
     fi
   done
