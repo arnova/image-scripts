@@ -695,7 +695,7 @@ check_disks()
     fi
 
     INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}/dev/${TARGET_NODEV} "
-    DEVICE_FILES="${DEVICE_FILES}${SOURCE_DEVICE_NODEV}:${TARGET_NODEV} "
+    DEVICE_FILES="${DEVICE_FILES}${SOURCE_DEVICE_NODEV}${SEP}${TARGET_NODEV} "
 
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
@@ -782,8 +782,8 @@ restore_disks()
       
       if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
 #        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1`
-        # For clean or empty disks always use complete DD_SOURCE else Grub2 may not work.
-        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV 2>&1` 
+        # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
+        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV 2>&1 bs=512 count=2048` 
         retval=$?
       else
         # FIXME: Need to detect the empty space before the first partition since Grub2 may be longer than 32256 bytes!
@@ -856,7 +856,7 @@ check_image_files()
       TARGET_PARTITION=`image_to_target_remap "$IMAGE_FILE"`
       
       # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}:${TARGET_PARTITION}"
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
     done
   else
     IFS=$EOL
@@ -866,7 +866,7 @@ check_image_files()
       TARGET_PARTITION=`image_to_target_remap "$IMAGE_FILE"`
 
       # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}:${TARGET_PARTITION}"
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
     done
   fi
 
