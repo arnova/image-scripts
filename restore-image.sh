@@ -697,6 +697,9 @@ check_disks()
 
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
+    
+    # Make sure kernel doesn't use old partition table
+    partprobe "/dev/$TARGET_NODEV"
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
