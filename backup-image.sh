@@ -297,11 +297,11 @@ parted_list()
   local MATCH=0
 
   IFS=$EOL
-  for LINE in `parted -l`; do
+  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do
     if echo "$LINE" |grep -q '^Model: '; then
       MATCH=0
       MODEL="$LINE"
-    elif echo "$LINE" |grep -q '^Disk '; then
+    elif echo "$LINE" |grep -q '^Disk /dev/'; then
       # Match disk
       if echo "$LINE" |grep -q "^Disk $DEV: "; then
         echo "$LINE"

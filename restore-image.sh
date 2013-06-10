@@ -312,7 +312,7 @@ parted_list()
   local MATCH=0
 
   IFS=$EOL
-  for LINE in `parted -l 2>/dev/null`; do
+  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do
     if echo "$LINE" |grep -q '^Model: '; then
       MATCH=0
       MODEL="$LINE"
@@ -406,7 +406,9 @@ partprobe()
   
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   for x in `seq 1 10`; do
-    printf "."  
+    printf "."
+    
+    # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
     result=`sfdisk -R "$DEVICE" 2>&1`
     
     # Wait a bit for things to settle
@@ -943,7 +945,7 @@ show_target_devices()
 {
   IFS=' '
   for DEV in $INCLUDED_TARGET_DEVICES; do
-    echo "* Using (target) device $DEV:"
+    echo "* Using (target) device:"
     parted_list $DEV |grep -e '^Disk /dev/' -e 'Model: '
     echo ""
   done
