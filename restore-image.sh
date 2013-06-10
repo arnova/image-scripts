@@ -617,8 +617,8 @@ restore_partitions()
   # Restore the actual image(s):
   unset IFS
   for IMAGE_FILE in $IMAGE_FILES; do
-    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d'$SEP' -s`
-    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d'$SEP' -s`
+    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
+    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     echo "* Selected partition: $TARGET_PARTITION. Using image file: $IMAGE_FILE"
     local retval=1
@@ -883,7 +883,7 @@ check_image_files()
   # Make sure the proper binaries are available
   IFS=' '
   for ITEM in $IMAGE_FILES; do
-    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d'$SEP'`
+    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP"`
     
     case $(image_type_detect "$IMAGE_FILE") in
       fsarchiver) check_command_error fsarchiver
@@ -912,8 +912,8 @@ check_partitions()
 {
   IFS=' '
   for ITEM in $IMAGE_FILES; do
-    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d'$SEP' -s`
-    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d'$SEP' -s`
+    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
+    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     # Check whether we need to add this to our included devices list
     PART_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
@@ -957,8 +957,8 @@ test_target_partitions()
   local MISMATCH=0
   unset IFS
   for ITEM in $IMAGE_FILES; do
-    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d'$SEP' -s`
-    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d'$SEP' -s`
+    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
+    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     # Strip extension so we get the actual device name
     IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
