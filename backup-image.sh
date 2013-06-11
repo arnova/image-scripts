@@ -464,7 +464,7 @@ select_partitions()
   local SELECT_PARTITIONS=""
 
   # Check if target device exists
-  if [ -n "$DEVICES" ]; then
+  if [ -n "$DEVICES" -a "$DEVICES" != "none" ]; then
     unset IFS
     for DEVICE in $DEVICES; do
       if ! get_partitions |grep -q -x "$DEVICE"; then
@@ -716,9 +716,7 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
-if [ "$DEVICES" != "none" ]; then
-  select_partitions;
-fi
+select_partitions;
 
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Setup network (interface)
@@ -785,7 +783,9 @@ fi
 echo "--------------------------------------------------------------------------------"
 
 # Backup selected partitions to images
-backup_partitions;
+if [ "$DEVICES" != "none" ]; then
+  backup_partitions;
+fi
 
 # Reset terminal
 #reset
@@ -808,7 +808,11 @@ if [ -n "$FAILED" ]; then
   echo "* Partitions FAILED to backup: $FAILED"
 fi
 
-echo "* Partitions backuped successfully: $SUCCESS"
+if [ -n "$SUCCSS" ]; then
+  echo "* Partitions backuped successfully: $SUCCESS"
+else
+  echo "* Partitions backuped successfully: none"
+fi
 
 # Check integrity of .gz-files:
 if [ -n "$(find . -maxdepth 1 -type f -iname "*\.gz*" 2>/dev/null)" ]; then
