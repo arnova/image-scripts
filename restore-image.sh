@@ -671,7 +671,7 @@ restore_partitions()
 {
   # Restore the actual image(s):
   unset IFS
-  for IMAGE_FILE in $IMAGE_FILES; do
+  for ITEM in $IMAGE_FILES; do
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
     TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
@@ -1258,7 +1258,7 @@ if [ $MBR_WRITE -eq 1 ]; then
 fi
 
 if [ $CLEAN -eq 1 ]; then
-  echo "* WARNING: Always updating MBR/track0, partition-table & swap-space enabled!" >&2
+  echo "* WARNING: Always updating MBR/track0, partition-table & swap-space enabled (--clean)!" >&2
 fi
 
 if [ -e "description.txt" ]; then
@@ -1268,6 +1268,7 @@ fi
 
 echo "--------------------------------------------------------------------------------"
 if ! get_user_yn "Continue with restore (Y/N)?"; then
+  echo "Aborted by user..."
   do_exit 1;
 fi
 
