@@ -1306,9 +1306,8 @@ echo ""
 # Show current partition status.
 for DEVICE in $INCLUDED_TARGET_DEVICES; do
   parted_list_fancy "$DEVICE"
+  echo ""
 done
-
-echo ""
 
 if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
