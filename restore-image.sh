@@ -632,7 +632,7 @@ image_type_detect()
 
 image_to_target_remap()
 {
-  local IMAGE_PARTITION_NODEV=` echo "$1" |sed 's/\..*//'`
+  local IMAGE_PARTITION_NODEV=`echo "$1" |sed 's/\..*//'`
       
   # Set default
   local TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
@@ -643,7 +643,7 @@ image_to_target_remap()
     SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
-    if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "TARGET_DEVICE_MAP" ]; then
+    if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "$TARGET_DEVICE_MAP" ]; then
       NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
       TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
       TARGET_PARTITION="/dev/$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
@@ -657,7 +657,7 @@ image_to_target_remap()
     SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
-    if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "TARGET_PARTITION_MAP" ]; then
+    if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "$TARGET_PARTITION_MAP" ]; then
       TARGET_PARTITION="$TARGET_PARTITION_MAP"
       break;
     fi
@@ -748,6 +748,8 @@ check_disks()
       do_exit 5
     fi
 
+    echo ""
+
     # Check if DMA is enabled for device
     check_dma "/dev/$TARGET_NODEV"
 
@@ -768,24 +770,24 @@ check_disks()
     fi
 
     if [ $TRACK0_CLEAN -eq 0 ] && [ $NO_TRACK0 -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
+      echo "" >&2
+
       if [ $PT_WRITE -eq 0 -a $MBR_WRITE -eq 0 ]; then
         printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table/MBR, it will NOT be updated!\n\033[0m" >&2
         echo "To override this you must specify --clean or --pt --mbr..." >&2
-        echo "" >&2
       else
         if [ $PT_WRITE -eq 0 ]; then
           printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, it will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --pt..." >&2
-          echo "" >&2
         fi
 
         if [ $MBR_WRITE -eq 0 ]; then
           printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --mbr..." >&2
-          echo "" >&2
         fi
       fi
 
+      echo "" >&2
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
       read dummy
 
@@ -984,7 +986,7 @@ check_partitions()
     # Check whether we need to add this to our included devices list
     PART_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
     if [ -z "$PART_DEV" ]; then
-      echo "* WARNING: Unable to obtain to device for partition $TARGET_PARTITION" >&2
+      echo "* WARNING: Unable to obtain device for target partition $TARGET_PARTITION" >&2
     else
       if ! echo "$INCLUDED_TARGET_DEVICES" |grep -q -e "^$PART_DEV " -e " $PART_DEV " -e " $PART_DEV$" -e "^PART_DEV$"; then
         INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${PART_DEV} "
@@ -1153,7 +1155,7 @@ load_config()
       --clean|--track0) CLEAN=1;;
       --force) FORCE=1;;
       --notrack0) NO_TRACK0=1;;
-      --dev|-d) DEVICES="$ARGVAL";;
+      --devices|--device|--dev|-d) DEVICES="$ARGVAL";;
       --partitions|--partition|--part|-p) PARTITIONS="$ARGVAL";;
       --conf|-c) CONF="$ARGVAL";;
       --nonet|-n) NO_NET=1;;
@@ -1265,8 +1267,9 @@ if [ -e "description.txt" ]; then
 fi
 
 echo "--------------------------------------------------------------------------------"
-echo "Press <enter> to continue"
-read dummy
+if ! get_user_yn "Continue with restore (Y/N)? "; then
+  do_exit 1;
+fi
 
 # Restore MBR/partition tables
 restore_disks;
