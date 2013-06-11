@@ -714,7 +714,7 @@ restore_partitions()
 check_disks()
 {
   # Reset global, used by other functions later on:
-  INCLUDED_TARGET_DEVICES=""
+  TARGET_DEVICES=""
   
   # Global used later on when restoring partition-tables etc.
   DEVICE_FILES=""
@@ -794,7 +794,7 @@ check_disks()
       continue;
     fi
 
-    INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}/dev/${TARGET_NODEV} "
+    TARGET_DEVICES="${TARGET_DEVICES}/dev/${TARGET_NODEV} "
     DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
 
     IFS=$EOL
@@ -989,8 +989,8 @@ check_partitions()
     if [ -z "$PART_DEV" ]; then
       echo "* WARNING: Unable to obtain device for target partition $TARGET_PARTITION" >&2
     else
-      if ! echo "$INCLUDED_TARGET_DEVICES" |grep -q -e "^$PART_DEV " -e " $PART_DEV " -e " $PART_DEV$" -e "^PART_DEV$"; then
-        INCLUDED_TARGET_DEVICES="${INCLUDED_TARGET_DEVICES}${PART_DEV} "
+      if ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DEV " -e " $PART_DEV " -e " $PART_DEV$" -e "^PART_DEV$"; then
+        TARGET_DEVICES="${TARGET_DEVICES}${PART_DEV} "
       fi
     fi
     
@@ -1026,7 +1026,7 @@ check_partitions()
 show_target_devices()
 {
   IFS=' '
-  for DEV in $INCLUDED_TARGET_DEVICES; do
+  for DEV in $TARGET_DEVICES; do
     echo "* Using (target) device:"
     parted_list_fancy $DEV |grep -e '^Disk /dev/' -e 'Model: '
     echo ""
@@ -1095,7 +1095,7 @@ create_swaps()
 {
   # Run mkswap on swap partitions
   IFS=' '
-  for DEVICE in $INCLUDED_TARGET_DEVICES; do
+  for DEVICE in $TARGET_DEVICES; do
     # Create swap on swap partitions on all used devices
     IFS=$EOL
     sfdisk -d "$DEVICE" 2>/dev/null |grep -i "id=82$" |while read LINE; do
@@ -1292,8 +1292,9 @@ if [ $CLEAN -eq 1 ]; then
 fi
 
 # Set this for legacy scripts:
-USER_TARGET_NODEV=`echo "$INCLUDED_TARGET_DEVICES" |cut -f1 -d' '` # Pick the first device as target (probably sda)
-TARGET_DEVICE="$USER_TARGET_NODEV"
+TARGET_DEVICE=`echo "$TARGET_DEVICES" |cut -f1 -d' '` # Pick the first device as target (probably sda)
+TARGET_NODEV=`echo "$TARGET_DEVICE |sed s,'^/dev/',,`
+USER_TARGET_NODEV="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
 if [ $NO_POST_SH -eq 0 ]; then
@@ -1306,10 +1307,11 @@ if [ $NO_POST_SH -eq 0 ]; then
   done
 fi
 
-echo ""
+echo "--------------------------------------------------------------------------------"
 
 # Show current partition status.
-for DEVICE in $INCLUDED_TARGET_DEVICES; do
+IFS=' '
+for DEVICE in $TARGET_DEVICES; do
   parted_list_fancy "$DEVICE"
   echo ""
 done
