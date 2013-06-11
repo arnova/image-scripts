@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.10-BETA5"
+MY_VERSION="3.10-BETA6"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: June 10, 2013
+# Last update: June 11, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -334,7 +334,7 @@ parted_list()
   local MATCH=0
 
   IFS=$EOL
-  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do
+  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
     if echo "$LINE" |grep -q '^Model: '; then
       MATCH=0
       MODEL="$LINE"

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA3"
+MY_VERSION="3.10-BETA6"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: June 7, 2013
+# Last update: June 11, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -297,7 +297,7 @@ parted_list()
   local MATCH=0
 
   IFS=$EOL
-  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do
+  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
     if echo "$LINE" |grep -q '^Model: '; then
       MATCH=0
       MODEL="$LINE"
@@ -459,12 +459,14 @@ set_image_dir()
 }
 
 
-check_target()
+select_partitions()
 {
+  local SELECT_PARTITIONS=""
+
   # Check if target device exists
-  if [ -n "$USER_SOURCE_NODEV" ]; then
+  if [ -n "$DEVICES" ]; then
     unset IFS
-    for DEVICE in $USER_SOURCE_NODEV; do
+    for DEVICE in $DEVICES; do
       if ! get_partitions |grep -q -x "$DEVICE"; then
         echo ""
         printf "\033[40m\033[1;31mERROR: Specified source device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
@@ -473,15 +475,32 @@ check_target()
       else
         # Does the device contain partitions?
         if get_partitions |grep -E -q -x "$DEVICE""p?[0-9]+"; then
-          PARTITIONS="${PARTITIONS}$(sfdisk -d /dev/$DEVICE 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+          SELECT_PARTITIONS="${SELECT_PARTITIONS}$(sfdisk -d /dev/$DEVICE 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
         else
-          PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${DEVICE}"
+          SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${DEVICE}"
         fi
       fi
     done
   else
     # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-    PARTITIONS="${PARTITIONS}$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+    SELECT_PARTITIONS="${SELECT_PARTITIONS}$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+  fi
+
+  # Check which partitions to backup, we ignore mounted ones
+  BACKUP_PARTITIONS=""
+  IGNORE_PARTITIONS=""
+  unset IFS
+  for PART in $SELECT_PARTITIONS; do
+    if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
+      IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }$PART"
+    else
+      BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }$PART"
+    fi
+  done
+
+  if [ -z "$BACKUP_PARTITIONS" ]; then
+    printf "\033[40m\033[1;31mWARNING: No partitions to backup!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+    read dummy
   fi
 }
 
@@ -593,7 +612,7 @@ show_help()
   echo ""
   echo "Options:"
   echo "--help|-h                   - Print this help"
-  echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all)"
+  echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all) or \"none\" for no partitions at all"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--compression|-z=level      - Set gzip/pigz compression level (when used). 1=Low but fast (default), 9=High but slow"
   echo "--noconf                    - Don't read the config file"
@@ -613,8 +632,7 @@ load_config()
   IMAGE_NAME=""
   SUCCESS=""
   FAILED=""
-  USER_SOURCE_NODEV=""
-  PARTITIONS=""
+  DEVICES=""
   IMAGE_PROGRAM=""
   NO_NET=0
   NO_CONF=0
@@ -628,7 +646,7 @@ load_config()
     ARGVAL=`echo "$arg" |cut -d= -f2 -s`
 
     case "$ARGNAME" in
-      --part|-p|--dev|-d) USER_SOURCE_NODEV=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+      --part|--partitions|-p|--dev|--devices|-d) DEVICES=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
       --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
       --conf|-c) CONF="$ARGVAL";;
       --fsa) IMAGE_PROGRAM="fsa";;
@@ -695,7 +713,9 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
-check_target;
+if [ "$DEVICES" != "none" ]; then
+  select_partitions;
+fi
 
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Setup network (interface)
@@ -735,18 +755,6 @@ if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   fi
 fi
 
-# Check which partitions to backup, we ignore mounted ones
-BACKUP_PARTITIONS=""
-IGNORE_PARTITIONS=""
-unset IFS
-for PART in $PARTITIONS; do
-  if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
-    IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }$PART"
-  else
-    BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }$PART"
-  fi
-done
-
 if [ -n "$IGNORE_PARTITIONS" ]; then
   echo "* Partitions to ignore: $IGNORE_PARTITIONS"
 fi
@@ -754,8 +762,7 @@ fi
 if [ -n "$BACKUP_PARTITIONS" ]; then
   echo "* Partitions to backup: $BACKUP_PARTITIONS"
 else
-  printf "\033[40m\033[1;31mERROR: No partitions to backup!\n\033[0m" >&2
-  do_exit 8;
+  echo "* Partitions to backup: none"
 fi
 
 echo ""
