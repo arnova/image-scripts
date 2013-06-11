@@ -569,6 +569,7 @@ backup_disks()
             # Check if DMA is enabled for HDD
             check_dma /dev/$HDD
 
+            echo "* Storing track0 for /dev/$HDD in track0.$HDD..."
             # Dump hdd info for all disks in the current system
             result=`dd if=/dev/$HDD of="track0.$HDD" bs=512 count=2048 2>&1` # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
             retval=$?
@@ -578,6 +579,7 @@ backup_disks()
               do_exit 8
             fi
 
+            echo "* Storing partition table for /dev/$HDD in sfdisk.$HDD..."
             if ! sfdisk -d /dev/$HDD > "sfdisk.$HDD"; then
               printf "\033[40m\033[1;31mERROR: Partition table backup failed! Quitting...\n\033[0m" >&2
               do_exit 9
