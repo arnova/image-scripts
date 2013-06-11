@@ -362,14 +362,19 @@ parted_list()
   local DEV="$1"
   local FOUND=0
   local MATCH=0
+  local TYPE=""
 
   IFS=$EOL
   for LINE in `parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+    if ! echo "$LINE" |grep -q ':'; then
+      TYPE="$LINE"
+      MATCH=0
+    fi
+
     if echo "$LINE" |grep -q "^$DEV:"; then
+      echo "$TYPE"
       FOUND=1
       MATCH=1
-    elif [ -z "$LINE" ]; then
-      MATCH=0
     fi
 
     if [ $MATCH -eq 1 ]; then
