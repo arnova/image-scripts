@@ -1250,15 +1250,15 @@ check_partitions;
 show_target_devices;
 
 if [ $PT_WRITE -eq 1 ]; then
-  echo "* WARNING: Always updating partition-table enabled!" >&2
+  echo "* WARNING: Always updating partition-table (--pt)!" >&2
 fi
 
 if [ $MBR_WRITE -eq 1 ]; then
-  echo "* WARNING: Always updating MBR/track0 enabled!" >&2
+  echo "* WARNING: Always updating MBR/track0 (--mbr)!" >&2
 fi
 
 if [ $CLEAN -eq 1 ]; then
-  echo "* WARNING: Always updating MBR/track0, partition-table & swap-space enabled (--clean)!" >&2
+  echo "* WARNING: Always updating MBR/track0, partition-table & swap-space (--clean)!" >&2
 fi
 
 if [ -e "description.txt" ]; then
