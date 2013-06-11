@@ -297,19 +297,15 @@ parted_list()
   local MATCH=0
 
   IFS=$EOL
-  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
-    if echo "$LINE" |grep -q '^Model: '; then
+  for LINE in `parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+    if echo "$LINE" |grep -q "^$DEV:"; then
+      FOUND=1
+      MATCH=1
+    elif [ -z "$LINE" ]; then
       MATCH=0
-      MODEL="$LINE"
-    elif echo "$LINE" |grep -q '^Disk /dev/'; then
-      # Match disk
-      if echo "$LINE" |grep -q "^Disk $DEV: "; then
-        echo "$LINE"
-        echo "$MODEL"
-        FOUND=1
-        MATCH=1
-      fi
-    elif [ $MATCH -eq 1 ]; then
+    fi
+
+    if [ $MATCH -eq 1 ]; then
       echo "$LINE"
     fi
   done

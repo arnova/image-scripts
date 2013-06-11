@@ -327,7 +327,7 @@ get_partitions()
 }
 
 
-parted_list()
+parted_list_fancy()
 {
   local DEV="$1"
   local FOUND=0
@@ -347,6 +347,32 @@ parted_list()
         MATCH=1
       fi
     elif [ $MATCH -eq 1 ]; then
+      echo "$LINE"
+    fi
+  done
+
+  if [ $FOUND -eq 0 ]; then
+    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
+  fi
+}
+
+
+parted_list()
+{
+  local DEV="$1"
+  local FOUND=0
+  local MATCH=0
+
+  IFS=$EOL
+  for LINE in `parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+    if echo "$LINE" |grep -q "^$DEV:"; then
+      FOUND=1
+      MATCH=1
+    elif [ -z "$LINE" ]; then
+      MATCH=0
+    fi
+
+    if [ $MATCH -eq 1 ]; then
       echo "$LINE"
     fi
   done
@@ -723,7 +749,7 @@ check_disks()
     # Make sure kernel doesn't use old partition table
     if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
       echo ""
-      parted_list "/dev/$TARGET_NODEV" |grep -e '^Disk /dev/' -e 'Model: '
+      parted_list_fancy "/dev/$TARGET_NODEV" |grep -e '^Disk /dev/' -e 'Model: '
       printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override. Quitting...\n\033[0m" >&2
       do_exit 5;
     fi
@@ -994,7 +1020,7 @@ show_target_devices()
   IFS=' '
   for DEV in $INCLUDED_TARGET_DEVICES; do
     echo "* Using (target) device:"
-    parted_list $DEV |grep -e '^Disk /dev/' -e 'Model: '
+    parted_list_fancy $DEV |grep -e '^Disk /dev/' -e 'Model: '
     echo ""
   done
 }
@@ -1271,7 +1297,7 @@ echo ""
 
 # Show current partition status.
 for DEVICE in $INCLUDED_TARGET_DEVICES; do
-  parted_list "$DEVICE"
+  parted_list_fancy "$DEVICE"
 done
 
 if [ -n "$FAILED" ]; then
