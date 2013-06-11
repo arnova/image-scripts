@@ -1287,7 +1287,7 @@ if [ $CLEAN -eq 1 ]; then
 fi
 
 # Set this for legacy scripts:
-USER_TARGET_NODEV=`echo "$INCLUDED_TARGET_DEVICES |cut -f1 -d' '` # Pick the first device as target (probably sda)
+USER_TARGET_NODEV=`echo "$INCLUDED_TARGET_DEVICES" |cut -f1 -d' '` # Pick the first device as target (probably sda)
 TARGET_DEVICE="$USER_TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
@@ -1307,6 +1307,8 @@ echo ""
 for DEVICE in $INCLUDED_TARGET_DEVICES; do
   parted_list_fancy "$DEVICE"
 done
+
+echo ""
 
 if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
