@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA6"
+MY_VERSION="3.10-BETA7"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: June 11, 2013
