@@ -98,7 +98,7 @@ configure_network()
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        if ! get_user_yn "Setup interface $CUR_IF statically (Y/N)? "; then
+        if ! get_user_yn "Setup interface $CUR_IF statically (Y/N)?"; then
           continue;
         fi
 
@@ -1077,7 +1077,7 @@ test_target_partitions()
 
   if [ $MISMATCH -ne 0 ]; then
     printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source!\n\033[0m" >&2
-    if ! get_user_yn "Continue anyway (Y/N)? "; then
+    if ! get_user_yn "Continue anyway (Y/N)?"; then
       do_exit 5;
     fi
     return 1
@@ -1267,7 +1267,7 @@ if [ -e "description.txt" ]; then
 fi
 
 echo "--------------------------------------------------------------------------------"
-if ! get_user_yn "Continue with restore (Y/N)? "; then
+if ! get_user_yn "Continue with restore (Y/N)?"; then
   do_exit 1;
 fi
 
