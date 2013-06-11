@@ -893,6 +893,7 @@ restore_disks()
     fi
     
     if [ $PARTPROBE -eq 1 ]; then
+      echo ""
       # Re-read partition table
       if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
         printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed! Use --force to override.\n\033[0m" >&2
@@ -1039,6 +1040,8 @@ test_target_partitions()
     return 1 # Nothing to do
   fi
 
+  echo ""
+
   # Test whether the target partition(s) exist and have the correct geometry:
   local MISMATCH=0
   unset IFS
@@ -1078,6 +1081,7 @@ test_target_partitions()
   if [ $MISMATCH -ne 0 ]; then
     printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source!\n\033[0m" >&2
     if ! get_user_yn "Continue anyway (Y/N)?"; then
+      echo "Aborted by user..."
       do_exit 5;
     fi
     return 1
