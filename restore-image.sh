@@ -1293,7 +1293,7 @@ fi
 
 # Set this for legacy scripts:
 TARGET_DEVICE=`echo "$TARGET_DEVICES" |cut -f1 -d' '` # Pick the first device as target (probably sda)
-TARGET_NODEV=`echo "$TARGET_DEVICE |sed s,'^/dev/',,`
+TARGET_NODEV=`echo "$TARGET_DEVICE" |sed s,'^/dev/',,`
 USER_TARGET_NODEV="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
