@@ -768,6 +768,10 @@ check_disks()
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
       TRACK0_CLEAN=1
     fi
+    
+    if [ -n "$PARTITIONS_FOUND" ] && [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $MBR_WRITE -eq 0 ]; then
+      echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions"
+    fi
 
     if [ $TRACK0_CLEAN -eq 0 ] && [ $NO_TRACK0 -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
       echo "" >&2
