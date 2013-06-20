@@ -290,6 +290,36 @@ get_partitions()
 }
 
 
+parted_list_fancy()
+{
+  local DEV="$1"
+  local FOUND=0
+  local MATCH=0
+
+  IFS=$EOL
+  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+    if echo "$LINE" |grep -q '^Model: '; then
+      MATCH=0
+      MODEL="$LINE"
+    elif echo "$LINE" |grep -q '^Disk /dev/'; then
+      # Match disk
+      if echo "$LINE" |grep -q "^Disk $DEV: "; then
+        echo "$LINE"
+        echo "$MODEL"
+        FOUND=1
+        MATCH=1
+      fi
+    elif [ $MATCH -eq 1 ]; then
+      echo "$LINE"
+    fi
+  done
+
+  if [ $FOUND -eq 0 ]; then
+    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
+  fi
+}
+
+
 parted_list()
 {
   local DEV="$1"
@@ -561,24 +591,23 @@ select_disks()
   BACKUP_DISKS=""
 
   # Scan all devices/HDDs
-  local HDD=""
+  local HDD_NODEV=""
   IFS=$EOL
   for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
     if echo "$LINE" |grep -q '^# '; then
-      HDD="$(echo "$LINE" |sed 's,.*/dev/,,')"
-    elif [ -n "$HDD" ]; then
+      HDD_NODEV="$(echo "$LINE" |sed 's,.*/dev/,,')"
+    elif [ -n "$HDD_NODEV" ]; then
       unset IFS
       for PART in $BACKUP_PARTITIONS; do
         if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
-          echo "* Including /dev/$HDD for backup"
+          echo "* Including /dev/$HDD_NODEV for backup"
 
-          # Use wrapped function to only get info for this device
-          parted_list_fancy /dev/$HDD
+          parted_list_fancy "/dev/$HDD_NODEV" |grep -e '^Disk /dev/' -e 'Model: '
 
-          BACKUP_DISKS="${BACKUP_DISKS}${HDD} "
+          BACKUP_DISKS="${BACKUP_DISKS}${HDD_NODEV} "
 
           # Mark HDD as done
-          HDD=""
+          HDD_NODEV=""
         fi
       done
     fi
@@ -594,36 +623,36 @@ select_disks()
 backup_disks()
 {
   # Backup all disks
-  local HDD=""
+  local HDD_NODEV=""
   IFS=' '
-  for HDD in $BACKUP_DISKS; do
+  for HDD_NODEV in $BACKUP_DISKS; do
     # Check if DMA is enabled for HDD
-    check_dma /dev/$HDD
+    check_dma /dev/$HDD_NODEV
 
-    echo "* Storing track0 for /dev/$HDD in track0.$HDD..."
+    echo "* Storing track0 for /dev/$HDD_NODEV in track0.$HDD_NODEV..."
     # Dump hdd info for all disks in the current system
-    result=`dd if=/dev/$HDD of="track0.$HDD" bs=512 count=2048 2>&1` # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
+    result=`dd if=/dev/$HDD_NODEV of="track0.$HDD_NODEV" bs=512 count=2048 2>&1` # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
     retval=$?
     if [ $retval -ne 0 ]; then
       echo "$result" >&2
-      printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD failed($retval)! Quitting...\n\033[0m" >&2
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
       do_exit 8
     fi
 
-    echo "* Storing partition table for /dev/$HDD in sfdisk.$HDD..."
-    if ! sfdisk -d /dev/$HDD > "sfdisk.$HDD"; then
+    echo "* Storing partition table for /dev/$HDD_NODEV in sfdisk.$HDD_NODEV..."
+    if ! sfdisk -d /dev/$HDD_NODEV > "sfdisk.$HDD_NODEV"; then
       printf "\033[40m\033[1;31mERROR: Partition table backup failed! Quitting...\n\033[0m" >&2
       do_exit 9
     fi
 
     # Legacy. Must be removed in future releases
-    cp "sfdisk.$HDD" "partitions.$HDD"
+    cp "sfdisk.$HDD_NODEV" "partitions.$HDD_NODEV"
 
     # Dump fdisk -l info to file
-    fdisk -l /dev/$HDD >"fdisk.$HDD"
+    fdisk -l /dev/$HDD_NODEV >"fdisk.$HDD_NODEV"
 
     # Use wrapped function to only get info for this device
-    parted_list /dev/$HDD >"parted.$HDD"
+    parted_list /dev/$HDD_NODEV >"parted.$HDD_NODEV"
   done
 }
 
