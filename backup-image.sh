@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA7"
+MY_VERSION="3.10-BETA8"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: June 11, 2013
+# Last update: June 20, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -500,7 +500,7 @@ select_partitions()
   done
 
   if [ -z "$BACKUP_PARTITIONS" ]; then
-    printf "\033[40m\033[1;31mWARNING: No partitions to backup!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+    printf "\033[40m\033[1;31mWARNING: No partitions to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
     read dummy
   fi
 }
@@ -556,55 +556,74 @@ backup_partitions()
 }
 
 
-backup_disks()
+select_disks()
 {
+  BACKUP_DISKS=""
+
   # Scan all devices/HDDs
   local HDD=""
   IFS=$EOL
   for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
     if echo "$LINE" |grep -q '^# '; then
       HDD="$(echo "$LINE" |sed 's,.*/dev/,,')"
-    else
-      if [ -n "$HDD" ]; then
-        unset IFS
-        for PART in $BACKUP_PARTITIONS; do
-          if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
-            echo "* Including /dev/$HDD for backup"
-            
-            # Check if DMA is enabled for HDD
-            check_dma /dev/$HDD
+    elif [ -n "$HDD" ]; then
+      unset IFS
+      for PART in $BACKUP_PARTITIONS; do
+        if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
+          echo "* Including /dev/$HDD for backup"
 
-            echo "* Storing track0 for /dev/$HDD in track0.$HDD..."
-            # Dump hdd info for all disks in the current system
-            result=`dd if=/dev/$HDD of="track0.$HDD" bs=512 count=2048 2>&1` # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
-            retval=$?
-            if [ $retval -ne 0 ]; then
-              echo "$result" >&2
-              printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD failed($retval)! Quitting...\n\033[0m" >&2
-              do_exit 8
-            fi
+          # Use wrapped function to only get info for this device
+          parted_list_fancy /dev/$HDD
 
-            echo "* Storing partition table for /dev/$HDD in sfdisk.$HDD..."
-            if ! sfdisk -d /dev/$HDD > "sfdisk.$HDD"; then
-              printf "\033[40m\033[1;31mERROR: Partition table backup failed! Quitting...\n\033[0m" >&2
-              do_exit 9
-            fi
+          BACKUP_DISKS="${BACKUP_DISKS}${HDD} "
 
-            # Legacy. Must be removed in future releases
-            cp "sfdisk.$HDD" "partitions.$HDD"
-
-            # Dump fdisk -l info to file
-            fdisk -l /dev/$HDD >"fdisk.$HDD"
-
-            # Use wrapped function to only get info for this device
-            parted_list /dev/$HDD >"parted.$HDD"
-
-            # Mark HDD as done
-            HDD=""
-          fi
-        done
-      fi
+          # Mark HDD as done
+          HDD=""
+        fi
+      done
     fi
+  done
+
+  if [ -z "$BACKUP_DISKS" ]; then
+    printf "\033[40m\033[1;31mWARNING: No disks to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+    read dummy
+  fi
+}
+
+
+backup_disks()
+{
+  # Backup all disks
+  local HDD=""
+  IFS=' '
+  for HDD in $BACKUP_DISKS; do
+    # Check if DMA is enabled for HDD
+    check_dma /dev/$HDD
+
+    echo "* Storing track0 for /dev/$HDD in track0.$HDD..."
+    # Dump hdd info for all disks in the current system
+    result=`dd if=/dev/$HDD of="track0.$HDD" bs=512 count=2048 2>&1` # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
+    retval=$?
+    if [ $retval -ne 0 ]; then
+      echo "$result" >&2
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD failed($retval)! Quitting...\n\033[0m" >&2
+      do_exit 8
+    fi
+
+    echo "* Storing partition table for /dev/$HDD in sfdisk.$HDD..."
+    if ! sfdisk -d /dev/$HDD > "sfdisk.$HDD"; then
+      printf "\033[40m\033[1;31mERROR: Partition table backup failed! Quitting...\n\033[0m" >&2
+      do_exit 9
+    fi
+
+    # Legacy. Must be removed in future releases
+    cp "sfdisk.$HDD" "partitions.$HDD"
+
+    # Dump fdisk -l info to file
+    fdisk -l /dev/$HDD >"fdisk.$HDD"
+
+    # Use wrapped function to only get info for this device
+    parted_list /dev/$HDD >"parted.$HDD"
   done
 }
 
@@ -719,7 +738,11 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
+# Determine which partitions to backup
 select_partitions;
+
+# Determine which disks to backup
+select_disks;
 
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Setup network (interface)
