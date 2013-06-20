@@ -603,6 +603,7 @@ select_disks()
           echo "* Including /dev/$HDD_NODEV for backup"
 
           parted_list_fancy "/dev/$HDD_NODEV" |grep -e '^Disk /dev/' -e 'Model: '
+          echo ""
 
           BACKUP_DISKS="${BACKUP_DISKS}${HDD_NODEV} "
 
@@ -767,12 +768,6 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
-# Determine which partitions to backup
-select_partitions;
-
-# Determine which disks to backup
-select_disks;
-
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Setup network (interface)
   configure_network;
@@ -801,6 +796,7 @@ fi
 
 # Make sure target directory is empty
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then
+  echo ""
   find . -maxdepth 1 -type f -exec ls -l {} \;
   printf "Current directory is NOT empty. PURGE directory before continueing (Y/N) (CTRL-C to abort)? "
   read answer
@@ -809,7 +805,14 @@ if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   if [ "$answer" = "y" -o "$answer" = "Y" ]; then
     find . -maxdepth 1 -type f -exec rm -vf {} \;
   fi
+  echo ""
 fi
+
+# Determine which partitions to backup
+select_partitions;
+
+# Determine which disks to backup
+select_disks;
 
 if [ -n "$IGNORE_PARTITIONS" ]; then
   echo "* Partitions to ignore: $IGNORE_PARTITIONS"
