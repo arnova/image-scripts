@@ -600,9 +600,9 @@ select_disks()
       unset IFS
       for PART in $BACKUP_PARTITIONS; do
         if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
-          echo "* Including /dev/$HDD_NODEV for backup"
+          echo "* Including /dev/$HDD_NODEV for backup:"
 
-          parted_list_fancy "/dev/$HDD_NODEV" |grep -e '^Disk /dev/' -e 'Model: '
+          parted_list_fancy "/dev/$HDD_NODEV" |grep -e '^Disk /dev/' -e 'Model: ' |sed s,'^',' ',
           echo ""
 
           BACKUP_DISKS="${BACKUP_DISKS}${HDD_NODEV} "

@@ -756,10 +756,11 @@ check_disks()
     # Make sure kernel doesn't use old partition table
     if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
       echo ""
-      parted_list_fancy "/dev/$TARGET_NODEV" |grep -e '^Disk /dev/' -e 'Model: '
+      parted_list_fancy "/dev/$TARGET_NODEV" |grep -e '^Disk /dev/' -e 'Model: ' |sed s,'^',' ',
       printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override. Quitting...\n\033[0m" >&2
       do_exit 5;
     fi
+    echo ""
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
@@ -769,8 +770,10 @@ check_disks()
       TRACK0_CLEAN=1
     fi
     
-    if [ -n "$PARTITIONS_FOUND" ] && [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $MBR_WRITE -eq 0 ]; then
-      echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions"
+    if [ -n "$PARTITIONS_FOUND" ]; then
+      echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions:"
+      parted_list_fancy /dev/$TARGET_NODEV |grep '^ '
+      echo ""
     fi
 
     if [ $TRACK0_CLEAN -eq 0 ] && [ $NO_TRACK0 -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
@@ -1032,7 +1035,7 @@ show_target_devices()
   IFS=' '
   for DEV in $TARGET_DEVICES; do
     echo "* Using (target) device:"
-    parted_list_fancy $DEV |grep -e '^Disk /dev/' -e 'Model: '
+    parted_list_fancy $DEV |grep -e '^Disk /dev/' -e 'Model: ' |sed s,'^',' ',
     echo ""
   done
 }
@@ -1257,16 +1260,16 @@ check_partitions;
 # Show info about target devices to be used
 show_target_devices;
 
-if [ $PT_WRITE -eq 1 ]; then
-  echo "* WARNING: Always updating partition-table (--pt)!" >&2
-fi
-
-if [ $MBR_WRITE -eq 1 ]; then
-  echo "* WARNING: Always updating MBR/track0 (--mbr)!" >&2
-fi
-
 if [ $CLEAN -eq 1 ]; then
-  echo "* WARNING: Always updating MBR/track0, partition-table & swap-space (--clean)!" >&2
+  echo "* WARNING: MBR/track0, partition-table & swap-space will ALWAYS be (over)written (--clean)!" >&2
+else
+  if [ $PT_WRITE -eq 1 ]; then
+    echo "* WARNING: Partition-table will ALWAYS be (over)written (--pt)!" >&2
+  fi
+
+  if [ $MBR_WRITE -eq 1 ]; then
+    echo "* WARNING: MBR/track0 will ALWAYS be (over)written (--mbr)!" >&2
+  fi
 fi
 
 if [ -e "description.txt" ]; then
