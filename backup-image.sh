@@ -866,7 +866,7 @@ if [ -n "$FAILED" ]; then
   echo "* Partitions FAILED to backup: $FAILED"
 fi
 
-if [ -n "$SUCCSS" ]; then
+if [ -n "$SUCCESS" ]; then
   echo "* Partitions backuped successfully: $SUCCESS"
 else
   echo "* Partitions backuped successfully: none"
