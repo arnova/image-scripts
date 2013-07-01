@@ -241,16 +241,18 @@ sanity_check()
 
   check_command_error awk
   check_command_error find
-  check_command_error ifconfig
   check_command_error sed
   check_command_error grep
-  check_command_error mkswap
   check_command_error sfdisk
   check_command_error fdisk
   check_command_error dd
-  check_command_error mount
-  check_command_error umount
   check_command_error parted
+
+  check_command_error mkswap
+
+  [ "$NO_NET" != "0" ] && check_command_error ifconfig
+  [ "$NO_MOUNT" != "0" ] && check_command_error mount
+  [ "$NO_MOUNT" != "0" ] && check_command_error umount
 
 # TODO: Need to do this for GPT implementation
 #  check_command_error gdisk
@@ -1219,15 +1221,15 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
-if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
+if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET -ne 1 ]; then
   # Setup network (interface)
   configure_network;
+fi
 
-  # Try to sync time against the server used, if ntpdate is available
-  if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
-    ntpdate "$SERVER"
-    echo ""
-  fi
+# Try to sync time against the server used, if ntpdate is available
+if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
+  ntpdate "$SERVER"
+  echo ""
 fi
 
 # Setup CTRL-C handler

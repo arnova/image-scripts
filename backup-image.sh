@@ -768,15 +768,15 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
-if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
+if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET -ne 1 ]; then
   # Setup network (interface)
   configure_network;
+fi
 
-  # Try to sync time against the server used, if ntpdate is available
-  if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
-    ntpdate "$SERVER"
-    echo ""
-  fi
+# Try to sync time against the server used, if ntpdate is available
+if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
+  ntpdate "$SERVER"
+  echo ""
 fi
 
 # Setup CTRL-C handler
