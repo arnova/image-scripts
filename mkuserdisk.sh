@@ -12,17 +12,51 @@ mkud_get_disks()
 }
 
 
+mkud_get_partitions_with_size()
+{
+  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
+}
+
+
+mkud_get_partitions()
+{
+  mkud_get_partitions_with_size |awk '{ print $1 }'
+}
+
+
 mkud_create_user_partition()
 {
-  local USER_DISK=$1
+  local USER_DISK_NODEV=$1
+  local USER_DISK="/dev/$1"
   local PART_ID=$2
   local USER_PART="${USER_DISK}${PART_ID}"
 
-  if ! get_partitions |grep -q "$(echo "$USER_PART" |sed s,'^/dev/',,)$" || [ "$CLEAN" = "1" ]; then
+  local EMPTY_PARTITION_TABLE=0
+
+  if [ "$CLEAN" = "1" ] && ! echo "$TARGET_DEVICES" |grep -q -e " $USER_DISK " -e "^$USER_DISK " -e " $USER_DISK$" && ! echo "$TARGET_NODEV" |grep -q -e " $USER_DISK_NODEV " -e "^$USER_DISK_NODEV " -e " $USER_DISK_NODEV$"; then
+    EMPTY_PARTITION_TABLE=1
+  fi
+
+  if ! mkud_get_partitions |grep -q "${USER_DISK_NODEV}${PART_ID}" || [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
     echo "* Creating user NTFS partition $USER_PART"
+
     # Create NTFS partition:
-    echo "
+    local FDISK_CMD=""
+
+    if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
+      # Empty partition table"
+      FDISK_CMD="o
 n
+p
+${PART_ID}
+
+
+t
+7
+w
+"
+    else
+      FDISK_CMD="n
 p
 ${PART_ID}
 
@@ -31,9 +65,12 @@ t
 ${PART_ID}
 7
 w
-" |fdisk $USER_DISK >/dev/null
+"
+    fi
 
-    if ! partprobe $USER_DISK; then
+    echo "$FDISK_CMD" |fdisk $USER_DISK >/dev/null
+
+    if ! sfdisk -R $USER_DISK; then
       printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress enter to continue or CTRL-C to abort...\n\033[0m" >&2
       read
     fi
@@ -60,11 +97,19 @@ w
 
 mkud_select_disk()
 {
-  local FIND_DISKS=`mkud_get_disks`
+  # Check which partitions to backup, we ignore mounted ones
+  FIND_DISKS=""
+  unset IFS
+  for DISK in `mkud_get_disks`; do
+    # Ignore disks with swap/mounted partitions
+    if ! grep -E -q "^/dev/${DISK}p?[0-9]+" /etc/mtab && ! grep -E -q "^/dev/${PART}p?[0-9]+" /proc/swaps; then
+      FIND_DISKS="${FIND_DISKS}${FIND_DISKS:+ }$DISK"
+    fi
+  done
 
-  if [ $(echo "$FIND_DISKS" |wc -l) -gt 1 ]; then
+  if [ $(echo "$FIND_DISKS" |wc -w) -gt 1 ]; then
     # Use last disk by default
-    USER_DISK_NODEV=`echo "$FIND_DISKS" |tail -n1`
+    USER_DISK_NODEV=`echo "$FIND_DISKS" |awk '{ print $NF }'`
     
 #    TODO: User selection
 #    echo "Multiple disks found:"
@@ -96,5 +141,5 @@ mkud_select_disk;
 if [ -z "$USER_DISK_NODEV" ]; then
   echo "WARNING: No (suitable) disk found for user partition!" >&2
 else
-  create_user_partition "/dev/$USER_DISK_NODEV" $USER_PART_ID
+  mkud_create_user_partition $USER_DISK_NODEV $USER_PART_ID
 fi
