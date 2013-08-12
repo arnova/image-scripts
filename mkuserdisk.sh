@@ -21,7 +21,17 @@ mkud_create_user_partition()
   if ! get_partitions |grep -q "$(echo "$USER_PART" |sed s,'^/dev/',,)$" || [ "$CLEAN" = "1" ]; then
     echo "* Creating user NTFS partition $USER_PART"
     # Create NTFS partition:
-    printf "n\np\n${PART_ID}\n\n\nt\n${PART_ID}\n7\nw\n" |fdisk $USER_DISK >/dev/null
+    echo "
+n
+p
+${PART_ID}
+
+
+t
+${PART_ID}
+7
+w
+" |fdisk $USER_DISK >/dev/null
 
     if ! partprobe $USER_DISK; then
       printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress enter to continue or CTRL-C to abort...\n\033[0m" >&2
@@ -50,7 +60,7 @@ mkud_create_user_partition()
 
 mkud_select_disk()
 {
-  local FIND_DISKS=`get_disks_local`
+  local FIND_DISKS=`mkud_get_disks`
 
   if [ $(echo "$FIND_DISKS" |wc -l) -gt 1 ]; then
     # Use last disk by default
