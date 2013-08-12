@@ -48,7 +48,7 @@ mkud_create_user_partition()
       FDISK_CMD="o
 n
 p
-${PART_ID}
+
 
 
 t
