@@ -1,6 +1,6 @@
 # !/bin/bash
 
-MY_VERSION="3.10-BETA8"
+MY_VERSION="3.10-BETA9"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: August 12, 2013
@@ -241,18 +241,16 @@ sanity_check()
 
   check_command_error awk
   check_command_error find
+  check_command_error ifconfig
   check_command_error sed
   check_command_error grep
+  check_command_error mkswap
   check_command_error sfdisk
   check_command_error fdisk
   check_command_error dd
+  check_command_error mount
+  check_command_error umount
   check_command_error parted
-
-  check_command_error mkswap
-
-  [ "$NO_NET" != "0" ] && check_command_error ifconfig
-  [ "$NO_MOUNT" != "0" ] && check_command_error mount
-  [ "$NO_MOUNT" != "0" ] && check_command_error umount
 
 # TODO: Need to do this for GPT implementation
 #  check_command_error gdisk
@@ -390,12 +388,6 @@ parted_list()
 }
 
 
-# Get all sdX & hdX disks
-get_disks()
-{
-  cat /proc/partitions |grep -E '[sh]d[a-z]$' |awk '{ print $4 }' |sed s,'^/dev/',,
-}
-
 chdir_safe()
 {
   local IMAGE_DIR="$1"
@@ -442,6 +434,7 @@ partwait()
       fi
     done
     
+    # Sleep 1 second:
     sleep 1
     
     if [ $FAIL -eq 0 ]; then
@@ -574,14 +567,18 @@ set_image_dir()
         do_exit 7
       fi
     else
-      if [ -z "$IMAGE_ROOT" ]; then
+      IMAGE_DIR="$IMAGE_ROOT"
+      if [ -z "$IMAGE_DIR" ]; then
         # Default to the cwd
-        IMAGE_ROOT="."
+        IMAGE_DIR=`pwd`
+      fi
+
+      if [ -z "$IMAGE_RESTORE_DEFAULT" ]; then
+        IMAGE_RESTORE_DEFAULT="."
       fi
       
-      IMAGE_DIR="$IMAGE_ROOT"
-      
-      # Ask user for IMAGE_NAME:
+      # Ask user for IMAGE_NAME
+      IMAGE_DEFAULT="$IMAGE_RESTORE_DEFAULT"
       while true; do
         echo "* Showing contents of the image root directory ($IMAGE_DIR):"
         IFS=$EOL
@@ -589,30 +586,36 @@ set_image_dir()
           echo "$(basename "$ITEM")"
         done
 
-        printf "\nImage to use ($IMAGE_RESTORE_DEFAULT): "
+        printf "\nImage (directory) to use ($IMAGE_DEFAULT): "
         read IMAGE_NAME
-        
-        if [ -z "$IMAGE_NAME" -a -n "$IMAGE_RESTORE_DEFAULT" ]; then
-          IMAGE_NAME="$IMAGE_RESTORE_DEFAULT"
+
+        if echo "$IMAGE_NAME" |grep -q "/$"; then
+          IMAGE_DIR="$IMAGE_DIR/${IMAGE_NAME%/}"
+          IMAGE_DEFAULT="."
+          continue;
         fi
-        
+
         if [ -z "$IMAGE_NAME" ]; then
-          printf "\033[40m\033[1;31m\nERROR: No image directory specified!\n\n\033[0m" >&2
+           IMAGE_NAME="$IMAGE_DEFAULT"
+        fi
+
+        if [ "$IMAGE_NAME" = "." -o -z "$IMAGE_NAME" ]; then
+          TEMP_IMAGE_DIR="$IMAGE_DIR"
+        else
+          TEMP_IMAGE_DIR="$IMAGE_DIR/$IMAGE_NAME"
+        fi
+        
+        if ! ls "$TEMP_IMAGE_DIR"/partitions.* >/dev/null 2>&1; then
+          printf "\033[40m\033[1;31m\nERROR: No valid image (directory) specified ($TEMP_IMAGE_DIR)!\n\n\033[0m" >&2
           continue;
         fi
 
-        # Set the directory where the image(s) are
-        IMAGE_DIR="$IMAGE_ROOT/$IMAGE_NAME"
-
-        if echo "$IMAGE_DIR" |grep -q "/$"; then
+        # Try to cd to the image directory
+        if ! chdir_safe "$TEMP_IMAGE_DIR"; then
           continue;
         fi
         
-        if ! chdir_safe "$IMAGE_DIR"; then
-          IMAGE_DIR="$IMAGE_ROOT"
-          continue;
-        fi
-        
+        IMAGE_DIR="$TEMP_IMAGE_DIR"
         break; # All done: break
       done
     fi
@@ -1227,15 +1230,15 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
-if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET -ne 1 ]; then
+if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
   # Setup network (interface)
   configure_network;
-fi
 
-# Try to sync time against the server used, if ntpdate is available
-if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
-  ntpdate "$SERVER"
-  echo ""
+  # Try to sync time against the server used, if ntpdate is available
+  if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
+    ntpdate "$SERVER"
+    echo ""
+  fi
 fi
 
 # Setup CTRL-C handler
