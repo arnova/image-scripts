@@ -46,23 +46,23 @@ mkud_create_user_partition()
     if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
       # Empty partition table"
       FDISK_CMD="o
-n
-p
+                 n
+                 p
+                 $PART_ID
 
 
-
-t
-7
-w
-"
+                 t
+                 7
+                 w
+                "
     else
       FDISK_CMD="n
 p
-${PART_ID}
+$PART_ID
 
 
 t
-${PART_ID}
+$PART_ID
 7
 w
 "
@@ -113,6 +113,10 @@ mkud_select_disk()
     for DISK in $FIND_DISKS; do
       if [ "$DISK" != "$TARGET_NODEV" ] && ! echo "$TARGET_DEVICES" |grep -q -e " $DISK " -e "^$DISK " -e " $DISK$"; then
         USER_DISK_NODEV="$DISK"
+
+        # Add the disk to restore-image script's target list
+        TARGET_DEVICES="$TARGET_DEVICES /dev/$DISK"
+
         break;
       fi
     done
