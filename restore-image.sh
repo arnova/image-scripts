@@ -415,6 +415,7 @@ partwait()
   printf "Waiting for kernel to reread the partition on $DEVICE"
     
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
+  IFS=' '
   for x in `seq 1 10`; do
     printf "."
     FAIL=0
@@ -459,15 +460,16 @@ partprobe()
   printf "(Re)reading partition-table on $DEVICE"
   
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
+  IFS=' '
   for x in `seq 1 10`; do
     printf "."
     
     # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
     result=`sfdisk -R "$DEVICE" 2>&1`
     
-    # Wait a bit for things to settle
+    # Wait a sec for things to settle
     sleep 1
-    
+
     if [ -z "$result" ]; then
       break;
     fi
@@ -731,9 +733,9 @@ check_disks()
   DEVICE_FILES=""
 
   # Restore MBR/track0/partitions
-  unset IFS
   # FIXME: need to check track0 + images as well here!?
   # FIXME, we should exclude disks not in --dev, if specified and consider --clean
+  unset IFS
   for FN in partitions.*; do
     # Extract drive name from file
     IMAGE_SOURCE_NODEV="$(basename "$FN" |sed s/'.*\.'//)"
