@@ -98,7 +98,7 @@ w
 mkud_select_disk()
 {
   # Check which partitions to backup, we ignore mounted ones
-  FIND_DISKS=""
+  local FIND_DISKS=""
   unset IFS
   for DISK in `mkud_get_disks`; do
     # Ignore disks with swap/mounted partitions
@@ -107,10 +107,16 @@ mkud_select_disk()
     fi
   done
 
+  # With more than one disk assume user partition will be on another disk than the OS
   if [ $(echo "$FIND_DISKS" |wc -w) -gt 1 ]; then
-    # Use last disk by default
-    USER_DISK_NODEV=`echo "$FIND_DISKS" |awk '{ print $NF }'`
-    
+    IFS=' '
+    for DISK in $FIND_DISKS; do
+      if [ "$DISK" != "$TARGET_NODEV" ] && ! echo "$TARGET_DEVICES" |grep -q -e " $DISK " -e "^$DISK " -e " $DISK$"; then
+        USER_DISK_NODEV="$DISK"
+        break;
+      fi
+    done
+
 #    TODO: User selection
 #    echo "Multiple disks found:"
 #    echo "$FIND_DISKS"
