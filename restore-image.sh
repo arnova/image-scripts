@@ -3,7 +3,7 @@
 MY_VERSION="3.10-BETA9"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: August 12, 2013
+# Last update: August 27, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -862,6 +862,35 @@ restore_disks()
       TRACK0_CLEAN=1
     fi
 
+    # FIXME for --add
+    if [ $PT_ADD -eq 1 ]; then
+      # Check for sfdisk for this target
+      if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        SFDISK_TARGET_DEV=`sfdisk -d "/dev/${TARGET_NODEV}"`
+        if [ -z "$SFDISK_TARGET_PART" ]; then
+          printf "\033[40m\033[1;31m\nERROR: Target partition /dev/${TARGET_NODEV} does NOT exist! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+        
+        MISMATCH=0
+        IFS=$EOL
+        for PART in $SFDISK_TARGET_DEV; do
+          if ! grep -q -x "$PART" "sfdisk.${IMAGE_SOURCE_NODEV}"; then
+            MISMATCH=1
+            break;
+          fi
+        done
+        
+        if [ $MISMATCH -eq 1 ]; then
+          #TODO: Show source/target?
+
+          printf "\033[40m\033[1;31mERROR: Target partition(s) mismatches with source. Unable to update partition table! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+      fi
+      # TODO: gdisk check for GPT
+    fi
+
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
@@ -895,12 +924,19 @@ restore_disks()
       fi
       PARTPROBE=1
     fi
-    
+
     # Check for partition restore
-    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
-      if [ -f "partitions.${IMAGE_SOURCE_NODEV}" ]; then
+    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 -o $PT_ADD -eq 1 ]; then
+      SFDISK_FILE=""
+      if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        SFDISK_FILE="sfdisk.${IMAGE_SOURCE_NODEV}"
+      elif [ -f "partitions.${IMAGE_SOURCE_NODEV}" ]
+        SFDISK_FILE="partitions.${IMAGE_SOURCE_NODEV}"
+      fi
+
+      if [ -n "$SFDISK_FILE" ]; then
         echo "* Updating partition-table on /dev/$TARGET_NODEV"
-        sfdisk --force --no-reread /dev/$TARGET_NODEV < "partitions.${IMAGE_SOURCE_NODEV}"
+        sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE"
         retval=$?
           
         if [ $retval -ne 0 ]; then
@@ -1078,7 +1114,11 @@ test_target_partitions()
       do_exit 5
     fi
 
-    SFDISK_SOURCE_PART=`cat partitions.* |grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]"`
+    SFDISK_SOURCE_PART=`grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" sfdisk.* 2>/dev/null`
+    # If empty, try old (legacy) file
+    if [ -z "$SFDISK_SOURCE_PART" ]; then
+      SFDISK_SOURCE_PART=`grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" partitions.* 2>/dev/null`
+    fi
 
     echo "* Source partition: $SFDISK_SOURCE_PART"
     echo "* Target partition: $SFDISK_TARGET_PART"
@@ -1134,6 +1174,8 @@ show_help()
   echo ""
   echo "Options:"
   echo "--help|-h                   - Print this help"
+  echo "--dev|-d={dev1,dev2}        - Restore image to target device(s) (instead of default). Optionally use source:/dev/target"
+  echo "                              like sdb:/dev/sda or sdb1:/dev/sda to restore to a different device/partition"
   echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
   echo "--noconf                    - Don't read the config file"
@@ -1142,11 +1184,11 @@ show_help()
   echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)"
   echo "--force                     - Continue, even if there are eg. mounted partitions (USE WITH CARE!)"
   echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty"
-  echo "--dev|-d={dev}              - Restore image to target device {dev} (instead of default)"
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
   echo "--noimage                   - Don't restore any images, only do partition/MBR operations"
   echo "--nopostsh|--nosh           - Don't execute any post image shell scripts"
+  echo "--add                       - Add partition entries (don't overwrite like with --clean)"
 }
 
 
@@ -1168,6 +1210,7 @@ load_config()
   NO_POST_SH=0
   NO_MOUNT=0
   FORCE=0
+  PT_ADD=0
 
   # Check arguments
   unset IFS
@@ -1187,6 +1230,7 @@ load_config()
       --noconf) NO_CONF=1;;
       --mbr) MBR_WRITE=1;;
       --pt) PT_WRITE=1;;
+      --add) PT_ADD=1;;
       --nopostsh|--nosh) NO_POST_SH=1;;
       --help|-h) show_help; exit 3;;
       -*) echo "Bad argument: $ARGNAME" >&2

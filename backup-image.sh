@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA8"
+MY_VERSION="3.10-BETA9"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: June 21, 2013
+# Last update: August 27, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -647,13 +647,16 @@ backup_disks()
     fi
 
     # Legacy. Must be removed in future releases
-    cp "sfdisk.$HDD_NODEV" "partitions.$HDD_NODEV"
+    cp "sfdisk.${HDD_NODEV}" "partitions.${HDD_NODEV}"
 
     # Dump fdisk -l info to file
-    fdisk -l /dev/$HDD_NODEV >"fdisk.$HDD_NODEV"
+    fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${HDD_NODEV}"
 
     # Use wrapped function to only get info for this device
-    parted_list /dev/$HDD_NODEV >"parted.$HDD_NODEV"
+    parted_list "/dev/${HDD_NODEV}" >"parted.${HDD_NODEV}"
+
+    # Dump device partitions as reported by the kernel
+    get_partitions_with_size |grep -E "^${HDD_NODEV}p?[0-9]+" >"proc_partitions.${HDD_NODEV}"
   done
 }
 
