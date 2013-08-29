@@ -846,16 +846,14 @@ check_disks()
       fi
     fi
 
+    DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
+    TARGET_DEVICES="${TARGET_DEVICES}/dev/${TARGET_NODEV} "
+
     if [ $ENTER -eq 1 ]; then
       echo "" >&2
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
       read dummy
-
-      continue;
     fi
-
-    TARGET_DEVICES="${TARGET_DEVICES}/dev/${TARGET_NODEV} "
-    DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
 
     IFS=$EOL
     for PART in $PARTITIONS_FOUND; do
