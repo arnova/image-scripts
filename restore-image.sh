@@ -818,24 +818,26 @@ check_disks()
     fi
 
     local ENTER=0
-    if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
-      echo "" >&2
-      printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table/MBR, it will NOT be updated!\n\033[0m" >&2
-      echo "To override this you must specify --clean or --pt --mbr..." >&2
-      ENTER=1
-    else
-      if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 ]; then
+    if [ $CLEAN -eq 0 ]; then
+      if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
         echo "" >&2
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, it will NOT be updated!\n\033[0m" >&2
-        echo "To override this you must specify --clean or --pt..." >&2
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table/MBR, it will NOT be updated!\n\033[0m" >&2
+        echo "To override this you must specify --clean or --pt --mbr..." >&2
         ENTER=1
-      fi
+      else
+        if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 ]; then
+          echo "" >&2
+          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, it will NOT be updated!\n\033[0m" >&2
+          echo "To override this you must specify --clean or --pt..." >&2
+          ENTER=1
+        fi
 
-      if [ $MBR_WRITE -eq 0 ]; then
-        echo "" >&2
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
-        echo "To override this you must specify --clean or --mbr..." >&2
-        ENTER=1
+        if [ $MBR_WRITE -eq 0 ]; then
+          echo "" >&2
+          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
+          echo "To override this you must specify --clean or --mbr..." >&2
+          ENTER=1
+        fi
       fi
     fi
 
