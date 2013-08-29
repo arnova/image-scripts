@@ -930,7 +930,7 @@ restore_disks()
       SFDISK_FILE=""
       if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         SFDISK_FILE="sfdisk.${IMAGE_SOURCE_NODEV}"
-      elif [ -f "partitions.${IMAGE_SOURCE_NODEV}" ]
+      elif [ -f "partitions.${IMAGE_SOURCE_NODEV}" ]; then
         SFDISK_FILE="partitions.${IMAGE_SOURCE_NODEV}"
       fi
 
