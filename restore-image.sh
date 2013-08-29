@@ -412,7 +412,7 @@ partwait()
 {
   local DEVICE="$1"
   
-  printf "Waiting for kernel to reread the partition on $DEVICE"
+  echo "Waiting for kernel to reread the partition on $DEVICE..."
     
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   IFS=' '
@@ -420,7 +420,6 @@ partwait()
   while [ $TRY -gt 0 ]; do
     TRY=$(($TRY - 1))
 
-    printf "."
     FAIL=0
     IFS=$EOL
     for LINE in `sfdisk -d "$DEVICE" |grep "^/dev/"`; do
@@ -442,13 +441,11 @@ partwait()
     sleep 1
     
     if [ $FAIL -eq 0 ]; then
-      echo " Done."
       return 0
     fi
   done
 
-  echo " FAIL!"
-  printf "\033[40m\033[1;31mWaiting for the kernel to reread the partition timed out!\n\033[0m" >&2
+  printf "\033[40m\033[1;31mWaiting for the kernel to reread the partition FAILED!\n\033[0m" >&2
   return 1
 }
 
@@ -460,14 +457,13 @@ partprobe()
   local DEVICE="$1"
   local result=""
 
-  printf "(Re)reading partition-table on $DEVICE"
-  
+  echo "(Re)reading partition-table on $DEVICE..."
+
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   local TRY=10
   while [ $TRY -gt 0 ]; do
     TRY=$(($TRY - 1))
-    printf "."
-    
+
     # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
     result=`sfdisk -R "$DEVICE" 2>&1`
     
@@ -480,18 +476,15 @@ partprobe()
   done
   
   if [ -n "$result" ]; then
-    echo " FAIL!"
     printf "\033[40m\033[1;31m${result}\n\033[0m" >&2
     return 1
   fi
-  
-  echo " Done."
   
   # Wait till the kernel reread the partition table
   if ! partwait "$DEVICE"; then
     return 2
   fi
-  
+
   return 0
 }
 
