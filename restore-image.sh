@@ -793,24 +793,60 @@ check_disks()
       echo ""
     fi
 
-    if [ $TRACK0_CLEAN -eq 0 ] && [ $NO_TRACK0 -eq 0 ] && [ $PT_WRITE -eq 0 -o $MBR_WRITE -eq 0 ]; then
-      echo "" >&2
-
-      if [ $PT_WRITE -eq 0 -a $MBR_WRITE -eq 0 ]; then
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table/MBR, it will NOT be updated!\n\033[0m" >&2
-        echo "To override this you must specify --clean or --pt --mbr..." >&2
-      else
-        if [ $PT_WRITE -eq 0 ]; then
-          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, it will NOT be updated!\n\033[0m" >&2
-          echo "To override this you must specify --clean or --pt..." >&2
+    if [ $PT_ADD -eq 1 ]; then
+      # Check for sfdisk for this target
+      if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        SFDISK_TARGET=`sfdisk -d "/dev/${TARGET_NODEV}"`
+        if [ -z "$SFDISK_TARGET" ]; then
+          printf "\033[40m\033[1;31m\nERROR: Unable to get partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
+          do_exit 5
         fi
 
-        if [ $MBR_WRITE -eq 0 ]; then
-          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
-          echo "To override this you must specify --clean or --mbr..." >&2
+        MISMATCH=0
+        IFS=$EOL
+        for PART in $SFDISK_TARGET; do
+          # Ignore empty entries:
+          if ! echo "$PART" |grep -i -q "Id= 0$" && ! grep -q -x "$PART" "sfdisk.${IMAGE_SOURCE_NODEV}"; then
+            MISMATCH=1
+            break;
+          fi
+        done
+
+        if [ $MISMATCH -eq 1 ]; then
+          #TODO: Show source/target?
+          cat "sfdisk.${IMAGE_SOURCE_NODEV}"
+          echo "$SFDISK_TARGET"
+
+          printf "\033[40m\033[1;31mERROR: Target partition(s) mismatches with source. Unable to update partition table (--add)! Quitting...\n\033[0m" >&2
+          do_exit 5
         fi
       fi
+      # TODO: gdisk check for GPT
+    fi
 
+    local ENTER=0
+    if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
+      echo "" >&2
+      printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table/MBR, it will NOT be updated!\n\033[0m" >&2
+      echo "To override this you must specify --clean or --pt --mbr..." >&2
+      ENTER=1
+    else
+      if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 ]; then
+        echo "" >&2
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, it will NOT be updated!\n\033[0m" >&2
+        echo "To override this you must specify --clean or --pt..." >&2
+        ENTER=1
+      fi
+
+      if [ $MBR_WRITE -eq 0 ]; then
+        echo "" >&2
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
+        echo "To override this you must specify --clean or --mbr..." >&2
+        ENTER=1
+      fi
+    fi
+
+    if [ $ENTER -eq 1 ]; then
       echo "" >&2
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
       read dummy
@@ -864,35 +900,6 @@ restore_disks()
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
       TRACK0_CLEAN=1
-    fi
-
-    # FIXME for --add
-    if [ $PT_ADD -eq 1 ]; then
-      # Check for sfdisk for this target
-      if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        SFDISK_TARGET_DEV=`sfdisk -d "/dev/${TARGET_NODEV}"`
-        if [ -z "$SFDISK_TARGET_PART" ]; then
-          printf "\033[40m\033[1;31m\nERROR: Target partition /dev/${TARGET_NODEV} does NOT exist! Quitting...\n\033[0m" >&2
-          do_exit 5
-        fi
-        
-        MISMATCH=0
-        IFS=$EOL
-        for PART in $SFDISK_TARGET_DEV; do
-          if ! grep -q -x "$PART" "sfdisk.${IMAGE_SOURCE_NODEV}"; then
-            MISMATCH=1
-            break;
-          fi
-        done
-        
-        if [ $MISMATCH -eq 1 ]; then
-          #TODO: Show source/target?
-
-          printf "\033[40m\033[1;31mERROR: Target partition(s) mismatches with source. Unable to update partition table! Quitting...\n\033[0m" >&2
-          do_exit 5
-        fi
-      fi
-      # TODO: gdisk check for GPT
     fi
 
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
