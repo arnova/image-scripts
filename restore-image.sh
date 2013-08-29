@@ -416,7 +416,10 @@ partwait()
     
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
   IFS=' '
-  for x in `seq 1 10`; do
+  local TRY=10
+  while [ $TRY -gt 0 ]; do
+    TRY=$(($TRY - 1))
+
     printf "."
     FAIL=0
     IFS=$EOL
@@ -460,8 +463,9 @@ partprobe()
   printf "(Re)reading partition-table on $DEVICE"
   
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
-  IFS=' '
-  for x in `seq 1 10`; do
+  local TRY=10
+  while [ $TRY -gt 0 ]; do
+    TRY=$(($TRY - 1))
     printf "."
     
     # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
@@ -1211,6 +1215,7 @@ load_config()
   NO_MOUNT=0
   FORCE=0
   PT_ADD=0
+  NO_IMAGE=0
 
   # Check arguments
   unset IFS
@@ -1232,6 +1237,7 @@ load_config()
       --pt) PT_WRITE=1;;
       --add) PT_ADD=1;;
       --nopostsh|--nosh) NO_POST_SH=1;;
+      --noimage|--noim) NO_IMAGE=1;;
       --help|-h) show_help; exit 3;;
       -*) echo "Bad argument: $ARGNAME" >&2
           show_help
@@ -1345,9 +1351,9 @@ restore_disks;
 
 # Make sure the target is sane
 test_target_partitions;
- 
+
 # Restore images to partitions
-if [ "$PARTITIONS" != "none" ]; then
+if [ "$PARTITIONS" != "none" ] && [ $NO_IMAGE -eq 0 ]; then
   restore_partitions;
 fi
 
