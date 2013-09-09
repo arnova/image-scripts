@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA9"
+MY_VERSION="3.10-BETA10"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: August 27, 2013
+# Last update: September 9, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -51,221 +51,27 @@ ctrlc_handler()
 }
 
 
-# Setup the ethernet interface
-configure_network()
+get_user_yn()
 {
-  IFS=$EOL
-  for CUR_IF in `ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan'`; do
-    IF_INFO=`ifconfig $CUR_IF`
-    MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
-    IP_TEST=""
-    if [ -n "$MAC_ADDR" ]; then 
-      # Old style ifconfig
-      IP_TEST=`echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g'`
-    else
-      # Check for new style ifconfig
-      MAC_ADDR=`echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }'`
-      if [ -z "$MAC_ADDR" ]; then
-        echo "* Skipped auto config for interface: $CUR_IF"
-        continue;
-      fi
-      IP_TEST=`echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g'`
-    fi
+  printf "$1 "
 
-    if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
-      echo "* Network interface $CUR_IF is not active (yet)"
-          
-      if echo "$NETWORK" |grep -q -e 'dhcp'; then
-        if which dhcpcd >/dev/null 2>&1; then
-          echo "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
-          # Run dhcpcd to get a dynamic IP
-          if dhcpcd -L $CUR_IF; then
-            continue
-          fi
-        elif which dhclient >/dev/null 2>&1; then
-          echo "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
-          if dhclient -1 $CUR_IF; then
-            continue
-          fi
-	fi
-      fi
+  read answer_with_case
+  
+  answer=`echo "$answer_with_case" |tr A-Z a-z`
 
-      if echo "$NETWORK" |grep -q -e 'static'; then
-        printf "\n* Setup interface $CUR_IF statically (Y/N)? "
-            
-        read answer
-        if [ "$answer" != "y" -a "$answer" != "Y" -a "$answer" != "yes" -a "$answer" != "YES" ]; then
-          continue
-        fi
-            
-        echo ""
-        echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
-        printf "IP address ($IPADDRESS)?: "
-        read USER_IPADDRESS
-        if [ -z "$USER_IPADDRESS" ]; then
-          USER_IPADDRESS="$IPADDRESS"
-          if [ -z "$USER_IPADDRESS" ]; then
-            echo "* Skipping configuration of $CUR_IF"
-            continue
-          fi
-        fi
+  if [ "$answer" = "y" -o "$answer" = "yes" ]; then
+    return 0
+  fi
 
-        printf "Netmask ($NETMASK)?: "
-        read USER_NETMASK
-        if [ -z "$USER_NETMASK" ]; then
-          USER_NETMASK="$NETMASK"
-        fi
+  if [ "$answer" = "n" -o "$answer" = "no" ]; then
+    return 1
+  fi
 
-        printf "Gateway ($GATEWAY)?: "
-        read USER_GATEWAY
-        if [ -z "$USER_GATEWAY" ]; then
-          USER_GATEWAY="$GATEWAY"
-        fi
-
-        echo "* Configuring static IP: $USER_IPADDRESS / $USER_NETMASK"
-        ifconfig $CUR_IF down
-        ifconfig $CUR_IF inet $USER_IPADDRESS netmask $USER_NETMASK up
-        if [ -n "$USER_GATEWAY" ]; then
-          route add default gw $USER_GATEWAY
-        fi
-      fi
-    else
-      echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
-      echo "  $IP_TEST"
-    fi
-  done
-}
-
-
-# Wrapper for partclone to autodetect filesystem and select the proper partclone.*
-partclone_detect()
-{
-  local PARTCLONE_BIN=""
-  local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
-  case $TYPE in
-    # TODO: On Linux we only support ext2/3/4 for now. For eg. btrfs we may need to probe using "fsck -N" or "file -s -b"
-    7|17)                           PARTCLONE_BIN="partclone.ntfs";;
-    1|4|6|b|c|e|11|14|16|1b|1c|1e)  PARTCLONE_BIN="partclone.fat";;
-    fd|83)                          PARTCLONE_BIN="partclone.extfs";;
-    *)                              PARTCLONE_BIN="partclone.dd";;
-  esac
-
-  check_command_error "$PARTCLONE_BIN"
-
-  echo "$PARTCLONE_BIN"
-}
-
-
-# Check if DMA is enabled for HDD
-check_dma()
-{
-  if which hdparm >/dev/null 2>&1; then
-    # DMA disabled?
-    if hdparm -d "$1" 2>/dev/null |grep -q 'using_dma.*0'; then
-      # Enable DMA
-      hdparm -d1 "$1" >/dev/null
-    fi
+  # Fallback to default
+  if [ "$2" = "y" ]; then
+    return 0
   else
-    printf "\033[40m\033[1;31mWARNING: hdparm binary does not exist so not checking/enabling DMA!\033[0m\n" >&2
-  fi
-}
-
-
-# Check whether a certain command is available
-check_command()
-{
-  local path IFS
-
-  IFS=' '
-  for cmd in $*; do
-    case "$cmd" in
-      /*) path="" ;;
-      ip|tc|modprobe|sysctl) path="/sbin/" ;;
-      sed|cat|date|uname) path="/bin/" ;;
-      *) path="/usr/bin/" ;;
-    esac
-
-    if [ -x "$path$cmd" ]; then
-      return 0
-    fi
-
-    if which "$cmd" >/dev/null 2>&1; then
-      return 0
-    fi
-  done
-  
-  return 1
-}
-
-
-# Check whether a binary is available and if not, generate an error and stop program execution
-check_command_error()
-{
-  local IFS=' '
-
-  if ! check_command "$@"; then
-    printf "\033[40m\033[1;31mERROR  : Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
-    printf "\033[40m\033[1;31m         Please investigate. Quitting...\033[0m\n" >&2
-    echo ""
-    exit 2
-  fi
-}
-
-
-# Check whether a binary is available and if not, generate a warning but continue program execution
-check_command_warning()
-{
-  local retval IFS=' '
-
-  check_command "$@"
-  retval=$?
-
-  if [ $retval -ne 0 ]; then
-    printf "\033[40m\033[1;31mWARNING: Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
-    printf "\033[40m\033[1;31m         Please investigate. This *may* be a problem!\033[0m\n" >&2
-    echo ""
-  fi
-
-  return $retval
-}
-
-
-sanity_check()
-{
-  # root check
-  if [ "$(id -u)" != "0" ]; then 
-    printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
-    exit 1
-  fi
-
-  check_command_error awk
-  check_command_error find
-  check_command_error sed
-  check_command_error grep
-  check_command_error sfdisk
-  check_command_error fdisk
-  check_command_error dd
-  check_command_error gzip
-  check_command_error parted
-
-  [ "$NO_NET" != "0" ] && check_command_error ifconfig
-  [ "$NO_MOUNT" != "0" ] && check_command_error mount
-  [ "$NO_MOUNT" != "0" ] && check_command_error umount
-
-  [ "$IMAGE_PROGRAM" = "fsa" ] && check_command_error fsarchiver
-  [ "$IMAGE_PROGRAM" = "pi" ] && check_command_error partimage
-  
-  if [ "$IMAGE_PROGRAM" = "pc" -o "$IMAGE_PROGRAM" = "ddgz" ]; then
-    if check_command pigz; then
-      GZIP="pigz"
-    else
-      GZIP="gzip"
-    fi
-  fi
-
-  if [ "$IMAGE_PROGRAM" = "pc" ]; then
-    # This is a dummy test for partclone, the actual binary test is in the wrapper
-    check_command_error partclone.restore 
+    return 1
   fi
 }
 
@@ -343,6 +149,213 @@ parted_list()
 } 
 
 
+# Setup the ethernet interface
+configure_network()
+{
+  IFS=$EOL
+  for CUR_IF in `ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan'`; do
+    IF_INFO=`ifconfig $CUR_IF`
+    MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
+    IP_TEST=""
+    if [ -n "$MAC_ADDR" ]; then 
+      # Old style ifconfig
+      IP_TEST=`echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g'`
+    else
+      # Check for new style ifconfig
+      MAC_ADDR=`echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }'`
+      if [ -z "$MAC_ADDR" ]; then
+        echo "* Skipped auto config for interface: $CUR_IF"
+        continue;
+      fi
+      IP_TEST=`echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g'`
+    fi
+
+    if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
+      echo "* Network interface $CUR_IF is not active (yet)"
+          
+      if echo "$NETWORK" |grep -q -e 'dhcp'; then
+        if which dhcpcd >/dev/null 2>&1; then
+          echo "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
+          # Run dhcpcd to get a dynamic IP
+          if dhcpcd -L $CUR_IF; then
+            continue
+          fi
+        elif which dhclient >/dev/null 2>&1; then
+          echo "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
+          if dhclient -1 $CUR_IF; then
+            continue
+          fi
+        fi
+      fi
+
+      if echo "$NETWORK" |grep -q -e 'static'; then
+        if ! get_answer_yn "\n* Setup interface $CUR_IF statically (Y/N)? "; then
+          continue;
+        fi
+
+        echo ""
+        echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
+        printf "IP address ($IPADDRESS)?: "
+        read USER_IPADDRESS
+        if [ -z "$USER_IPADDRESS" ]; then
+          USER_IPADDRESS="$IPADDRESS"
+          if [ -z "$USER_IPADDRESS" ]; then
+            echo "* Skipping configuration of $CUR_IF"
+            continue
+          fi
+        fi
+
+        printf "Netmask ($NETMASK)?: "
+        read USER_NETMASK
+        if [ -z "$USER_NETMASK" ]; then
+          USER_NETMASK="$NETMASK"
+        fi
+
+        printf "Gateway ($GATEWAY)?: "
+        read USER_GATEWAY
+        if [ -z "$USER_GATEWAY" ]; then
+          USER_GATEWAY="$GATEWAY"
+        fi
+
+        echo "* Configuring static IP: $USER_IPADDRESS / $USER_NETMASK"
+        ifconfig $CUR_IF down
+        ifconfig $CUR_IF inet $USER_IPADDRESS netmask $USER_NETMASK up
+        if [ -n "$USER_GATEWAY" ]; then
+          route add default gw $USER_GATEWAY
+        fi
+      fi
+    else
+      echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
+      echo "  $IP_TEST"
+    fi
+  done
+}
+
+
+# Check if DMA is enabled for HDD
+check_dma()
+{
+  if which hdparm >/dev/null 2>&1; then
+    # DMA disabled?
+    if hdparm -d "$1" 2>/dev/null |grep -q 'using_dma.*0'; then
+      # Enable DMA
+      hdparm -d1 "$1" >/dev/null
+    fi
+  else
+    printf "\033[40m\033[1;31mWARNING: hdparm binary does not exist so not checking/enabling DMA!\033[0m\n" >&2
+  fi
+}
+
+
+# Check whether a certain command is available
+check_command()
+{
+  local path IFS
+
+  IFS=' '
+  for cmd in $*; do
+    if which "$cmd" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  
+  return 1
+}
+
+
+# Check whether a binary is available and if not, generate an error and stop program execution
+check_command_error()
+{
+  local IFS=' '
+
+  if ! check_command "$@"; then
+    printf "\033[40m\033[1;31mERROR  : Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
+    printf "\033[40m\033[1;31m         Please investigate. Quitting...\033[0m\n" >&2
+    echo ""
+    exit 2
+  fi
+}
+
+
+# Check whether a binary is available and if not, generate a warning but continue program execution
+check_command_warning()
+{
+  local retval IFS=' '
+
+  check_command "$@"
+  retval=$?
+
+  if [ $retval -ne 0 ]; then
+    printf "\033[40m\033[1;31mWARNING: Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
+    printf "\033[40m\033[1;31m         Please investigate. This *may* be a problem!\033[0m\n" >&2
+    echo ""
+  fi
+
+  return $retval
+}
+
+
+# Wrapper for partclone to autodetect filesystem and select the proper partclone.*
+partclone_detect()
+{
+  local PARTCLONE_BIN=""
+  local TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
+  case $TYPE in
+    # TODO: On Linux we only support ext2/3/4 for now. For eg. btrfs we may need to probe using "fsck -N" or "file -s -b"
+    7|17)                           PARTCLONE_BIN="partclone.ntfs";;
+    1|4|6|b|c|e|11|14|16|1b|1c|1e)  PARTCLONE_BIN="partclone.fat";;
+    fd|83)                          PARTCLONE_BIN="partclone.extfs";;
+    *)                              PARTCLONE_BIN="partclone.dd";;
+  esac
+
+  check_command_error "$PARTCLONE_BIN"
+
+  echo "$PARTCLONE_BIN"
+}
+
+
+sanity_check()
+{
+  # root check
+  if [ "$(id -u)" != "0" ]; then 
+    printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
+    exit 1
+  fi
+
+  check_command_error awk
+  check_command_error find
+  check_command_error sed
+  check_command_error grep
+  check_command_error gzip
+  check_command_error sfdisk
+  check_command_error fdisk
+  check_command_error dd
+  check_command_error parted
+
+  [ "$NO_NET" != "0" ] && check_command_error ifconfig
+  [ "$NO_MOUNT" != "0" ] && check_command_error mount
+  [ "$NO_MOUNT" != "0" ] && check_command_error umount
+
+  [ "$IMAGE_PROGRAM" = "fsa" ] && check_command_error fsarchiver
+  [ "$IMAGE_PROGRAM" = "pi" ] && check_command_error partimage
+  
+  if [ "$IMAGE_PROGRAM" = "pc" -o "$IMAGE_PROGRAM" = "ddgz" ]; then
+    if check_command pigz; then
+      GZIP="pigz"
+    else
+      GZIP="gzip"
+    fi
+  fi
+
+  if [ "$IMAGE_PROGRAM" = "pc" ]; then
+    # This is a dummy test for partclone, the actual binary test is in the wrapper
+    check_command_error partclone.restore 
+  fi
+}
+
+
+
+
 # mkdir + sanity check (cd) access to it
 mkdir_safe()
 {
@@ -355,14 +368,13 @@ mkdir_safe()
   fi
 
   if [ ! -d "$IMAGE_DIR" ]; then
-    echo ""
-    printf "\033[40m\033[1;31mERROR: Image target directory $IMAGE_DIR does NOT exist!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nERROR: Image target directory $IMAGE_DIR does NOT exist!\n\033[0m" >&2
     return 2
   fi
 
+  # Make the image dir our working directory
   if ! cd "$IMAGE_DIR"; then
-    echo ""
-    printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
     return 3
   fi
   
@@ -370,7 +382,7 @@ mkdir_safe()
 }
 
 
-set_image_dir()
+set_image_target_dir()
 {
   if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
     # Assume absolute path
@@ -395,7 +407,7 @@ set_image_dir()
       # Unmount mount point to be used
       umount "$IMAGE_ROOT" 2>/dev/null
 
-      if [ -n "$SERVER" ]; then
+      if [ -n "$SERVER" -a -n "$DEFAULT_USERNAME" ]; then
         while true; do
           printf "Network username ($DEFAULT_USERNAME): "
           read USERNAME
@@ -777,7 +789,7 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-set_image_dir;
+set_image_target_dir;
 
 echo "--------------------------------------------------------------------------------"
 echo "* Using image name: $IMAGE_DIR"
@@ -793,11 +805,7 @@ fi
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   echo ""
   find . -maxdepth 1 -type f -exec ls -l {} \;
-  printf "Current directory is NOT empty. PURGE directory before continueing (Y/N) (CTRL-C to abort)? "
-  read answer
-  echo ""
-
-  if [ "$answer" = "y" -o "$answer" = "Y" ]; then
+  if get_answer_yn "Image target directory is NOT empty. PURGE directory before continueing (Y/N) (CTRL-C to abort)? "; then
     find . -maxdepth 1 -type f -exec rm -vf {} \;
   fi
   echo ""

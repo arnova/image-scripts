@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.10-BETA9"
+MY_VERSION="3.10-BETA10"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: August 27, 2013
+# Last update: September 9, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -52,6 +52,104 @@ ctrlc_handler()
 }
 
 
+get_user_yn()
+{
+  printf "$1 "
+
+  read answer_with_case
+  
+  answer=`echo "$answer_with_case" |tr A-Z a-z`
+
+  if [ "$answer" = "y" -o "$answer" = "yes" ]; then
+    return 0
+  fi
+
+  if [ "$answer" = "n" -o "$answer" = "no" ]; then
+    return 1
+  fi
+
+  # Fallback to default
+  if [ "$2" = "y" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+
+get_partitions_with_size()
+{
+  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
+}
+
+
+get_partitions()
+{
+  get_partitions_with_size |awk '{ print $1 }'
+}
+
+
+parted_list_fancy()
+{
+  local DEV="$1"
+  local FOUND=0
+  local MATCH=0
+
+  IFS=$EOL
+  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+    if echo "$LINE" |grep -q '^Model: '; then
+      MATCH=0
+      MODEL="$LINE"
+    elif echo "$LINE" |grep -q '^Disk /dev/'; then
+      # Match disk
+      if echo "$LINE" |grep -q "^Disk $DEV: "; then
+        echo "$LINE"
+        echo "$MODEL"
+        FOUND=1
+        MATCH=1
+      fi
+    elif [ $MATCH -eq 1 ]; then
+      echo "$LINE"
+    fi
+  done
+
+  if [ $FOUND -eq 0 ]; then
+    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
+  fi
+}
+
+
+parted_list()
+{
+  local DEV="$1"
+  local FOUND=0
+  local MATCH=0
+  local TYPE=""
+
+  IFS=$EOL
+  for LINE in `parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+    if ! echo "$LINE" |grep -q ':'; then
+      TYPE="$LINE"
+      MATCH=0
+    fi
+
+    if echo "$LINE" |grep -q "^$DEV:"; then
+      echo "$TYPE"
+      FOUND=1
+      MATCH=1
+    fi
+
+    if [ $MATCH -eq 1 ]; then
+      echo "$LINE"
+    fi
+  done
+
+  if [ $FOUND -eq 0 ]; then
+    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
+  fi
+}
+
+
 # Setup the ethernet interface
 configure_network()
 {
@@ -92,11 +190,8 @@ configure_network()
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        printf "\n* Setup interface $CUR_IF statically (Y/N)? "
-            
-        read answer
-        if [ "$answer" != "y" -a "$answer" != "Y" -a "$answer" != "yes" -a "$answer" != "YES" ]; then
-          continue
+        if ! get_answer_yn "\n* Setup interface $CUR_IF statically (Y/N)? "; then
+          continue;
         fi
 
         echo ""
@@ -201,207 +296,6 @@ check_command_warning()
 }
 
 
-get_user_yn()
-{
-  printf "$1 "
-
-  read answer_with_case
-  
-  answer=`echo "$answer_with_case" |tr A-Z a-z`
-
-  if [ "$answer" = "y" -o "$answer" = "yes" ]; then
-    return 0
-  fi
-
-  if [ "$answer" = "n" -o "$answer" = "no" ]; then
-    return 1
-  fi
-
-  # Fallback to default
-  if [ "$2" = "y" ]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-
-sanity_check()
-{
-  # root check
-  if [ "$(id -u)" != "0" ]; then 
-    printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
-    exit 1
-  fi
-
-  check_command_error awk
-  check_command_error find
-  check_command_error ifconfig
-  check_command_error sed
-  check_command_error grep
-  check_command_error mkswap
-  check_command_error sfdisk
-  check_command_error fdisk
-  check_command_error dd
-  check_command_error mount
-  check_command_error umount
-  check_command_error parted
-
-# TODO: Need to do this for GPT implementation
-#  check_command_error gdisk
-#  check_command_error sgdisk
-
-  # Sanity check devices and check if target devices exist
-  IFS=','
-  for ITEM in $DEVICES; do
-    SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-    if [ -n "$TARGET_DEVICE_MAP" ]; then
-      if ! echo "$TARGET_DEVICE_MAP" |grep -q '^/dev/'; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Specified target device $TARGET_DEVICE_MAP should start with /dev/! Quitting...\n\033[0m" >&2
-        echo ""
-        exit 5
-      fi
-
-      CHECK_DEVICE_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-    else
-      if echo "$SOURCE_DEVICE_NODEV" |grep -q '^/dev/'; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Specified (source) device $SOURCE_DEVICE_NODEV should exclude /dev/! Quitting...\n\033[0m" >&2
-        echo ""
-        exit 5
-      fi
-
-      CHECK_DEVICE_NODEV="$SOURCE_DEVICE_NODEV"
-    fi
-
-    if ! get_partitions |grep -q -x "$CHECK_DEVICE_NODEV"; then
-      echo ""
-      printf "\033[40m\033[1;31mERROR: Specified (target) device /dev/$CHECK_DEVICE_NODEV does NOT exist! Quitting...\n\033[0m" >&2
-      echo ""
-      exit 5
-    fi
-  done
-
-  # Sanity check partitions
-  IFS=','
-  for ITEM in $PARTITIONS; do
-    SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-    TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-    
-    if [ -n "$TARGET_PARTITION_MAP" ]; then
-      if ! echo "$TARGET_PARTITION_MAP" |grep -q '^/dev/'; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Specified target partition $TARGET_PARTITION_MAP should start with /dev/! Quitting...\n\033[0m" >&2
-        echo ""
-        exit 5
-      fi
-    else
-      if echo "$SOURCE_PARTITION_NODEV" |grep -q '^/dev/'; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Specified (source) partition $SOURCE_PARTITION_NODEV should exclude /dev/! Quitting...\n\033[0m" >&2
-        echo ""
-        exit 5
-      fi
-    fi
-  done
-}
-
-
-get_partitions_with_size()
-{
-  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
-}
-
-
-get_partitions()
-{
-  get_partitions_with_size |awk '{ print $1 }'
-}
-
-
-parted_list_fancy()
-{
-  local DEV="$1"
-  local FOUND=0
-  local MATCH=0
-
-  IFS=$EOL
-  for LINE in `parted -l 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
-    if echo "$LINE" |grep -q '^Model: '; then
-      MATCH=0
-      MODEL="$LINE"
-    elif echo "$LINE" |grep -q '^Disk /dev/'; then
-      # Match disk
-      if echo "$LINE" |grep -q "^Disk $DEV: "; then
-        echo "$LINE"
-        echo "$MODEL"
-        FOUND=1
-        MATCH=1
-      fi
-    elif [ $MATCH -eq 1 ]; then
-      echo "$LINE"
-    fi
-  done
-
-  if [ $FOUND -eq 0 ]; then
-    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
-  fi
-}
-
-
-parted_list()
-{
-  local DEV="$1"
-  local FOUND=0
-  local MATCH=0
-  local TYPE=""
-
-  IFS=$EOL
-  for LINE in `parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
-    if ! echo "$LINE" |grep -q ':'; then
-      TYPE="$LINE"
-      MATCH=0
-    fi
-
-    if echo "$LINE" |grep -q "^$DEV:"; then
-      echo "$TYPE"
-      FOUND=1
-      MATCH=1
-    fi
-
-    if [ $MATCH -eq 1 ]; then
-      echo "$LINE"
-    fi
-  done
-
-  if [ $FOUND -eq 0 ]; then
-    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
-  fi
-}
-
-
-chdir_safe()
-{
-  local IMAGE_DIR="$1"
-  
-  if [ ! -d "$IMAGE_DIR" ]; then
-    printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
-    return 1
-  fi
-  
-  # Make the image dir our working directory
-  if ! cd "$IMAGE_DIR"; then
-    printf "\033[40m\033[1;31mERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
-    return 2
-  fi
-
-  return 0
-}
-
-
 # Function which waits till the kernel ACTUALLY re-read the partition table
 partwait()
 {
@@ -484,7 +378,111 @@ partprobe()
 }
 
 
-set_image_dir()
+sanity_check()
+{
+  # root check
+  if [ "$(id -u)" != "0" ]; then 
+    printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
+    exit 1
+  fi
+
+  check_command_error awk
+  check_command_error find
+  check_command_error sed
+  check_command_error grep
+  check_command_error mkswap
+  check_command_error sfdisk
+  check_command_error fdisk
+  check_command_error dd
+  check_command_error parted
+
+  [ "$NO_NET" != "0" ] && check_command_error ifconfig
+  [ "$NO_MOUNT" != "0" ] && check_command_error mount
+  [ "$NO_MOUNT" != "0" ] && check_command_error umount
+
+# TODO: Need to do this for GPT implementation
+#  check_command_error gdisk
+#  check_command_error sgdisk
+
+  # Sanity check devices and check if target devices exist
+  IFS=','
+  for ITEM in $DEVICES; do
+    SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+
+    if [ -n "$TARGET_DEVICE_MAP" ]; then
+      if ! echo "$TARGET_DEVICE_MAP" |grep -q '^/dev/'; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified target device $TARGET_DEVICE_MAP should start with /dev/! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      fi
+
+      CHECK_DEVICE_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+    else
+      if echo "$SOURCE_DEVICE_NODEV" |grep -q '^/dev/'; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified (source) device $SOURCE_DEVICE_NODEV should exclude /dev/! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      fi
+
+      CHECK_DEVICE_NODEV="$SOURCE_DEVICE_NODEV"
+    fi
+
+    if ! get_partitions |grep -q -x "$CHECK_DEVICE_NODEV"; then
+      echo ""
+      printf "\033[40m\033[1;31mERROR: Specified (target) device /dev/$CHECK_DEVICE_NODEV does NOT exist! Quitting...\n\033[0m" >&2
+      echo ""
+      exit 5
+    fi
+  done
+
+  # Sanity check partitions
+  IFS=','
+  for ITEM in $PARTITIONS; do
+    SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    
+    if [ -n "$TARGET_PARTITION_MAP" ]; then
+      if ! echo "$TARGET_PARTITION_MAP" |grep -q '^/dev/'; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified target partition $TARGET_PARTITION_MAP should start with /dev/! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      fi
+    else
+      if echo "$SOURCE_PARTITION_NODEV" |grep -q '^/dev/'; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Specified (source) partition $SOURCE_PARTITION_NODEV should exclude /dev/! Quitting...\n\033[0m" >&2
+        echo ""
+        exit 5
+      fi
+    fi
+  done
+}
+
+
+chdir_safe()
+{
+  local IMAGE_DIR="$1"
+  
+  if [ ! -d "$IMAGE_DIR" ]; then
+    printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
+    return 2
+  fi
+  
+  # Make the image dir our working directory
+  if ! cd "$IMAGE_DIR"; then
+    printf "\033[40m\033[1;31m\nERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
+    return 3
+  fi
+
+  return 0
+}
+
+
+set_image_source_dir()
 {
   if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
     # Assume absolute path
@@ -1291,7 +1289,7 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-set_image_dir;
+set_image_source_dir;
 
 echo "--------------------------------------------------------------------------------"
 echo "* Image name: $(basename $IMAGE_DIR)"
