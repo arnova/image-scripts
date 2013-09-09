@@ -76,31 +76,25 @@ configure_network()
       echo "* Network interface $CUR_IF is not active (yet)"
           
       if echo "$NETWORK" |grep -q -e 'dhcp'; then
-        if which dhclient >/dev/null 2>&1; then
-          printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
-          if ! dhclient -v -1 $CUR_IF; then
-            echo "FAILED!"
-          else
-            echo "OK"
-            continue
-          fi
-        elif which dhcpcd >/dev/null 2>&1; then
-          printf "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
+        if which dhcpcd >/dev/null 2>&1; then
+          echo "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
           # Run dhcpcd to get a dynamic IP
-          if ! dhcpcd -L $CUR_IF; then
-            echo "FAILED!"
-          else
-            echo "OK"
+          if dhcpcd -L $CUR_IF; then
             continue
           fi
-        fi
+        elif which dhclient >/dev/null 2>&1; then
+          echo "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
+          if dhclient -1 $CUR_IF; then
+            continue
+          fi
+	fi
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        printf "Setup interface $CUR_IF statically (Y/N)? "
+        printf "\n* Setup interface $CUR_IF statically (Y/N)? "
             
         read answer
-        if [ "$answer" = "n" -o "$answer" = "N" ]; then
+        if [ "$answer" != "y" -a "$answer" != "Y" -a "$answer" != "yes" -a "$answer" != "YES" ]; then
           continue
         fi
             
@@ -139,8 +133,6 @@ configure_network()
       echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
       echo "  $IP_TEST"
     fi
-
-    echo ""
   done
 }
 

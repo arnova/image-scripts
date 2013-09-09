@@ -77,29 +77,26 @@ configure_network()
       echo "* Network interface $CUR_IF is not active (yet)"
           
       if echo "$NETWORK" |grep -q -e 'dhcp'; then
-        if which dhclient >/dev/null 2>&1; then
-          printf "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
-          if ! dhclient -v -1 $CUR_IF; then
-            echo "FAILED!"
-          else
-            echo "OK"
+        if which dhcpcd >/dev/null 2>&1; then
+          echo "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
+          # Run dhcpcd to get a dynamic IP
+          if dhcpcd -L $CUR_IF; then
             continue
           fi
-        elif which dhcpcd >/dev/null 2>&1; then
-          printf "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
-          # Run dhcpcd to get a dynamic IP
-          if ! dhcpcd -L $CUR_IF; then
-            echo "FAILED!"
-          else
-            echo "OK"
+        elif which dhclient >/dev/null 2>&1; then
+          echo "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
+          if dhclient -1 $CUR_IF; then
             continue
           fi
         fi
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        if ! get_user_yn "Setup interface $CUR_IF statically (Y/N)?"; then
-          continue;
+        printf "\n* Setup interface $CUR_IF statically (Y/N)? "
+            
+        read answer
+        if [ "$answer" != "y" -a "$answer" != "Y" -a "$answer" != "yes" -a "$answer" != "YES" ]; then
+          continue
         fi
 
         echo ""
@@ -137,8 +134,6 @@ configure_network()
       echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
       echo "  $IP_TEST"
     fi
-
-    echo ""
   done
 }
 
@@ -841,14 +836,14 @@ check_disks()
       fi
     fi
 
-    DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
-    TARGET_DEVICES="${TARGET_DEVICES}/dev/${TARGET_NODEV} "
-
     if [ $ENTER -eq 1 ]; then
       echo "" >&2
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
       read dummy
     fi
+
+    DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
+    TARGET_DEVICES="${TARGET_DEVICES}/dev/${TARGET_NODEV} "
 
     IFS=$EOL
     for PART in $PARTITIONS_FOUND; do
