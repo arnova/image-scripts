@@ -1,9 +1,9 @@
 # !/bin/bash
 
-MY_VERSION="3.10-BETA10"
+MY_VERSION="3.10-BETA11"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: September 9, 2013
+# Last update: September 23, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1261,6 +1261,11 @@ load_config()
   elif [ "$IMAGE_PROGRAM" = "partclone" ]; then
     IMAGE_PROGRAM="pc"
   fi
+  
+  # Set no_image to true if requested via --part=none
+  if [ "$PARTITIONS" = "none" ]; then
+    NO_IMAGE=1
+  fi
 }
 
 
@@ -1301,17 +1306,19 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
   do_exit 7
 fi
 
-if [ "$PARTITIONS" = "none" ]; then
-  echo "* NOTE: Skipping partition image restoration"
-else
+if [ $NO_IMAGE -eq 0 ]; then
   check_image_files;
+else
+  echo "* NOTE: Skipping partition image restoration"
 fi
 
 # Check target disks
 check_disks;
 
-# Check target partitions
-check_partitions;
+if [ $NO_IMAGE -eq 0 ]; then
+  # Check target partitions
+  check_partitions;
+fi
 
 # Show info about target devices to be used
 show_target_devices;
@@ -1342,11 +1349,11 @@ fi
 # Restore MBR/partition tables
 restore_disks;
 
-# Make sure the target is sane
-test_target_partitions;
+if [ $NO_IMAGE -eq 0 ]; then
+  # Make sure the target is sane
+  test_target_partitions;
 
-# Restore images to partitions
-if [ "$PARTITIONS" != "none" ] && [ $NO_IMAGE -eq 0 ]; then
+  # Restore images to partitions
   restore_partitions;
 fi
 
