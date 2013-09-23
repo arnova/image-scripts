@@ -31,17 +31,18 @@ mkud_create_user_partition()
   local PART_ID=$2
   local USER_PART="${USER_DISK}${PART_ID}"
 
-  if ! mkud_get_partitions |grep -q "${USER_DISK_NODEV}${PART_ID}" || [ $CLEAN -eq 1 ]; then
+  local PARTITIONS_FOUND=`mkud_get_partitions |grep -E -x "${USER_DISK_NODEV}p?[0-9]+"`
+  if ! echo "$PARTITIONS_FOUND" |grep -q "${USER_DISK_NODEV}${PART_ID}" || [ $CLEAN -eq 1 ]; then
     local EMPTY_PARTITION_TABLE=0
-    # FIXME: What about already empty second disk?
+
+    # Automatically handle cases where we have 2 harddisks: one for the OS (Eg. ssd) and one for user data
     if [ "$CLEAN" = "1" ] && [ -n "$TARGET_DEVICES" -o -n "$TARGET_NODEV" ] && \
        ! echo "$TARGET_DEVICES" |grep -q -e " $USER_DISK " -e "^$USER_DISK " -e " $USER_DISK$" && \
        ! echo "$TARGET_NODEV" |grep -q -e " $USER_DISK_NODEV " -e "^$USER_DISK_NODEV " -e " $USER_DISK_NODEV$"; then
       EMPTY_PARTITION_TABLE=1
     fi
 
-    # Check whether device already contains partitions
-    local PARTITIONS_FOUND=`mkud_get_partitions |grep -E -x "${USER_DISK_NODEV}p?[0-9]+"`
+    # Check whether target device is (already) empty
     if [ -z "$PARTITIONS_FOUND" ]; then
       EMPTY_PARTITION_TABLE=1
     fi
@@ -133,19 +134,10 @@ mkud_select_disk()
   fi
 }
 
+
 ############
 # Mainline #
 ############
-
-# Old way:
-#if [ -n "$TARGET_DEVICES" ]; then
-#  TARGET_DEVICE=`echo "$TARGET_DEVICES" |cut -f1 -d' '`
-#elif [ -n "$TARGET_NODEV" ]; then
-#  TARGET_DEVICE="/dev/$TARGET_NODEV"
-#elif [ -n "$1" ]; then
-#  TARGET_DEVICE="$1"
-#fi
-
 USER_DISK_NODEV=""
 
 # Get $USER_DISK_NODEV & $USER_PART_ID:
