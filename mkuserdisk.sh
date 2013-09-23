@@ -31,13 +31,21 @@ mkud_create_user_partition()
   local PART_ID=$2
   local USER_PART="${USER_DISK}${PART_ID}"
 
-  local EMPTY_PARTITION_TABLE=0
+  if ! mkud_get_partitions |grep -q "${USER_DISK_NODEV}${PART_ID}" || [ $CLEAN -eq 1 ]; then
+    local EMPTY_PARTITION_TABLE=0
+    # FIXME: What about already empty second disk?
+    if [ "$CLEAN" = "1" ] && [ -n "$TARGET_DEVICES" -o -n "$TARGET_NODEV" ] && \
+       ! echo "$TARGET_DEVICES" |grep -q -e " $USER_DISK " -e "^$USER_DISK " -e " $USER_DISK$" && \
+       ! echo "$TARGET_NODEV" |grep -q -e " $USER_DISK_NODEV " -e "^$USER_DISK_NODEV " -e " $USER_DISK_NODEV$"; then
+      EMPTY_PARTITION_TABLE=1
+    fi
 
-  if [ "$CLEAN" = "1" ] && ! echo "$TARGET_DEVICES" |grep -q -e " $USER_DISK " -e "^$USER_DISK " -e " $USER_DISK$" && ! echo "$TARGET_NODEV" |grep -q -e " $USER_DISK_NODEV " -e "^$USER_DISK_NODEV " -e " $USER_DISK_NODEV$"; then
-    EMPTY_PARTITION_TABLE=1
-  fi
+    # Check whether device already contains partitions
+    local PARTITIONS_FOUND=`mkud_get_partitions |grep -E -x "${USER_DISK_NODEV}p?[0-9]+"`
+    if [ -z "$PARTITIONS_FOUND" ]; then
+      EMPTY_PARTITION_TABLE=1
+    fi
 
-  if ! mkud_get_partitions |grep -q "${USER_DISK_NODEV}${PART_ID}" || [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
     echo "* Creating user NTFS partition $USER_PART"
 
     # Create NTFS partition:
@@ -57,15 +65,15 @@ mkud_create_user_partition()
                 "
     else
       FDISK_CMD="n
-p
-$PART_ID
+                 p
+                 $PART_ID
 
 
-t
-$PART_ID
-7
-w
-"
+                 t
+                 $PART_ID
+                 7
+                 w
+                "
     fi
 
     echo "$FDISK_CMD" |fdisk $USER_DISK >/dev/null
@@ -75,7 +83,6 @@ w
       read
     fi
 
-    echo ""
     echo "* Creating user NTFS filesystem on $USER_PART"
     if mkntfs -L USER -Q "$USER_PART"; then
       mkdir -p /mnt/windows &&
@@ -113,10 +120,6 @@ mkud_select_disk()
     for DISK in $FIND_DISKS; do
       if [ "$DISK" != "$TARGET_NODEV" ] && ! echo "$TARGET_DEVICES" |grep -q -e " $DISK " -e "^$DISK " -e " $DISK$"; then
         USER_DISK_NODEV="$DISK"
-
-        # Add the disk to restore-image script's target list
-        TARGET_DEVICES="$TARGET_DEVICES /dev/$DISK"
-
         break;
       fi
     done
@@ -152,4 +155,7 @@ if [ -z "$USER_DISK_NODEV" ]; then
   echo "WARNING: No (suitable) disk found for user partition!" >&2
 else
   mkud_create_user_partition $USER_DISK_NODEV $USER_PART_ID
+
+  # Add the disk to restore-image script's target list so its partitions get listed when done
+  TARGET_DEVICES="$TARGET_DEVICES /dev/$USER_DISK_NODEV"
 fi

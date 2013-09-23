@@ -1,4 +1,4 @@
-# !/bin/bash
+#!/bin/bash
 
 MY_VERSION="3.10-BETA11"
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1367,11 +1367,13 @@ TARGET_NODEV=`echo "$TARGET_DEVICE" |sed s,'^/dev/',,`
 USER_TARGET_NODEV="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
-if [ $NO_POST_SH -eq 0 ]; then
+if [ $NO_POST_SH -eq 0 ] && ls *.sh >/dev/null 2>&1; then
+  echo "--------------------------------------------------------------------------------"
   unset IFS
   for script in *.sh; do
     if [ -f "$script" ]; then
       # Source script:
+      echo "* Executing custom script \"$script\""
       . ./"$script"
     fi
   done
