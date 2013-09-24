@@ -76,15 +76,39 @@ get_user_yn()
 }
 
 
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions_with_size()
 {
-  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }' |grep -E "^${DISK_NODEV}[0-9]+"
 }
 
 
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions()
 {
-  get_partitions_with_size |awk '{ print $1 }'
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  get_partitions_with_size "$DISK_NODEV" |awk '{ print $1 }'
+}
+
+
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
+get_partitions_with_size_type()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  IFS=$EOL
+  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+    local TYPE=`blkid -s TYPE -o value "/dev/${PART_NODEV}"`
+    
+    if [ -z "$TYPE" ]; then
+      TYPE="other" # = eg. extended partition, disk device, sr0, loop0 etc.
+    fi
+    echo "$LINE $TYPE"
+  done
 }
 
 
@@ -152,7 +176,40 @@ parted_list()
   fi
 
   return 0
-} 
+}
+
+
+parted_partition_info()
+{
+  local PART="$1"
+  local MATCH=0
+  local TYPE=""
+  
+  local PART_NUM=`echo "$PART" |sed -r -e 's,^[/a-z]*,,' -e 's,^.*p,,'`
+  local DEV=`echo "$PART" |sed -E -e s,"p?${PART_NUM}$",,`
+
+  IFS=$EOL
+  for LINE in `parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+    if ! echo "$LINE" |grep -q ':'; then
+      TYPE="$LINE"
+      MATCH=0
+    fi
+
+    if echo "$LINE" |grep -q "^$DEV:"; then
+      MATCH=1
+    fi
+
+    if [ $MATCH -eq 1 ]; then
+      if echo "$LINE" |grep "^$PART_NUM:"; then
+        echo "$LINE"
+        return 0
+      fi
+    fi
+  done
+
+  echo "WARNING: Parted was unable to retrieve information for partition $PART!" >&2
+  return 1
+}
 
 
 # Setup the ethernet interface
@@ -304,35 +361,34 @@ check_command_warning()
 # Wrapper for partclone to autodetect filesystem and select the proper partclone.*
 partclone_detect()
 {
+  local PART="$1"
   local PARTCLONE_BIN=""
-  local TYPE=""
 
-  # First try GPT
-  TYPE=`sgdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
-  
-  # Fallback to DOS partition table
-  if [ -z "$TYPE" ]; then
-    TYPE=`sfdisk -d 2>/dev/null |grep -E "^$1[[:blank:]]" |sed -r -e s!".*Id= ?"!! -e s!",.*"!!`
-  fi
-
+  local TYPE=`blkid -s TYPE -o value "$PART"` # May try `file -s -b "$PART"` instead but blkid seems to work better
   case $TYPE in
-    # TODO: On Linux we only support ext2/3/4 for now. For eg. btrfs we may need to probe using "fsck -N" or "file -s -b"
-    7|17)                           PARTCLONE_BIN="partclone.ntfs";;
-    1|4|6|b|c|e|11|14|16|1b|1c|1e)  PARTCLONE_BIN="partclone.fat";;
-    fd|83)                          PARTCLONE_BIN="partclone.extfs";;
-    *)                              PARTCLONE_BIN="partclone.dd";;
+    ntfs)                           PARTCLONE_BIN="partclone.ntfs"
+                                    ;;
+    vfat|msdos|fat*)                PARTCLONE_BIN="partclone.fat"
+                                    ;;
+    ext2|ext3|ext4)                 PARTCLONE_BIN="partclone.extfs"
+                                    ;;
+    btrfs)                          PARTCLONE_BIN="partclone.btrfs"
+                                    ;;
+    *)                              PARTCLONE_BIN="partclone.dd"
+                                    ;;
   esac
 
   check_command_error "$PARTCLONE_BIN"
 
   echo "$PARTCLONE_BIN"
+  return 0
 }
 
 
 sanity_check()
 {
   # root check
-  if [ "$(id -u)" != "0" ]; then 
+  if [ "$(id -u)" != "0" ]; then
     printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
     exit 1
   fi
@@ -346,6 +402,7 @@ sanity_check()
   check_command_error fdisk
   check_command_error dd
   check_command_error parted
+  check_command_error blkid
 
   check_command_warning sgdisk
   check_command_warning gdisk
@@ -527,9 +584,9 @@ select_partitions()
         exit 5
       else
         # Does the device contain partitions?
-        # GPT TODO: Replace with parted_list
-        if get_partitions |grep -E -q -x "$DEVICE""p?[0-9]+"; then
-          SELECT_PARTITIONS="${SELECT_PARTITIONS}$(sfdisk -d /dev/$DEVICE 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+        if get_partitions |grep -E -q -x "${DEVICE}p?[0-9]+"; then
+          local FIND_PARTITIONS=`get_partitions_with_size_type /dev/$DEVICE |grep -v -e ' swap$' -e ' other$' -e ' unknown$' |awk '{ printf ("%s ",$1) }')`
+          SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
         else
           SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${DEVICE}"
         fi
@@ -537,8 +594,8 @@ select_partitions()
     done
   else
     # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-    # GPT TODO: Replace with parted_list
-    SELECT_PARTITIONS="${SELECT_PARTITIONS}$(sfdisk -d 2>/dev/null |grep '^/dev/' |grep -v -i -e 'Id= 0' -e 'Id= 5' -e 'Id= f' -e 'Id=85' -e 'Id=82' |sed 's,^/dev/,,' |awk '{ printf ("%s ",$1) }')"
+    local FIND_PARTITIONS=`get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$' |awk '{ printf ("%s ",$1) }')`
+    SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
   fi
 
   # Check which partitions to backup, we ignore mounted ones
@@ -565,7 +622,7 @@ backup_partitions()
   # Backup all specified partitions:
   unset IFS
   for PART in $BACKUP_PARTITIONS; do
-    retval=0
+    local retval=1
     case "$IMAGE_PROGRAM" in
       fsa)  TARGET_FILE="$PART.fsa"
             printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
@@ -579,11 +636,13 @@ backup_partitions()
             ;;
       pc)   TARGET_FILE="$PART.pc.gz"
             PARTCLONE=`partclone_detect "/dev/$PART"`
-            printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            { $PARTCLONE -c -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
-            retval=$?
-            if [ $retval -eq 0 ]; then
-              retval=`cat /tmp/.partclone.exitcode`
+            if [ -n "$PARTCLONE" ]; then
+              printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+              { $PARTCLONE -c -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+              retval=$?
+              if [ $retval -eq 0 ]; then
+                retval=`cat /tmp/.partclone.exitcode`
+              fi
             fi
             ;;
       ddgz) TARGET_FILE="$PART.dd.gz"
@@ -665,37 +724,34 @@ backup_disks()
       do_exit 8
     fi
 
-    SGDISK_OUTPUT=`sgdisk -d /dev/$HDD_NODEV 2>/dev/null`
-    if [ -n "$SGDISK_OUTPUT" ]; then
+    SFDISK_OUTPUT=`sfdisk -d /dev/$HDD_NODEV 2>/dev/null`
+    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee$'; then
       # GPT partition table found
       echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.$HDD_NODEV..."
-      echo "$SGDISK_OUTPUT" > "sgdisk.$HDD_NODEV"
+      sgdisk --backup="sgdisk.${HDD_NODEV}" /dev/$HDD_NODEV
 
       # Dump gdisk -l info to file
       gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${HDD_NODEV}"
+    elif [ -n "$SFDISK_OUTPUT" ]; then
+      # DOS partition table found
+      echo "* Storing DOS partition table for /dev/$HDD_NODEV in sfdisk.$HDD_NODEV..."
+      echo "$SFDISK_OUTPUT" > "sfdisk.$HDD_NODEV"
+
+      # FIXME: Legacy. Must be removed in future releases
+      cp "sfdisk.${HDD_NODEV}" "partitions.${HDD_NODEV}"
+
+      # Dump fdisk -l info to file
+      fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${HDD_NODEV}"
     else
-      SFDISK_OUTPUT=`sfdisk -d /dev/$HDD_NODEV 2>/dev/null`
-      if [ -n "$SFDISK_OUTPUT" ]; then
-        # DOS partition table found
-        echo "* Storing DOS partition table for /dev/$HDD_NODEV in sfdisk.$HDD_NODEV..."
-        echo "$SFDISK_OUTPUT" > "sfdisk.$HDD_NODEV"
-
-        # FIXME: Legacy. Must be removed in future releases
-        cp "sfdisk.${HDD_NODEV}" "partitions.${HDD_NODEV}"
-
-        # Dump fdisk -l info to file
-        fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${HDD_NODEV}"
-      else
-        printf "\033[40m\033[1;31mERROR: Unable to obtain GPT or DOS partition table for /dev/$HDD_NODEV! Quitting...\n\033[0m" >&2
-        do_exit 9
-      fi
+      printf "\033[40m\033[1;31mERROR: Unable to obtain GPT or DOS partition table for /dev/$HDD_NODEV! Quitting...\n\033[0m" >&2
+      do_exit 9
     fi
 
     # Use wrapped function to only get info for this device
     parted_list "/dev/${HDD_NODEV}" >"parted.${HDD_NODEV}"
 
     # Dump device partitions as reported by the kernel
-    get_partitions_with_size |grep -E "^${HDD_NODEV}p?[0-9]+" >"proc_partitions.${HDD_NODEV}"
+    get_partitions_with_size_type "$HDD_NODEV" >"proc_partitions.${HDD_NODEV}"
   done
 }
 
