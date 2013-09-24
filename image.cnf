@@ -38,4 +38,4 @@ IMAGE_BACKUP_DIR="temp"
 DEFAULT_IMAGE_PROGRAM="pc"
 
 # Optional custom script to run when backing up
-BACKUP_CUSTOM_SCRIPT="$(dirname $0)/backup-custom-script.sh"
+BACKUP_CUSTOM_SCRIPT="$(dirname $0)/custom-backup-script.sh"
