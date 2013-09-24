@@ -245,7 +245,7 @@ configure_network()
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        if ! get_answer_yn "\n* Setup interface $CUR_IF statically (Y/N)? "; then
+        if ! get_user_yn "\n* Setup interface $CUR_IF statically (Y/N)? "; then
           continue;
         fi
 
@@ -874,7 +874,7 @@ fi
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   echo ""
   find . -maxdepth 1 -type f -exec ls -l {} \;
-  if get_answer_yn "Image target directory is NOT empty. PURGE directory before continueing (Y/N) (CTRL-C to abort)? "; then
+  if get_user_yn "Image target directory is NOT empty. PURGE directory before continueing (Y/N) (CTRL-C to abort)? "; then
     find . -maxdepth 1 -type f -exec rm -vf {} \;
   fi
   echo ""
