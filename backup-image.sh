@@ -408,11 +408,7 @@ sanity_check()
   [ "$IMAGE_PROGRAM" = "pi" ] && check_command_error partimage
   
   if [ "$IMAGE_PROGRAM" = "pc" -o "$IMAGE_PROGRAM" = "ddgz" ]; then
-    if check_command pigz; then
-      GZIP="pigz"
-    else
-      GZIP="gzip"
-    fi
+    GZIP="gzip"
   fi
 
   if [ "$IMAGE_PROGRAM" = "pc" ]; then
@@ -739,13 +735,13 @@ show_help()
   echo "--help|-h                   - Print this help"
   echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all) or \"none\" for no partitions at all"
   echo "--conf|-c={config_file}     - Specify alternate configuration file"
-  echo "--compression|-z=level      - Set gzip/pigz compression level (when used). 1=Low but fast (default), 9=High but slow"
+  echo "--compression|-z=level      - Set gzip compression level (when used). 1=Low but fast (default), 9=High but slow"
   echo "--notrack0                  - Don't backup any track0(MBR)/partition-tables"
   echo "--noconf                    - Don't read the config file"
   echo "--fsa                       - Use fsarchiver for imaging"
   echo "--pi                        - Use partimage for imaging"
-  echo "--pc                        - Use partclone + gzip/pigz for imaging"
-  echo "--ddgz                      - Use dd + gzip/pigz for imaging"
+  echo "--pc                        - Use partclone + gzip for imaging"
+  echo "--ddgz                      - Use dd + gzip for imaging"
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
   echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts"
@@ -948,7 +944,7 @@ fi
 if [ -n "$(find . -maxdepth 1 -type f -iname "*\.gz*" 2>/dev/null)" ]; then
   echo ""
   echo "Verifying .gz images (CTRL-C to break):"
-  # Use gzip here as pigz seems to hang on broken archives:
+  # Note that pigz seems to hang on broken archives, therefor use gzip
   gzip -tv *\.gz*
 fi
 

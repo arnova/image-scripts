@@ -1027,17 +1027,11 @@ check_image_files()
       partimage ) check_command_error partimage
                   ;;
       partclone ) check_command_error partclone.restore
-                  if check_command pigz; then
-                    GZIP="pigz"
-                  elif check_command_error gzip; then
-                    GZIP="gzip"
-                  fi
+                  check_command_error gzip
+                  GZIP="gzip"
                   ;;
-      ddgz      ) if check_command pigz; then
-                    GZIP="pigz"
-                  elif check_command_error gzip; then
-                    GZIP="gzip"
-                  fi
+      ddgz      ) check_command_error gzip; then
+                  GZIP="gzip"
                   ;;
     esac
   done
