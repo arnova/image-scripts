@@ -112,6 +112,18 @@ get_partitions_with_size_type()
 }
 
 
+# Get disk (device) on which specified partition resides
+# $1 = partition device
+get_partition_disk()
+{
+  local PART_NODEV=`echo "$1" |sed -e s,'^/dev/',,`
+  local PART_NUM=`echo "$PART_NODEV" |sed -r -e 's,^[/a-z]*,,' -e 's,^.*p,,'`
+
+  # Strip of partition number to get the disk device:
+  echo "$PART_NODEV" |sed -E -e s,"p?${PART_NUM}$",,
+}
+
+
 parted_list_fancy()
 {
   local DEV="$1"
@@ -184,7 +196,7 @@ parted_partition_info()
   local PART="$1"
   local MATCH=0
   local TYPE=""
-  
+
   local PART_NUM=`echo "$PART" |sed -r -e 's,^[/a-z]*,,' -e 's,^.*p,,'`
   local DEV=`echo "$PART" |sed -E -e s,"p?${PART_NUM}$",,`
 
@@ -673,28 +685,16 @@ select_disks()
 {
   BACKUP_DISKS=""
 
-  # Scan all devices/HDDs
-  local HDD_NODEV=""
   IFS=$EOL
-  # GPT TODO: Replace with get_partitions
-  for LINE in $(sfdisk -d 2>/dev/null |grep -e '/dev/'); do
-    if echo "$LINE" |grep -q '^# '; then
-      HDD_NODEV="$(echo "$LINE" |sed 's,.*/dev/,,')"
-    elif [ -n "$HDD_NODEV" ]; then
-      unset IFS
-      for PART in $BACKUP_PARTITIONS; do
-        if echo "$LINE" |grep -E -q "^/dev/$PART[[:blank:]]"; then
-          echo "* Including /dev/$HDD_NODEV for backup:"
+  for PART in $BACKUP_PARTITIONS; do
+    local HDD_NODEV=`get_partition_disk "$PART"`
+    if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
+      echo "* Including /dev/$HDD_NODEV for backup:"
 
-          parted_list_fancy "/dev/$HDD_NODEV" |grep -e '^Disk /dev/' -e 'Model: ' |sed s,'^',' ',
-          echo ""
+      parted_list_fancy "/dev/$HDD_NODEV" |grep -e '^Disk /dev/' -e 'Model: ' |sed s,'^',' ',
+      echo ""
 
-          BACKUP_DISKS="${BACKUP_DISKS}${HDD_NODEV} "
-
-          # Mark HDD as done
-          HDD_NODEV=""
-        fi
-      done
+      BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
     fi
   done
 
