@@ -137,7 +137,7 @@ parted_list_fancy()
   local MATCH=0
 
   IFS=$EOL
-  for LINE in `parted --list 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+  for LINE in `echo "OK" |parted --list 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
     if echo "$LINE" |grep -q '^Model: '; then
       MATCH=0
       MODEL="$LINE"
@@ -171,7 +171,7 @@ parted_list()
   local TYPE=""
 
   IFS=$EOL
-  for LINE in `parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+  for LINE in `echo "OK" |parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
     if ! echo "$LINE" |grep -q ':'; then
       TYPE="$LINE"
       MATCH=0
@@ -207,7 +207,7 @@ parted_partition_info()
   local DEV=`echo "$PART" |sed -E -e s,"p?${PART_NUM}$",,`
 
   IFS=$EOL
-  for LINE in `parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
+  for LINE in `echo "OK" |parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
     if ! echo "$LINE" |grep -q ':'; then
       TYPE="$LINE"
       MATCH=0
