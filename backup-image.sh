@@ -197,39 +197,6 @@ parted_list()
 }
 
 
-parted_partition_info()
-{
-  local PART="$1"
-  local MATCH=0
-  local TYPE=""
-
-  local PART_NUM=`echo "$PART" |sed -r -e 's,^[/a-z]*,,' -e 's,^.*p,,'`
-  local DEV=`echo "$PART" |sed -E -e s,"p?${PART_NUM}$",,`
-
-  IFS=$EOL
-  for LINE in `echo "OK" |parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
-    if ! echo "$LINE" |grep -q ':'; then
-      TYPE="$LINE"
-      MATCH=0
-    fi
-
-    if echo "$LINE" |grep -q "^$DEV:"; then
-      MATCH=1
-    fi
-
-    if [ $MATCH -eq 1 ]; then
-      if echo "$LINE" |grep "^$PART_NUM:"; then
-        echo "$LINE"
-        return 0
-      fi
-    fi
-  done
-
-  echo "WARNING: Parted was unable to retrieve information for partition $PART!" >&2
-  return 1
-}
-
-
 # Setup the ethernet interface
 configure_network()
 {
@@ -447,8 +414,6 @@ sanity_check()
 }
 
 
-
-
 # mkdir + sanity check (cd) access to it
 mkdir_safe()
 {
@@ -603,7 +568,7 @@ select_partitions()
       else
         # Does the device contain partitions?
         if get_partitions |grep -E -q -x "${DEVICE}p?[0-9]+"; then
-          local FIND_PARTITIONS=`get_partitions_with_size_type /dev/$DEVICE |grep -v -e ' swap$' -e ' other$' -e ' unknown$' |awk '{ printf ("%s ",$1) }')`
+          local FIND_PARTITIONS=`get_partitions_with_size_type /dev/$DEVICE |grep -v -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$' |awk '{ printf ("%s ",$1) }')`
           SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
         else
           SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${DEVICE}"
@@ -612,7 +577,7 @@ select_partitions()
     done
   else
     # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-    local FIND_PARTITIONS=`get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$' |awk '{ printf ("%s ",$1) }'`
+    local FIND_PARTITIONS=`get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$'  -e ' squashfs$' |awk '{ printf ("%s ",$1) }'`
     SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
   fi
 
@@ -691,7 +656,7 @@ select_disks()
 {
   BACKUP_DISKS=""
 
-  IFS=$EOL
+  IFS=' '
   for PART in $BACKUP_PARTITIONS; do
     local HDD_NODEV=`get_partition_disk "$PART"`
     if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
