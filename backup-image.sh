@@ -931,9 +931,9 @@ fi
 echo ""
 
 # Run custom script, if specified
-if [ $NO_CUSTOM_SH -eq 0 -a -n "$BACKUP_CUSTOM_SCRIPT" -a -e "$BACKUP_CUSTOM_SCRIPT" ]; then
+if [ $NO_CUSTOM_SH -eq 0 -a -n "$BACKUP_CUSTOM_SCRIPT" -a -f "$BACKUP_CUSTOM_SCRIPT" ]; then
   # Source script:
-  . ./"$BACKUP_CUSTOM_SCRIPT"
+  . "$BACKUP_CUSTOM_SCRIPT"
 fi
 
 # Backup disk partitions/MBR's etc. :

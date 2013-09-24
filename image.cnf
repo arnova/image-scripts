@@ -37,6 +37,5 @@ IMAGE_BACKUP_DIR="temp"
 # ddgz - dd + gzip
 DEFAULT_IMAGE_PROGRAM="pc"
 
-# Optional custom script to run at the end of the backup script
-BACKUP_POST_SCRIPT=""
-
+# Optional custom script to run when backing up
+BACKUP_CUSTOM_SCRIPT="$(dirname $0)/backup-custom-script.sh"
