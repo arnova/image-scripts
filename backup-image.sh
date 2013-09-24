@@ -197,6 +197,12 @@ parted_list()
 }
 
 
+show_block_device_info()
+{
+  echo "$(cat /sys/class/block/$1/device/model) Size: $((`cat /sys/class/block/$1/size` / 2 / 1024 / 1024))GiB"
+}
+
+
 # Setup the ethernet interface
 configure_network()
 {
@@ -660,11 +666,7 @@ select_disks()
   for PART in $BACKUP_PARTITIONS; do
     local HDD_NODEV=`get_partition_disk "$PART"`
     if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
-      echo "* Including /dev/$HDD_NODEV for backup:"
-
-      parted_list_fancy "/dev/$HDD_NODEV" |grep -e '^Disk /dev/' -e 'Model: ' |sed s,'^',' ',
-      echo ""
-
+      echo "* Including /dev/$HDD_NODEV for backup: $(show_block_device_info)"
       BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
     fi
   done

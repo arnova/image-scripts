@@ -156,6 +156,12 @@ parted_list()
 }
 
 
+show_block_device_info()
+{
+  echo "$(cat /sys/class/block/$1/device/model) Size: $((`cat /sys/class/block/$1/size` / 2 / 1024 / 1024))GiB"
+}
+
+
 # Setup the ethernet interface
 configure_network()
 {
@@ -765,7 +771,7 @@ check_disks()
     # Make sure kernel doesn't use old partition table
     if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
       echo ""
-      parted_list_fancy "/dev/$TARGET_NODEV" |grep -e '^Disk /dev/' -e 'Model: ' |sed s,'^',' ',
+      echo "/dev/$TARGET_NODEV: $(show_block_device_info /dev/$TARGET_NODEV)"
       printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override. Quitting...\n\033[0m" >&2
       do_exit 5;
     fi
@@ -1086,8 +1092,7 @@ show_target_devices()
 {
   IFS=' '
   for DEV in $TARGET_DEVICES; do
-    echo "* Using (target) device:"
-    parted_list_fancy $DEV |grep -e '^Disk /dev/' -e 'Model: ' |sed s,'^',' ',
+    echo "* Using (target) device /dev/$HDD_NODEV: $(show_block_device_info)"
     echo ""
   done
 }
