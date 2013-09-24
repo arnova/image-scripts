@@ -773,6 +773,7 @@ show_help()
   echo "--ddgz                      - Use dd + gzip/pigz for imaging"
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
+  echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts"
 }
 
 
@@ -790,6 +791,7 @@ load_config()
   GZIP_COMPRESSION=1
   NO_MOUNT=0
   NO_TRACK0=0
+  NO_CUSTOM_SH=0
 
   # Check arguments
   unset IFS
@@ -809,6 +811,7 @@ load_config()
       --nonet|-n) NO_NET=1;;
       --nomount|-m) NO_MOUNT=1;;
       --noconf) NO_CONF=1;;
+      --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
       --help) show_help; exit 3;;
       -*) echo "Bad argument: $ARGNAME"
           show_help
@@ -927,6 +930,12 @@ if [ -n "$DESCRIPTION" ]; then
 fi
 echo ""
 
+# Run custom script, if specified
+if [ $NO_CUSTOM_SH -eq 0 -a -n "$BACKUP_CUSTOM_SCRIPT" -a -e "$BACKUP_CUSTOM_SCRIPT" ]; then
+  # Source script:
+  . ./"$BACKUP_CUSTOM_SCRIPT"
+fi
+
 # Backup disk partitions/MBR's etc. :
 if [ $NO_TRACK0 -ne 1 ]; then
   backup_disks;
@@ -949,12 +958,6 @@ find . -maxdepth 1 -type f -exec chmod 664 {} \;
 echo "* Target directory contents($IMAGE_DIR):"
 ls -l
 echo ""
-
-# Run custom script, if specified
-if [ -n "$BACKUP_POST_SCRIPT" ]; then
-  # Source script:
-  . "$BACKUP_POST_SCRIPT"
-fi
 
 if [ -n "$FAILED" ]; then
   echo "* Partitions FAILED to backup: $FAILED"

@@ -115,7 +115,10 @@ parted_list_fancy()
 
   if [ $FOUND -eq 0 ]; then
     echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
+    return 1
   fi
+
+  return 0
 }
 
 
@@ -146,7 +149,10 @@ parted_list()
 
   if [ $FOUND -eq 0 ]; then
     echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
+    return 1
   fi
+
+  return 0
 }
 
 
@@ -1184,7 +1190,7 @@ show_help()
   echo "--nonet|-n                  - Don't try to setup networking"
   echo "--nomount|-m                - Don't mount anything"
   echo "--noimage                   - Don't restore any images, only do partition/MBR operations"
-  echo "--nopostsh|--nosh           - Don't execute any post image shell scripts"
+  echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts"
   echo "--add                       - Add partition entries (don't overwrite like with --clean)"
 }
 
@@ -1204,7 +1210,7 @@ load_config()
   NO_CONF=0
   MBR_WRITE=0
   PT_WRITE=0
-  NO_POST_SH=0
+  NO_CUSTOM_SH=0
   NO_MOUNT=0
   FORCE=0
   PT_ADD=0
@@ -1229,7 +1235,7 @@ load_config()
       --mbr) MBR_WRITE=1;;
       --pt) PT_WRITE=1;;
       --add) PT_ADD=1;;
-      --nopostsh|--nosh) NO_POST_SH=1;;
+      --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
       --noimage|--noim) NO_IMAGE=1;;
       --help|-h) show_help; exit 3;;
       -*) echo "Bad argument: $ARGNAME" >&2
@@ -1367,7 +1373,7 @@ TARGET_NODEV=`echo "$TARGET_DEVICE" |sed s,'^/dev/',,`
 USER_TARGET_NODEV="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
-if [ $NO_POST_SH -eq 0 ] && ls *.sh >/dev/null 2>&1; then
+if [ $NO_CUSTOM_SH -eq 0 ] && ls *.sh >/dev/null 2>&1; then
   echo "--------------------------------------------------------------------------------"
   unset IFS
   for script in *.sh; do
