@@ -199,7 +199,9 @@ parted_list()
 
 show_block_device_info()
 {
-  echo "$(cat /sys/class/block/$1/device/model) Size: $((`cat /sys/class/block/$1/size` / 2 / 1024 / 1024))GiB"
+  local DEVICE=`echo "$1" |sed s,'^/dev/',,`
+
+  echo "$(cat /sys/class/block/${DEVICE}/device/model |sed s/' *$'//) Size: $((`cat /sys/class/block/${DEVICE}/size` / 2 / 1024 / 1024)) GiB"
 }
 
 
@@ -666,7 +668,7 @@ select_disks()
   for PART in $BACKUP_PARTITIONS; do
     local HDD_NODEV=`get_partition_disk "$PART"`
     if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
-      echo "* Including /dev/$HDD_NODEV for backup: $(show_block_device_info)"
+      echo "* Including /dev/$HDD_NODEV for backup: $(show_block_device_info $HDD_NODEV)"
       BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
     fi
   done

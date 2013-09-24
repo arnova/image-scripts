@@ -158,7 +158,9 @@ parted_list()
 
 show_block_device_info()
 {
-  echo "$(cat /sys/class/block/$1/device/model) Size: $((`cat /sys/class/block/$1/size` / 2 / 1024 / 1024))GiB"
+  local DEVICE=`echo "$1" |sed s,'^/dev/',,`
+
+  echo "$(cat /sys/class/block/${DEVICE}/device/model |sed s/' *$'//) Size: $((`cat /sys/class/block/${DEVICE}/size` / 2 / 1024 / 1024)) GiB"
 }
 
 
@@ -771,7 +773,7 @@ check_disks()
     # Make sure kernel doesn't use old partition table
     if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
       echo ""
-      echo "/dev/$TARGET_NODEV: $(show_block_device_info /dev/$TARGET_NODEV)"
+      echo "/dev/$TARGET_NODEV: $(show_block_device_info $TARGET_NODEV)"
       printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override. Quitting...\n\033[0m" >&2
       do_exit 5;
     fi
@@ -1092,7 +1094,7 @@ show_target_devices()
 {
   IFS=' '
   for DEV in $TARGET_DEVICES; do
-    echo "* Using (target) device /dev/$HDD_NODEV: $(show_block_device_info)"
+    echo "* Using (target) device /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
     echo ""
   done
 }
