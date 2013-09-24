@@ -81,14 +81,20 @@ get_partitions_with_size()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
-  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }' |grep -E "^${DISK_NODEV}[0-9]+"
+  local FIND_PARTS=`cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'`
+  
+  if [ -n "$DISK_NODEV" ]; then
+    echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}[0-9]+"
+  else
+    echo "$FIND_PARTS" # Show all
+  fi
 }
 
 
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local DISK_NODEV="$1"
 
   get_partitions_with_size "$DISK_NODEV" |awk '{ print $1 }'
 }
@@ -97,7 +103,7 @@ get_partitions()
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions_with_size_type()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local DISK_NODEV="$1"
 
   IFS=$EOL
   get_partitions_with_size "$DISK_NODEV" |while read LINE; do
@@ -606,7 +612,7 @@ select_partitions()
     done
   else
     # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-    local FIND_PARTITIONS=`get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$' |awk '{ printf ("%s ",$1) }')`
+    local FIND_PARTITIONS=`get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$' |awk '{ printf ("%s ",$1) }'`
     SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
   fi
 
