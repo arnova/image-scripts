@@ -1030,7 +1030,7 @@ check_image_files()
                   check_command_error gzip
                   GZIP="gzip"
                   ;;
-      ddgz      ) check_command_error gzip; then
+      ddgz      ) check_command_error gzip
                   GZIP="gzip"
                   ;;
     esac
