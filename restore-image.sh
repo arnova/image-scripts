@@ -1087,8 +1087,8 @@ check_partitions()
 show_target_devices()
 {
   IFS=' '
-  for DEV in $TARGET_DEVICES; do
-    echo "* Using (target) device /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
+  for DEVICE in $TARGET_DEVICES; do
+    echo "* Using (target) device $DEVICE: $(show_block_device_info $DEVICE)"
     echo ""
   done
 }
@@ -1369,7 +1369,7 @@ if [ $CLEAN -eq 1 ]; then
 fi
 
 # Set this for legacy scripts:
-TARGET_DEVICE=`echo "$TARGET_DEVICES" |cut -f1 -d' '` # Pick the first device as target (probably sda)
+TARGET_DEVICE=`echo "$TARGET_DEVICES" |cut -f1 -d' '` # Pick the first device (probably sda)
 TARGET_NODEV=`echo "$TARGET_DEVICE" |sed s,'^/dev/',,`
 USER_TARGET_NODEV="$TARGET_NODEV"
 
