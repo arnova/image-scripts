@@ -825,7 +825,7 @@ check_disks()
     fi
 
     local ENTER=0
-    if [ $CLEAN -eq 0 ]; then
+    if [ $CLEAN -eq 0 -a -n "$PARTITIONS_FOUND" ]; then
       if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
         echo "" >&2
         printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table/MBR, it will NOT be updated!\n\033[0m" >&2
