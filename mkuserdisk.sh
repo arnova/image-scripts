@@ -26,9 +26,7 @@ mkud_get_partitions()
 
 mkud_create_user_partition()
 {
-  local USER_DISK_NODEV=$1
-  local USER_DISK="/dev/$1"
-  local PART_ID=$2
+  local PART_ID=$USER_PART_ID
   local USER_PART="${USER_DISK}${PART_ID}"
 
   local PARTITIONS_FOUND=`mkud_get_partitions |grep -E -x "${USER_DISK_NODEV}p?[0-9]+"`
@@ -119,7 +117,7 @@ mkud_select_disk()
   if [ $(echo "$FIND_DISKS" |wc -w) -gt 1 ]; then
     IFS=' '
     for DISK in $FIND_DISKS; do
-      if [ "$DISK" != "$TARGET_NODEV" ] && ! echo "$TARGET_DEVICES" |grep -q -e " $DISK " -e "^$DISK " -e " $DISK$"; then
+      if [ "$DISK" != "$TARGET_NODEV" ] && ! echo "$TARGET_DEVICES" |grep -q -e " ${DISK} " -e "^${DISK} " -e "^${DISK}$" -e " ${DISK}$"; then
         USER_DISK_NODEV="$DISK"
         break;
       fi
@@ -146,8 +144,11 @@ mkud_select_disk;
 if [ -z "$USER_DISK_NODEV" ]; then
   echo "WARNING: No (suitable) disk found for user partition!" >&2
 else
-  mkud_create_user_partition $USER_DISK_NODEV $USER_PART_ID
+  USER_DISK="/dev/${USER_DISK_NODEV}"
+  mkud_create_user_partition
 
   # Add the disk to restore-image script's target list so its partitions get listed when done
-  TARGET_DEVICES="$TARGET_DEVICES /dev/$USER_DISK_NODEV"
+  if ! echo "$TARGET_DEVICES" |grep -q -e " ${USER_DISK} " -e "^${USER_DISK} " -e "^${USER_DISK}$" -e " ${USER_DISK}$"; then
+    TARGET_DEVICES="$TARGET_DEVICES $USER_DISK"
+  fi
 fi
