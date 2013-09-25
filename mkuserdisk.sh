@@ -86,13 +86,13 @@ mkud_create_user_partition()
 
     echo "* Creating user NTFS filesystem on $USER_PART"
     if mkntfs -L USER -Q "$USER_PART"; then
-      mkdir -p /mnt/windows &&
-      ntfs-3g "$USER_PART" /mnt/windows &&
-      mkdir "/mnt/windows/temp" &&
-      mkdir "/mnt/windows/My Documents" &&
-      mkdir "/mnt/windows/Program Files" &&
-      mkdir "/mnt/windows/Downloads"
-      
+      if mkdir -p /mnt/windows && ntfs-3g "$USER_PART" /mnt/windows; then
+        mkdir "/mnt/windows/My Documents"
+        mkdir "/mnt/windows/Downloads"
+        mkdir "/mnt/windows/temp"
+#        mkdir "/mnt/windows/Program Files"
+      fi
+
       umount /mnt/windows
     else
       printf "\033[40m\033[1;31mERROR: Creating NTFS filesystem on $USER_PART failed!\033[0m\n" >&2
