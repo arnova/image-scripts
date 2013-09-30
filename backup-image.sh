@@ -783,7 +783,9 @@ load_config()
                                    --nomount|-m) NO_MOUNT=1;;
                                        --noconf) NO_CONF=1;;
                             --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
-                                         --help) show_help; exit 3;;
+                                         --help) show_help;
+                                                 exit 0
+                                                 ;;
                                              -*) echo "Bad argument: $ARGNAME" >&2
                                                  show_help;
                                                  exit 4

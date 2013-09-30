@@ -1241,7 +1241,7 @@ load_config()
                                --help|-h) show_help; exit 3;;
                                       -*) echo "Bad argument: $ARGNAME" >&2
                                           show_help;
-                                          exit 4
+                                          exit 0
                                           ;;
                                        *) if [ -z "$IMAGE_NAME" ]; then
                                             IMAGE_NAME="$arg"
