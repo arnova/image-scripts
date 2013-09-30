@@ -1174,25 +1174,25 @@ create_swaps()
 
 show_help()
 {
-  echo "Usage: restore-image.sh [options] [image-name]"
-  echo ""
-  echo "Options:"
-  echo "--help|-h                   - Print this help"
-  echo "--dev|-d={dev1,dev2}        - Restore image to target device(s) (instead of default). Optionally use source:/dev/target"
-  echo "                              like sdb:/dev/sda or sdb1:/dev/sda to restore to a different device/partition"
-  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all"
-  echo "--conf|-c={config_file}     - Specify alternate configuration file"
-  echo "--noconf                    - Don't read the config file"
-  echo "--mbr                       - Always write a new track0(MBR) (from track0.*)"
-  echo "--pt                        - Always write a new partition-table (from partitions.*)"
-  echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)"
-  echo "--force                     - Continue, even if there are eg. mounted partitions (USE WITH CARE!)"
-  echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty"
-  echo "--nonet|-n                  - Don't try to setup networking"
-  echo "--nomount|-m                - Don't mount anything"
-  echo "--noimage                   - Don't restore any images, only do partition/MBR operations"
-  echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts"
-  echo "--add                       - Add partition entries (don't overwrite like with --clean)"
+  echo "Usage: restore-image.sh [options] [image-name]" >&2
+  echo "" >&2
+  echo "Options:" >&2
+  echo "--help|-h                   - Print this help" >&2
+  echo "--dev|-d={dev1,dev2}        - Restore image to target device(s) (instead of default). Optionally use source:/dev/target" >&2
+  echo "                              like sdb:/dev/sda or sdb1:/dev/sda to restore to a different device/partition" >&2
+  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all" >&2
+  echo "--conf|-c={config_file}     - Specify alternate configuration file" >&2
+  echo "--noconf                    - Don't read the config file" >&2
+  echo "--mbr                       - Always write a new track0(MBR) (from track0.*)" >&2
+  echo "--pt                        - Always write a new partition-table (from partitions.*)" >&2
+  echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)" >&2
+  echo "--force                     - Continue, even if there are eg. mounted partitions (USE WITH CARE!)" >&2
+  echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty" >&2
+  echo "--nonet|-n                  - Don't try to setup networking" >&2
+  echo "--nomount|-m                - Don't mount anything" >&2
+  echo "--noimage                   - Don't restore any images, only do partition/MBR operations" >&2
+  echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts" >&2
+  echo "--add                       - Add partition entries (don't overwrite like with --clean)" >&2
 }
 
 
@@ -1224,33 +1224,33 @@ load_config()
     ARGVAL=`echo "$arg" |cut -d= -f2 -s`
 
     case "$ARGNAME" in
-      --clean|--track0) CLEAN=1;;
-      --force) FORCE=1;;
-      --notrack0) NO_TRACK0=1;;
-      --devices|--device|--dev|-d) DEVICES="$ARGVAL";;
       --partitions|--partition|--part|-p) PARTITIONS="$ARGVAL";;
-      --conf|-c) CONF="$ARGVAL";;
-      --nonet|-n) NO_NET=1;;
-      --nomount|-m) NO_MOUNT=1;;
-      --noconf) NO_CONF=1;;
-      --mbr) MBR_WRITE=1;;
-      --pt) PT_WRITE=1;;
-      --add) PT_ADD=1;;
-      --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
-      --noimage|--noim) NO_IMAGE=1;;
-      --help|-h) show_help; exit 3;;
-      -*) echo "Bad argument: $ARGNAME" >&2
-          show_help
-          exit 4
-          ;;
-       *) if [ -z "$IMAGE_NAME" ]; then
-            IMAGE_NAME="$arg"
-          else
-            echo "Bad command syntax" >&2
-            show_help;
-            exit 4
-          fi
-          ;;
+             --devices|--device|--dev|-d) DEVICES="$ARGVAL";;
+                        --clean|--track0) CLEAN=1;;
+                                 --force) FORCE=1;;
+                              --notrack0) NO_TRACK0=1;;
+                               --conf|-c) CONF="$ARGVAL";;
+                              --nonet|-n) NO_NET=1;;
+                            --nomount|-m) NO_MOUNT=1;;
+                                --noconf) NO_CONF=1;;
+                                   --mbr) MBR_WRITE=1;;
+                                    --pt) PT_WRITE=1;;
+                                   --add) PT_ADD=1;;
+                     --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
+                        --noimage|--noim) NO_IMAGE=1;;
+                               --help|-h) show_help; exit 3;;
+                                      -*) echo "Bad argument: $ARGNAME" >&2
+                                          show_help;
+                                          exit 4
+                                          ;;
+                                       *) if [ -z "$IMAGE_NAME" ]; then
+                                            IMAGE_NAME="$arg"
+                                          else
+                                            echo "Bad command syntax" >&2
+                                            show_help;
+                                            exit 4
+                                          fi
+                                          ;;
     esac
   done
 

@@ -729,22 +729,22 @@ backup_disks()
 
 show_help()
 {
-  echo "Usage: backup-image.sh [options] [image-name]"
-  echo ""
-  echo "Options:"
-  echo "--help|-h                   - Print this help"
-  echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all) or \"none\" for no partitions at all"
-  echo "--conf|-c={config_file}     - Specify alternate configuration file"
-  echo "--compression|-z=level      - Set gzip compression level (when used). 1=Low but fast (default), 9=High but slow"
-  echo "--notrack0                  - Don't backup any track0(MBR)/partition-tables"
-  echo "--noconf                    - Don't read the config file"
-  echo "--fsa                       - Use fsarchiver for imaging"
-  echo "--pi                        - Use partimage for imaging"
-  echo "--pc                        - Use partclone + gzip for imaging"
-  echo "--ddgz                      - Use dd + gzip for imaging"
-  echo "--nonet|-n                  - Don't try to setup networking"
-  echo "--nomount|-m                - Don't mount anything"
-  echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts"
+  echo "Usage: backup-image.sh [options] [image-name]" >&2
+  echo "" >&2
+  echo "Options:" >&2
+  echo "--help|-h                   - Print this help" >&2
+  echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all) or \"none\" for no partitions at all" >&2
+  echo "--conf|-c={config_file}     - Specify alternate configuration file" >&2
+  echo "--compression|-z=level      - Set gzip compression level (when used). 1=Low but fast (default), 9=High but slow" >&2
+  echo "--notrack0                  - Don't backup any track0(MBR)/partition-tables" >&2
+  echo "--noconf                    - Don't read the config file" >&2
+  echo "--fsa                       - Use fsarchiver for imaging" >&2
+  echo "--pi                        - Use partimage for imaging" >&2
+  echo "--pc                        - Use partclone + gzip for imaging" >&2
+  echo "--ddgz                      - Use dd + gzip for imaging" >&2
+  echo "--nonet|-n                  - Don't try to setup networking" >&2
+  echo "--nomount|-m                - Don't mount anything" >&2
+  echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts" >&2
 }
 
 
@@ -772,30 +772,30 @@ load_config()
 
     case "$ARGNAME" in
       --part|--partitions|-p|--dev|--devices|-d) DEVICES=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
-      --notrack0) NO_TRACK0=1;;
-      --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
-      --conf|-c) CONF="$ARGVAL";;
-      --fsa) IMAGE_PROGRAM="fsa";;
-      --ddgz) IMAGE_PROGRAM="ddgz";;
-      --pi) IMAGE_PROGRAM="pi";;
-      --pc) IMAGE_PROGRAM="pc";;
-      --nonet|-n) NO_NET=1;;
-      --nomount|-m) NO_MOUNT=1;;
-      --noconf) NO_CONF=1;;
-      --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
-      --help) show_help; exit 3;;
-      -*) echo "Bad argument: $ARGNAME"
-          show_help
-          exit 4
-          ;;
-       *) if [ -z "$IMAGE_NAME" ]; then
-            IMAGE_NAME="$arg"
-          else
-            echo "Bad command syntax" >&2
-            show_help
-            exit 4
-          fi
-          ;;
+                                     --notrack0) NO_TRACK0=1;;
+                               --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
+                                      --conf|-c) CONF="$ARGVAL";;
+                                          --fsa) IMAGE_PROGRAM="fsa";;
+                                         --ddgz) IMAGE_PROGRAM="ddgz";;
+                                           --pi) IMAGE_PROGRAM="pi";;
+                                           --pc) IMAGE_PROGRAM="pc";;
+                                     --nonet|-n) NO_NET=1;;
+                                   --nomount|-m) NO_MOUNT=1;;
+                                       --noconf) NO_CONF=1;;
+                            --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
+                                         --help) show_help; exit 3;;
+                                             -*) echo "Bad argument: $ARGNAME" >&2
+                                                 show_help;
+                                                 exit 4
+                                                 ;;
+                                              *) if [ -z "$IMAGE_NAME" ]; then
+                                                   IMAGE_NAME="$arg"
+                                                 else
+                                                   echo "Bad command syntax" >&2
+                                                   show_help;
+                                                   exit 4
+                                                 fi
+                                                 ;;
     esac
   done
 
