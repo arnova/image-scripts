@@ -662,9 +662,12 @@ image_to_target_remap()
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "$TARGET_DEVICE_MAP" ]; then
-      NUM=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^.*p,,'`
+      # FIXME?: Not sure whether this logic works for all cases since some drives have partitions like sda1, sda2 and some like md128p1, md128p2
+      PART=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^[0-9]*p,p,'`
+
       TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-      TARGET_PARTITION="/dev/$(get_partitions |grep -E -x -e "${TARGET_DEVICE_MAP_NODEV}p?${NUM}")"
+
+      TARGET_PARTITION="/dev/${TARGET_DEVICE_MAP_NODEV}${PART}"
       break;
     fi
   done
@@ -794,6 +797,7 @@ check_disks()
       echo ""
     fi
 
+    # TODO: This currently only works for MBR/DOS partition table
     if [ $PT_ADD -eq 1 ]; then
       # Check for sfdisk for this target
       if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
@@ -822,7 +826,6 @@ check_disks()
           do_exit 5
         fi
       fi
-      # TODO: gdisk check for GPT
     fi
 
     local ENTER=0
