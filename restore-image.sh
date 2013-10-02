@@ -424,6 +424,7 @@ sanity_check()
     SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
+    # FIXME: Handle case for --device=/dev/sdc ?
     if [ -n "$TARGET_DEVICE_MAP" ]; then
       if ! echo "$TARGET_DEVICE_MAP" |grep -q '^/dev/'; then
         echo ""
@@ -946,17 +947,32 @@ restore_disks()
       fi
 
       if [ -n "$SFDISK_FILE" ]; then
-        echo "* Updating partition-table on /dev/$TARGET_NODEV"
+        echo "* Updating DOS partition-table on /dev/$TARGET_NODEV"
         sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE"
         retval=$?
           
         if [ $retval -ne 0 ]; then
-          printf "\033[40m\033[1;31mPartition-table restore failed($retval). Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
           echo ""
           do_exit 5
         fi
         PARTPROBE=1
       fi
+      
+      SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
+      if [ -f "$SGDISK_FILE" ]; then
+        echo "* Updating GPT partition-table on /dev/$TARGET_NODEV"
+        sgdisk --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV
+        retval=$?
+          
+        if [ $retval -ne 0 ]; then
+          printf "\033[40m\033[1;31mGPT partition-table restore failed($retval). Quitting...\n\033[0m" >&2
+          echo ""
+          do_exit 5
+        fi
+        PARTPROBE=1
+      fi
+
     fi
     
     if [ $PARTPROBE -eq 1 ]; then
@@ -1157,13 +1173,23 @@ test_target_partitions()
 
 create_swaps()
 {
-  # Run mkswap on swap partitions
+  # Create swap on swap partitions on all used devices
+
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
-    # Create swap on swap partitions on all used devices
+    # MBR/DOS Partitions:
     IFS=$EOL
     sfdisk -d "$DEVICE" 2>/dev/null |grep -i "id=82$" |while read LINE; do
       PART="$(echo "$LINE" |awk '{ print $1 }')"
+      if ! mkswap $PART; then
+        printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
+      fi
+    done
+    
+    # GPT Partitions:
+    IFS=$EOL
+    sgdisk -p "$DEVICE" 2>/dev/null |grep -E -i "[[:blank:]]8200[[:blank:]]*Linux swap$" |while read LINE; do
+      PART="$DEVICE/$(echo "$LINE" |awk '{ print $1 }')"
       if ! mkswap $PART; then
         printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi

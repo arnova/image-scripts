@@ -7,7 +7,7 @@ for PART_NODEV in $BACKUP_PARTITIONS; do
   if [ "$TYPE" = "ntfs" ]; then
     if mkdir -p /mnt/windows && ntfs-3g "/dev/${PART_NODEV}" /mnt/windows; then
       rm -fv /mnt/windows/hiberfil.sys
-      rm -fv /mnt/windows/pagefile.sys
+#      rm -fv /mnt/windows/pagefile.sys
     fi
 
     umount /mnt/windows
