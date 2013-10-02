@@ -707,13 +707,15 @@ source_to_target_remap()
     fi
 
     TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-
-    if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+"; then
-      NUM=`get_partition_number "$IMAGE_PARTITION_NODEV"`
-
-      TARGET_DEVICE=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
-      break;
+    NUM=`get_partition_number "$IMAGE_PARTITION_NODEV"`
+    if [ -n "$NUM" ]; then
+      # Argument is a partition
+      if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+"; then
+        TARGET_DEVICE=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
+        break;
+      fi
     else
+      # Argument is a disk
       TARGET_DEVICE="/dev/${TARGET_DEVICE_MAP_NODEV}"
       break;
     fi
