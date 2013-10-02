@@ -700,7 +700,7 @@ image_to_target_remap()
 
       TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
 
-      TARGET_PARTITION=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${PART}"`
+      TARGET_PARTITION=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
       break;
     fi
   done
