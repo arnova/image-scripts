@@ -455,10 +455,15 @@ sanity_check()
   # Sanity check devices and check if target devices exist
   IFS=','
   for ITEM in $DEVICES; do
-    SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    SOURCE_DEVICE_NODEV=""
 
-    # FIXME: Handle case for --device=/dev/sdc ?
+    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    if [ -z "$TARGET_DEVICE_MAP" ]; then
+      TARGET_DEVICE_MAP="$ITEM"
+    else
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    fi
+
     if [ -n "$TARGET_DEVICE_MAP" ]; then
       if ! echo "$TARGET_DEVICE_MAP" |grep -q '^/dev/'; then
         echo ""
@@ -681,26 +686,35 @@ image_type_detect()
   fi
 }
 
-
-image_to_target_remap()
+# $1 = source without /dev/
+# stdout = target with /dev/
+source_to_target_remap()
 {
-  local IMAGE_PARTITION_NODEV=`echo "$1" |sed 's/\..*//'`
+  local IMAGE_PARTITION_NODEV="$1"
 
   # Set default
-  local TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
+  local TARGET_DEVICE="/dev/$IMAGE_PARTITION_NODEV"
 
   # We want another target device than specified in the image name?:
   IFS=','
   for ITEM in $DEVICES; do
-    SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    SOURCE_DEVICE_NODEV=""
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    if [ -z "$TARGET_DEVICE_MAP" ]; then
+      TARGET_DEVICE_MAP="$ITEM"
+    else
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    fi
 
-    if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "$TARGET_DEVICE_MAP" ]; then
+    TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+
+    if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+"; then
       NUM=`get_partition_number "$IMAGE_PARTITION_NODEV"`
 
-      TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-
-      TARGET_PARTITION=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
+      TARGET_DEVICE=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
+      break;
+    else
+      TARGET_DEVICE="/dev/${TARGET_DEVICE_MAP_NODEV}"
       break;
     fi
   done
@@ -712,12 +726,12 @@ image_to_target_remap()
     TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "$TARGET_PARTITION_MAP" ]; then
-      TARGET_PARTITION="$TARGET_PARTITION_MAP"
+      TARGET_DEVICE="$TARGET_PARTITION_MAP"
       break;
     fi
   done
   
-  echo "$TARGET_PARTITION"
+  echo "$TARGET_DEVICE"
 }
 
 
@@ -780,20 +794,7 @@ check_disks()
   for FN in partitions.*; do
     # Extract drive name from file
     IMAGE_SOURCE_NODEV="$(basename "$FN" |sed s/'.*\.'//)"
-    TARGET_NODEV="$IMAGE_SOURCE_NODEV"
-
-    # Overrule target device?:
-    # We want another target device than specified in the image name?:
-    IFS=','
-    for ITEM in $DEVICES; do
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-      TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-
-      if [ "$SOURCE_DEVICE_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
-        TARGET_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
-        break;
-      fi
-    done
+    TARGET_NODEV=`source_to_target_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
 
     # Check if target device exists
     if ! get_partitions |grep -q -x "$TARGET_NODEV"; then
@@ -1046,7 +1047,8 @@ check_image_files()
       fi
 
       IMAGE_FILE=`basename "$LOOKUP"`
-      TARGET_PARTITION=`image_to_target_remap "$IMAGE_FILE"`
+      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//')`
+      TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
       
       # Add item to list
       IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
@@ -1056,7 +1058,8 @@ check_image_files()
     for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
       # FIXME: Can have multiple images here!
       IMAGE_FILE=`basename "$ITEM"`
-      TARGET_PARTITION=`image_to_target_remap "$IMAGE_FILE"`
+      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
+      TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
 
       # Add item to list
       IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
@@ -1097,6 +1100,8 @@ check_partitions()
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
     TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
+    echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
+
     # Check whether we need to add this to our included devices list
     PART_DISK=`get_partition_disk "$TARGET_PARTITION"`
     if [ -z "$PART_DISK" ]; then
@@ -1126,8 +1131,6 @@ check_partitions()
         do_exit 5
       fi
     fi
-
-    echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
   done
 
   return 0
