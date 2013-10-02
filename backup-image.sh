@@ -570,10 +570,11 @@ select_partitions()
         echo ""
         exit 5
       else
+        local FIND_PARTITIONS=`get_partitions_with_size_type /dev/$DEVICE`
         # Does the device contain partitions?
-        if get_partitions |grep -E -q -x "${DEVICE}p?[0-9]+"; then
-          local FIND_PARTITIONS=`get_partitions_with_size_type /dev/$DEVICE |grep -v -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$' |awk '{ printf ("%s ",$1) }')`
-          SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
+        if [ -n "$FIND_PARTITIONS" ]; then
+          local FILTER_PARTITIONS=`echo "$FIND_PARTITIONS" |grep -v -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$' |awk '{ printf ("%s ",$1) }')`
+          SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FILTER_PARTITIONS}"
         else
           SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${DEVICE}"
         fi

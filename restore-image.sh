@@ -89,6 +89,40 @@ get_partitions()
 }
 
 
+# Get partition number from argument and return to stdout
+get_partition_number()
+{
+  echo "$1" |sed -r -e 's,^[/a-z]*,,' -e 's,^.*p,,'
+}
+
+
+# Add partition number to device and return to stdout
+# $1 = device
+# $2 = number
+add_partition_number()
+{
+  if echo "$1" |grep -q '[0-9]'; then
+    echo "${1}p${2}"
+  else
+    echo "${1}${2}"
+  fi
+}
+
+
+# Figure out to which disk the specified partition ($1) belongs
+get_partition_disk()
+{
+  echo "$1" |sed -r 's,p?[0-9]*$,,'
+}
+
+
+# Get partitions from specified disk
+get_disk_partitions()
+{
+  get_partitions |grep -E -x "${1}p?[0-9]+"
+}
+
+
 parted_list_fancy()
 {
   local DEV="$1"
@@ -651,7 +685,7 @@ image_type_detect()
 image_to_target_remap()
 {
   local IMAGE_PARTITION_NODEV=`echo "$1" |sed 's/\..*//'`
-      
+
   # Set default
   local TARGET_PARTITION="/dev/$IMAGE_PARTITION_NODEV"
 
@@ -662,12 +696,11 @@ image_to_target_remap()
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     if echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+" && [ -n "$TARGET_DEVICE_MAP" ]; then
-      # FIXME?: Not sure whether this logic works for all cases since some drives have partitions like sda1, sda2 and some like md128p1, md128p2
-      PART=`echo "$IMAGE_PARTITION_NODEV" |sed -r -e 's,^[a-z]*,,' -e 's,^[0-9]*p,p,'`
+      NUM=`get_partition_number "$IMAGE_PARTITION_NODEV"`
 
       TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
 
-      TARGET_PARTITION="/dev/${TARGET_DEVICE_MAP_NODEV}${PART}"
+      TARGET_PARTITION=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${PART}"`
       break;
     fi
   done
@@ -784,7 +817,7 @@ check_disks()
     echo ""
 
     # Check whether device already contains partitions
-    PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
+    PARTITIONS_FOUND=`get_disk_partitions "$TARGET_NODEV"`
 
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
@@ -899,7 +932,7 @@ restore_disks()
     TARGET_NODEV=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     # Check whether device already contains partitions
-    PARTITIONS_FOUND=`get_partitions |grep -E -x "${TARGET_NODEV}p?[0-9]+"`
+    PARTITIONS_FOUND=`get_disk_partitions "$TARGET_NODEV"`
 
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
@@ -1065,13 +1098,11 @@ check_partitions()
     TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     # Check whether we need to add this to our included devices list
-    PART_DEV=`echo "$TARGET_PARTITION" |sed -r 's,p?[0-9]*$,,'`
-    if [ -z "$PART_DEV" ]; then
+    PART_DISK=`get_partition_disk "$TARGET_PARTITION"`
+    if [ -z "$PART_DISK" ]; then
       echo "* WARNING: Unable to obtain device for target partition $TARGET_PARTITION" >&2
-    else
-      if ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DEV " -e " $PART_DEV " -e " $PART_DEV$" -e "^PART_DEV$"; then
-        TARGET_DEVICES="${TARGET_DEVICES}${PART_DEV} "
-      fi
+    elif ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DISK " -e " $PART_DISK " -e " $PART_DISK$" -e "^PART_DISK$"; then
+      TARGET_DEVICES="${TARGET_DEVICES}${PART_DISK} "
     fi
     
     # Check for mounted partitions on target device
