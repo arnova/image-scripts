@@ -14,7 +14,7 @@ mkud_get_disks()
 
 mkud_get_partitions_with_size()
 {
-  cat /proc/partitions |sed -e '1,2d' -e 's,^/dev/,,' |awk '{ print $4" "$3 }'
+  cat /proc/partitions |sed -e '1,2d' -e 's, /dev/, ,' |awk '{ print $4" "$3 }'
 }
 
 
