@@ -12,15 +12,25 @@ mkud_get_disks()
 }
 
 
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
 mkud_get_partitions_with_size()
 {
-  cat /proc/partitions |sed -e '1,2d' -e 's, /dev/, ,' |awk '{ print $4" "$3 }'
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  local FIND_PARTS=`cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }'`
+
+  if [ -n "$DISK_NODEV" ]; then
+    echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}p?[0-9]+"
+  else
+    echo "$FIND_PARTS" # Show all
+  fi
 }
 
 
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
 mkud_get_partitions()
 {
-  mkud_get_partitions_with_size |awk '{ print $1 }'
+  mkud_get_partitions_with_size "$1" |awk '{ print $1 }'
 }
 
 
