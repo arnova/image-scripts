@@ -562,9 +562,9 @@ select_partitions()
   if [ -n "$DEVICES" -a "$DEVICES" != "none" ]; then
     unset IFS
     for DEVICE in $DEVICES; do
-      if ! get_partitions |grep -q -x "$DEVICE"; then
+      if [ ! -e "/sys/block/${DEVICE}" ]; then
         echo ""
-        printf "\033[40m\033[1;31mERROR: Specified source device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
+        printf "\033[40m\033[1;31mERROR: Specified source block device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
         echo ""
         exit 5
       else

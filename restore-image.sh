@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA11"
+MY_VERSION="3.10-BETA12"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: September 23, 2013
+# Last update: October 8, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -203,8 +203,30 @@ parted_list()
 show_block_device_info()
 {
   local DEVICE=`echo "$1" |sed s,'^/dev/',,`
+  
+  if ! echo "$DEVICE" |grep -q '^/'; then
+    DEVICE="/sys/class/block/${DEVICE}"
+  fi
 
-  echo "$(cat /sys/class/block/${DEVICE}/device/model |sed s/' *$'//) Size: $((`cat /sys/class/block/${DEVICE}/size` / 2 / 1024 / 1024)) GiB"
+  local VENDOR=$(cat "${DEVICE}/device/vendor"):
+  if [ -n "$VENDOR" ]; then
+    printf "$VENDOR "
+  fi
+
+  local MODEL="$(cat "${DEVICE}/device/model")"
+  if [ -n "$MODEL" ]; then
+    printf "$MODEL "
+  fi
+
+  local REV="$(cat "${DEVICE}/device/rev")"
+  if [ -n "$REV" ]; then
+    printf "$REV "
+  fi
+
+  local SIZE="$(cat "${DEVICE}/size")"
+  if [ -n "$SIZE" ]; then
+    printf "$(($SIZE / 2 / 1024 / 1024)) GiB"
+  fi
 }
 
 
@@ -494,9 +516,9 @@ sanity_check()
       CHECK_DEVICE_NODEV="$SOURCE_DEVICE_NODEV"
     fi
 
-    if ! get_partitions |grep -q -x "$CHECK_DEVICE_NODEV"; then
+    if [ ! -e "/sys/block/${CHECK_DEVICE_NODEV}" ]; then
       echo ""
-      printf "\033[40m\033[1;31mERROR: Specified (target) device /dev/$CHECK_DEVICE_NODEV does NOT exist! Quitting...\n\033[0m" >&2
+      printf "\033[40m\033[1;31mERROR: Specified (target) block device /dev/$CHECK_DEVICE_NODEV does NOT exist! Quitting...\n\033[0m" >&2
       echo ""
       exit 5
     fi
@@ -791,6 +813,41 @@ restore_partitions()
 }
 
 
+user_target_dev_select()
+{
+  local DEFAULT_TARGET_NODEV="$1"
+  printf "Select target device (Default=/dev/$DEFAULT_TARGET_NODEV): "
+  read USER_TARGET_NODEV
+
+  if [ -z "$USER_TARGET_NODEV" ]; then
+    USER_TARGET_NODEV="$DEFAULT_TARGET_NODEV"
+  fi
+
+  # Auto remove /dev/ :
+  if echo "$USER_TARGET_NODEV" |grep -q '^/dev/'; then
+    USER_TARGET_NODEV="$(echo "$USER_TARGET_NODEV" |sed s,'^/dev/',,)"
+  fi
+}
+
+
+show_available_disks()
+{
+  echo "* Available devices/disks:"
+  
+  IFS=$EOL
+  for BLK_DEVICE in /sys/block/*; do
+    DEVICE="/dev/$(echo "$BLK_DEVICE" |sed s,'^/sys/block',,)"
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' || [ ! -e "$DEVICE" ] || [ $(cat "$BLK_DEVICE/size") -eq 0 ]; then
+      continue; # Ignore device
+    fi
+
+    echo "  $DEVICE: $(show_block_device_info $BLK_DEVICE)"
+  done
+
+  echo ""
+}
+
+
 check_disks()
 {
   # Reset global, used by other functions later on:
@@ -798,6 +855,9 @@ check_disks()
   
   # Global used later on when restoring partition-tables etc.
   DEVICE_FILES=""
+  
+  # Show disks/devices available for restoration
+  show_available_disks;
 
   # Restore MBR/track0/partitions
   # FIXME: need to check track0 + images as well here!?
@@ -806,28 +866,40 @@ check_disks()
   for FN in partitions.*; do
     # Extract drive name from file
     IMAGE_SOURCE_NODEV="$(basename "$FN" |sed s/'.*\.'//)"
-    TARGET_NODEV=`source_to_target_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
+    IMAGE_TARGET_NODEV=`source_to_target_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
+    
+    echo "* Select target device for image source device /dev/$IMAGE_SOURCE_NODEV"
 
-    # Check if target device exists
-    if ! get_partitions |grep -q -x "$TARGET_NODEV"; then
+    while true; do
+      user_target_dev_select "$IMAGE_TARGET_NODEV"
+      TARGET_NODEV="$USER_TARGET_NODEV"
+      
+      if [ -z "$TARGET_NODEV" ]; then
+        continue;
+      fi
+
+      # Check if target device exists
+      if [ ! -e "/sys/block/${TARGET_NODEV}" ]; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist!\n\n\033[0m" >&2
+        continue;
+      fi
+
       echo ""
-      printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist! Quitting...\n\033[0m" >&2
-      do_exit 5
-    fi
 
-    echo ""
+      # Check if DMA is enabled for device
+      check_dma "/dev/$TARGET_NODEV"
 
-    # Check if DMA is enabled for device
-    check_dma "/dev/$TARGET_NODEV"
+      # Make sure kernel doesn't use old partition table
+      if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
+        echo ""
+        printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override.\n\n\033[0m" >&2
+        continue;
+      fi
 
-    # Make sure kernel doesn't use old partition table
-    if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
       echo ""
-      echo "/dev/$TARGET_NODEV: $(show_block_device_info $TARGET_NODEV)"
-      printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override. Quitting...\n\033[0m" >&2
-      do_exit 5;
-    fi
-    echo ""
+      break;
+    done
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND=`get_disk_partitions "$TARGET_NODEV"`
