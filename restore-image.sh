@@ -1329,7 +1329,7 @@ show_help()
   echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty" >&2
   echo "--nonet|-n                  - Don't try to setup networking" >&2
   echo "--nomount|-m                - Don't mount anything" >&2
-  echo "--noimage                   - Don't restore any images, only do partition/MBR operations" >&2
+  echo "--noimage                   - Don't restore any partition images, only do partition-table/MBR operations" >&2
   echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts" >&2
   echo "--add                       - Add partition entries (don't overwrite like with --clean)" >&2
 }
@@ -1377,7 +1377,9 @@ load_config()
                                    --add) PT_ADD=1;;
                      --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
                         --noimage|--noim) NO_IMAGE=1;;
-                               --help|-h) show_help; exit 3;;
+                               --help|-h) show_help;
+                                          exit 0
+                                          ;;
                                       -*) echo "Bad argument: $ARGNAME" >&2
                                           show_help;
                                           exit 0

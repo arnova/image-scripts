@@ -513,7 +513,7 @@ select_partitions()
   local SELECT_PARTITIONS=""
 
   # Check if target device exists
-  if [ -n "$DEVICES" -a "$DEVICES" != "none" ]; then
+  if [ -n "$DEVICES" ]; then
     unset IFS
     for DEVICE in $DEVICES; do
       if [ ! -e "/sys/block/${DEVICE}" ]; then
@@ -686,7 +686,7 @@ show_help()
   echo "" >&2
   echo "Options:" >&2
   echo "--help|-h                   - Print this help" >&2
-  echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all) or \"none\" for no partitions at all" >&2
+  echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all)" >&2
   echo "--conf|-c={config_file}     - Specify alternate configuration file" >&2
   echo "--compression|-z=level      - Set gzip compression level (when used). 1=Low but fast (default), 9=High but slow" >&2
   echo "--notrack0                  - Don't backup any track0(MBR)/partition-tables" >&2
@@ -697,6 +697,7 @@ show_help()
   echo "--ddgz                      - Use dd + gzip for imaging" >&2
   echo "--nonet|-n                  - Don't try to setup networking" >&2
   echo "--nomount|-m                - Don't mount anything" >&2
+  echo "--noimage                   - Don't create any partition images, only do partition-table/MBR operations" >&2
   echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts" >&2
 }
 
@@ -716,6 +717,7 @@ load_config()
   NO_MOUNT=0
   NO_TRACK0=0
   NO_CUSTOM_SH=0
+  NO_IMAGE=0
 
   # Check arguments
   unset IFS
@@ -736,7 +738,8 @@ load_config()
                                    --nomount|-m) NO_MOUNT=1;;
                                        --noconf) NO_CONF=1;;
                             --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
-                                         --help) show_help;
+                               --noimage|--noim) NO_IMAGE=1;;
+                                      --help|-h) show_help;
                                                  exit 0
                                                  ;;
                                              -*) echo "Bad argument: $ARGNAME" >&2
@@ -834,17 +837,20 @@ fi
 # Determine which partitions to backup
 select_partitions;
 
+
 # Determine which disks to backup
 select_disks;
 
-if [ -n "$IGNORE_PARTITIONS" ]; then
-  echo "* Partitions to ignore: $IGNORE_PARTITIONS"
-fi
+if [ $NO_IMAGE -eq 0 ]; then
+  if [ -n "$IGNORE_PARTITIONS" ]; then
+    echo "* Partitions to ignore: $IGNORE_PARTITIONS"
+  fi
 
-if [ -n "$BACKUP_PARTITIONS" ]; then
-  echo "* Partitions to backup: $BACKUP_PARTITIONS"
-else
-  echo "* Partitions to backup: none"
+  if [ -n "$BACKUP_PARTITIONS" ]; then
+    echo "* Partitions to backup: $BACKUP_PARTITIONS"
+  else
+    echo "* Partitions to backup: none"
+  fi
 fi
 
 echo ""
@@ -873,7 +879,7 @@ fi
 echo "--------------------------------------------------------------------------------"
 
 # Backup selected partitions to images
-if [ "$DEVICES" != "none" ]; then
+if [ $NO_IMAGE -eq 0 ]; then
   backup_partitions;
 fi
 
