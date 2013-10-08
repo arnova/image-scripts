@@ -1280,6 +1280,8 @@ create_swaps()
 {
   # Create swap on swap partitions on all used devices
 
+  local SWAP_COUNT=0
+
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
     SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null)"
@@ -1287,9 +1289,10 @@ create_swaps()
     IFS=$EOL
     echo "$SFDISK_OUTPUT" |grep -i "id=82$" |while read LINE; do
       PART="$(echo "$LINE" |awk '{ print $1 }')"
-      if ! mkswap $PART; then
+      if ! mkswap -L "SWAP${SWAP_COUNT}" "$PART"; then
         printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi
+      SWAP_COUNT=$(($SWAP_COUNT + 1))
     done
     
     if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
@@ -1301,9 +1304,10 @@ create_swaps()
         echo "$SGDISK_OUTPUT" |grep -E -i "[[:blank:]]8200[[:blank:]]+Linux swap$" |while read LINE; do
           NUM="$DEVICE/$(echo "$LINE" |awk '{ print $1 }')"
           PART="$(add_partition_number "$DEVICE" "$NUM")"
-          if ! mkswap $PART; then
+          if ! -L "SWAP${SWAP_COUNT}" "$PART"; then
             printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
           fi
+          SWAP_COUNT=$(($SWAP_COUNT + 1))
         done
       fi
     fi
