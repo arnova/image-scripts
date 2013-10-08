@@ -133,73 +133,6 @@ get_disk_partitions()
 }
 
 
-parted_list_fancy()
-{
-  local DEV="$1"
-  local FOUND=0
-  local MATCH=0
-
-  IFS=$EOL
-  for LINE in `echo "OK" |parted --list 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
-    if echo "$LINE" |grep -q '^Model: '; then
-      MATCH=0
-      MODEL="$LINE"
-    elif echo "$LINE" |grep -q '^Disk /dev/'; then
-      # Match disk
-      if echo "$LINE" |grep -q "^Disk $DEV: "; then
-        echo "$LINE"
-        echo "$MODEL"
-        FOUND=1
-        MATCH=1
-      fi
-    elif [ $MATCH -eq 1 ]; then
-      echo "$LINE"
-    fi
-  done
-
-  if [ $FOUND -eq 0 ]; then
-    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
-    return 1
-  fi
-
-  return 0
-}
-
-
-parted_list()
-{
-  local DEV="$1"
-  local FOUND=0
-  local MATCH=0
-  local TYPE=""
-
-  IFS=$EOL
-  for LINE in `echo "OK" |parted --list --machine 2>/dev/null |sed s,'.*\r',,`; do # NOTE: The sed is there to fix a bug(?) in parted causing an \r to appear on stdout in case of errors output to stderr
-    if ! echo "$LINE" |grep -q ':'; then
-      TYPE="$LINE"
-      MATCH=0
-    fi
-
-    if echo "$LINE" |grep -q "^$DEV:"; then
-      echo "$TYPE"
-      FOUND=1
-      MATCH=1
-    fi
-
-    if [ $MATCH -eq 1 ]; then
-      echo "$LINE"
-    fi
-  done
-
-  if [ $FOUND -eq 0 ]; then
-    echo "WARNING: Parted was unable to retrieve information for device $DEV!" >&2
-    return 1
-  fi
-
-  return 0
-}
-
-
 show_block_device_info()
 {
   local DEVICE=`echo "$1" |sed s,'^/dev/',,`
@@ -208,7 +141,7 @@ show_block_device_info()
     DEVICE="/sys/class/block/${DEVICE}"
   fi
 
-  local VENDOR=$(cat "${DEVICE}/device/vendor"):
+  local VENDOR="$(cat "${DEVICE}/device/vendor")"
   if [ -n "$VENDOR" ]; then
     printf "$VENDOR "
   fi
@@ -226,6 +159,25 @@ show_block_device_info()
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
     printf "$(($SIZE / 2 / 1024 / 1024)) GiB"
+  fi
+}
+
+
+list_device_partitions()
+{
+  local DEVICE="$1"
+
+  FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
+  # MBR/DOS Partitions:
+  IFS=$EOL
+  if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
+    printf "* DOS partition table:\n${FDISK_OUTPUT}\n"
+  fi
+
+  if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
+    # GPT partition table found
+    GDISK_OUTPUT="$(gdisk -p "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
+    printf "* GPT partition table:\n${GDISK_OUTPUT}\n"
   fi
 }
 
@@ -474,7 +426,6 @@ sanity_check()
   check_command_error sfdisk
   check_command_error fdisk
   check_command_error dd
-  check_command_error parted
 
   [ "$NO_NET" != "0" ] && check_command_error ifconfig
   [ "$NO_MOUNT" != "0" ] && check_command_error mount
@@ -946,8 +897,7 @@ check_disks()
     
     if [ -n "$PARTITIONS_FOUND" ]; then
       echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions:"
-      parted_list_fancy /dev/$TARGET_NODEV |grep '^ '
-      echo ""
+      list_device_partitions /dev/$TARGET_NODEV
     fi
 
     # TODO: This currently only works for MBR/DOS partition table
@@ -1342,7 +1292,7 @@ create_swaps()
       fi
     done
     
-    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee$'; then
+    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
       # GPT partition table found
       SGDISK_OUTPUT="$(sgdisk -p "$DEVICE" 2>/dev/null)"
 
@@ -1580,7 +1530,8 @@ echo "--------------------------------------------------------------------------
 # Show current partition status.
 IFS=' '
 for DEVICE in $TARGET_DEVICES; do
-  parted_list_fancy "$DEVICE"
+  echo "* $DEVICE: $(show_block_device_info "$DEVICE")"
+  list_device_partitions "$DEVICE"
   echo ""
 done
 
