@@ -198,8 +198,30 @@ parted_list()
 show_block_device_info()
 {
   local DEVICE=`echo "$1" |sed s,'^/dev/',,`
+  
+  if ! echo "$DEVICE" |grep -q '^/'; then
+    DEVICE="/sys/class/block/${DEVICE}"
+  fi
 
-  echo "$(cat /sys/class/block/${DEVICE}/device/model |sed s/' *$'//) Size: $((`cat /sys/class/block/${DEVICE}/size` / 2 / 1024 / 1024)) GiB"
+  local VENDOR=$(cat "${DEVICE}/device/vendor"):
+  if [ -n "$VENDOR" ]; then
+    printf "$VENDOR "
+  fi
+
+  local MODEL="$(cat "${DEVICE}/device/model")"
+  if [ -n "$MODEL" ]; then
+    printf "$MODEL "
+  fi
+
+  local REV="$(cat "${DEVICE}/device/rev")"
+  if [ -n "$REV" ]; then
+    printf "$REV "
+  fi
+
+  local SIZE="$(cat "${DEVICE}/size")"
+  if [ -n "$SIZE" ]; then
+    printf "$(($SIZE / 2 / 1024 / 1024)) GiB"
+  fi
 }
 
 

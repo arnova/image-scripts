@@ -728,7 +728,7 @@ source_to_target_remap()
   local TARGET_DEVICE="/dev/$IMAGE_PARTITION_NODEV"
 
   # We want another target device than specified in the image name?:
-  IFS=','
+  IFS=' ,'
   for ITEM in $DEVICES; do
     SOURCE_DEVICE_NODEV=""
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -754,7 +754,7 @@ source_to_target_remap()
   done
 
   # We want another target partition than specified in the image name?:
-  IFS=','
+  IFS=' ,'
   for ITEM in $PARTITIONS; do
     SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -766,6 +766,37 @@ source_to_target_remap()
   done
   
   echo "$TARGET_DEVICE"
+}
+
+
+# $1=image-source-device
+# $2=target-device
+update_source_to_target_device_remap()
+{
+  local IMAGE_SOURCE_NODEV="$1"
+  local TARGET_DEVICE="$2"
+
+  local DEVICES_TEMP=""
+  IFS=' ,'
+  for ITEM in $DEVICES; do
+    SOURCE_DEVICE_NODEV=""
+    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    if [ -z "$TARGET_DEVICE_MAP" ]; then
+      TARGET_DEVICE_MAP="$ITEM"
+    else
+      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    fi
+
+    # Remove entries for specified device
+    if [ "$SOURCE_DEVICE_NODEV" != "$IMAGE_SOURCE_NODEV" ]; then
+    FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
+    
+    DEVICES_TEMP="${DEVICES_TEMP}${DEVICES_TEMP:+,}${ITEM}"
+    fi
+  done
+
+  # Update global devices (remap) variable
+  DEVICES="${DEVICES_TEMP}${DEVICES_TEMP:+,}${IMAGE_SOURCE_NODEV}:${TARGET_DEVICE}"
 }
 
 
@@ -898,6 +929,10 @@ check_disks()
       fi
 
       echo ""
+
+      if [ "$IMAGE_TARGET_NODEV" != "$TARGET_NODEV" ]; then
+        update_source_to_target_device_remap "$IMAGE_SOURCE_NODEV" "/dev/$TARGET_NODEV"
+      fi
       break;
     done
 
@@ -1226,7 +1261,6 @@ show_target_devices()
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
     echo "* Using (target) device $DEVICE: $(show_block_device_info $DEVICE)"
-    echo ""
   done
 }
 
@@ -1460,14 +1494,14 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
   do_exit 7
 fi
 
+# Check target disks
+check_disks;
+
 if [ $NO_IMAGE -eq 0 ]; then
   check_image_files;
 else
   echo "* NOTE: Skipping partition image restoration"
 fi
-
-# Check target disks
-check_disks;
 
 if [ $NO_IMAGE -eq 0 ]; then
   # Check target partitions
@@ -1478,7 +1512,7 @@ fi
 show_target_devices;
 
 if [ $CLEAN -eq 1 ]; then
-  echo "* WARNING: MBR/track0, partition-table & swap-space will ALWAYS be (over)written (--clean)!" >&2
+  echo "* WARNING: MBR/track0 & partition-table will ALWAYS be (over)written (--clean)!" >&2
 else
   if [ $PT_WRITE -eq 1 ]; then
     echo "* WARNING: Partition-table will ALWAYS be (over)written (--pt)!" >&2
