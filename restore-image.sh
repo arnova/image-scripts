@@ -1332,23 +1332,31 @@ create_swaps()
 
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
+    SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null)"
     # MBR/DOS Partitions:
     IFS=$EOL
-    sfdisk -d "$DEVICE" 2>/dev/null |grep -i "id=82$" |while read LINE; do
+    echo "$SFDISK_OUTPUT" |grep -i "id=82$" |while read LINE; do
       PART="$(echo "$LINE" |awk '{ print $1 }')"
       if ! mkswap $PART; then
         printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi
     done
     
-    # GPT Partitions:
-    IFS=$EOL
-    sgdisk -p "$DEVICE" 2>/dev/null |grep -E -i "[[:blank:]]8200[[:blank:]]*Linux swap$" |while read LINE; do
-      PART="$DEVICE/$(echo "$LINE" |awk '{ print $1 }')"
-      if ! mkswap $PART; then
-        printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
+    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee$'; then
+      # GPT partition table found
+      SGDISK_OUTPUT="$(sgdisk -p "$DEVICE" 2>/dev/null)"
+
+      if ! echo "$SGDISK_OUTPUT" |grep -q -i -e "GPT: not present"; then
+        IFS=$EOL
+        echo "$SGDISK_OUTPUT" |grep -E -i "[[:blank:]]8200[[:blank:]]+Linux swap$" |while read LINE; do
+          NUM="$DEVICE/$(echo "$LINE" |awk '{ print $1 }')"
+          PART="$(add_partition_number "$DEVICE" "$NUM")"
+          if ! mkswap $PART; then
+            printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
+          fi
+        done
       fi
-    done
+    fi
   done
 }
 
