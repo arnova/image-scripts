@@ -116,15 +116,10 @@ get_partitions_with_size_type()
 }
 
 
-# Get disk (device) on which specified partition resides
-# $1 = partition device
+# Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
-  local PART_NODEV=`echo "$1" |sed -e s,'^/dev/',,`
-  local PART_NUM=`echo "$PART_NODEV" |sed -r -e 's,^[/a-z]*,,' -e 's,^.*p,,'`
-
-  # Strip of partition number to get the disk device:
-  echo "$PART_NODEV" |sed -E -e s,"p?${PART_NUM}$",,
+  echo "$1" |sed -r s,'p?[0-9]+$',,
 }
 
 

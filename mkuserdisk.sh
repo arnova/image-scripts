@@ -132,7 +132,7 @@ mkud_create_user_filesystem()
     fi
 
     # Detect GPT
-    if sfdisk -d $USER_DISK 2>/dev/null |grep -q -i 'Id=ee$'; then
+    if sfdisk -d $USER_DISK 2>/dev/null |grep -q -E -i '[[:blank:]]Id=ee'; then
       mkud_create_user_gpt_partition;
     else
       mkud_create_user_dos_partition;

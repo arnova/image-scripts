@@ -102,7 +102,7 @@ get_partitions()
 # Get partition number from argument and return to stdout
 get_partition_number()
 {
-  echo "$1" |sed -r -e 's,^[/a-z]*,,' -e 's,^.*p,,'
+  echo "$1" |sed -r -e s,'^[/a-z]+',, -e s,'^[0-9]+p',,
 }
 
 
@@ -122,7 +122,7 @@ add_partition_number()
 # Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
-  echo "$1" |sed -r 's,p?[0-9]*$,,'
+  echo "$1" |sed -r s,'p?[0-9]+$',,
 }
 
 
@@ -431,9 +431,9 @@ sanity_check()
   [ "$NO_MOUNT" != "0" ] && check_command_error mount
   [ "$NO_MOUNT" != "0" ] && check_command_error umount
 
-# TODO: Need to do this for GPT implementation
-#  check_command_error gdisk
-#  check_command_error sgdisk
+# TODO: Need to do this for GPT implementation but only when GPT is used, so may need to move this
+  check_command_warning gdisk
+  check_command_warning sgdisk
 
   # Sanity check devices and check if target devices exist
   IFS=','
@@ -900,7 +900,7 @@ check_disks()
       list_device_partitions /dev/$TARGET_NODEV
     fi
 
-    # TODO: This currently only works for MBR/DOS partition table
+    # FIXME: This currently only works for MBR/DOS partition table
     if [ $PT_ADD -eq 1 ]; then
       # Check for sfdisk for this target
       if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
@@ -1227,37 +1227,61 @@ test_target_partitions()
   local MISMATCH=0
   unset IFS
   for ITEM in $IMAGE_FILES; do
-    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
-    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    IMAGE_FILE=$(echo "$ITEM" |cut -f1 -d"$SEP" -s)
+    TARGET_PARTITION=$(echo "$ITEM" |cut -f2 -d"$SEP" -s)
 
     # Strip extension so we get the actual device name
-    IMAGE_PARTITION_NODEV="$(echo "$IMAGE_FILE" |sed 's/\..*//')"
+    IMAGE_PARTITION_NODEV=$(echo "$IMAGE_FILE" |sed 's/\..*//')
+    SOURCE_DISK_NODEV=$(get_partition_disk "$IMAGE_PARTITION_NODEV")
+    TARGET_DISK=$(get_partition_disk "$TARGET_PARTITION")
 
-    SFDISK_TARGET_PART=`sfdisk -d 2>/dev/null |grep -E "^${TARGET_PARTITION}[[:blank:]]"`
-    if [ -z "$SFDISK_TARGET_PART" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Target partition $TARGET_PARTITION does NOT exist! Quitting...\n\033[0m" >&2
-      do_exit 5
-    fi
+    SFDISK_TARGET_PART="$(sfdisk -d "$TARGET_DISK" 2>/dev/null |grep -E "^${TARGET_PARTITION}[[:blank:]]")"
+    if [ -n "$SFDISK_TARGET_PART" ]; then
+      # DOS partition found
+      SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "sfdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
+      # If empty, try old (legacy) file
+      if [ -z "$SFDISK_SOURCE_PART" ]; then
+        SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "partitions.${SOURCE_DISK_NODEV}" 2>/dev/null)"
+      fi
 
-    SFDISK_SOURCE_PART=`grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" sfdisk.* 2>/dev/null`
-    # If empty, try old (legacy) file
-    if [ -z "$SFDISK_SOURCE_PART" ]; then
-      SFDISK_SOURCE_PART=`grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" partitions.* 2>/dev/null`
-    fi
+      echo "* Source DOS partition: $SFDISK_SOURCE_PART"
+      echo "* Target DOS partition: $SFDISK_TARGET_PART"
 
-    echo "* Source partition: $SFDISK_SOURCE_PART"
-    echo "* Target partition: $SFDISK_TARGET_PART"
+      # Match partition with what we have stored in our partitions file
+      if [ -z "$SFDISK_SOURCE_PART" ]; then
+        printf "\033[40m\033[1;31m\nWARNING: DOS partition /dev/$IMAGE_PARTITION_NODEV can not be found in the partition source  files!\n\033[0m" >&2
+        echo ""
+        MISMATCH=1
+        continue;
+      fi
 
-    # Match partition with what we have stored in our partitions file
-    if [ -z "$SFDISK_SOURCE_PART" ]; then
-      printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$IMAGE_PARTITION_NODEV can not be found in the partitions.* files!\n\033[0m" >&2
-      echo ""
-      MISMATCH=1
-      continue;
-    fi
+      # Check geometry/type of partition
+      if [ "$(echo "$SFDISK_TARGET_PART" |sed -r -e s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)" != "$(echo "$SFDISK_SOURCE_PART" |sed -r -e s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)"; then
+        MISMATCH=1
+      fi
+    else
+      GFDISK_TARGET_PART="$(sgdisk -l "$TARGET_DISK" |grep -E "^[[:blank:]]+$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
+      if [ -n "$SGDISK_TARGET_PART" ]; then
+        SGDISK_SOURCE_PART="$(grep -E "^[[:blank:]]+$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" "sgdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
 
-    if ! echo "$SFDISK_TARGET_PART" |grep -q "$(echo "$SFDISK_SOURCE_PART" |sed -r s,"^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]","",)"; then
-      MISMATCH=1
+        echo "* Source GPT partition: $SGDISK_SOURCE_PART"
+        echo "* Target GPT partition: $SGDISK_TARGET_PART"
+
+        # Match partition with what we have stored in our partitions file
+        if [ -z "$SGDISK_SOURCE_PART" ]; then
+          printf "\033[40m\033[1;31m\nWARNING: GPT partition /dev/$IMAGE_PARTITION_NODEV can not be found in partition source files!\n\033[0m" >&2
+          echo ""
+          MISMATCH=1
+          continue;
+        fi
+
+        if [ "$SGDISK_TARGET_PART" != "$SGDISK_SOURCE_PART" ]; then
+          MISMATCH=1
+        fi
+      else
+        printf "\033[40m\033[1;31m\nERROR: Unable to detect target partition $TARGET_PARTITION! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
     fi
   done
 
