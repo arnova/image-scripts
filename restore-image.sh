@@ -176,7 +176,7 @@ list_device_partitions()
 
   if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
     # GPT partition table found
-    GDISK_OUTPUT="$(gdisk -p "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
+    GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
     printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
   fi
 }
@@ -900,32 +900,69 @@ check_disks()
       list_device_partitions /dev/$TARGET_NODEV
     fi
 
-    # FIXME: This currently only works for MBR/DOS partition table
     if [ $PT_ADD -eq 1 ]; then
-      # Check for sfdisk for this target
+      # DOS/MBR:
       if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        SFDISK_TARGET=`sfdisk -d "/dev/${TARGET_NODEV}"`
+        SFDISK_TARGET="$(sfdisk -d "/dev/${TARGET_NODEV}" |grep -i '^/dev/.*Id=' |grep -i -v 'Id= 0$' |sed s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)"
         if [ -z "$SFDISK_TARGET" ]; then
-          printf "\033[40m\033[1;31m\nERROR: Unable to get partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31m\nERROR: Unable to get DOS partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
 
         MISMATCH=0
         IFS=$EOL
         for PART in $SFDISK_TARGET; do
-          # Ignore empty entries:
-          if ! echo "$PART" |grep -i -q "Id= 0$" && ! grep -q -x "$PART" "sfdisk.${IMAGE_SOURCE_NODEV}"; then
+          if ! grep -q "[a-z]${PART}$" "sfdisk.${IMAGE_SOURCE_NODEV}"; then
             MISMATCH=1
             break;
           fi
         done
 
         if [ $MISMATCH -eq 1 ]; then
-          #TODO: Show source/target?
+          printf "\033[40m\033[1;31mERROR: Target DOS partition(s) mismatches with source. Unable to update DOS partition table (--add)! Quitting...\n\033[0m" >&2
+          
+          echo "* Source DOS partition table (/dev/$IMAGE_SOURCE_NODEV):"
           cat "sfdisk.${IMAGE_SOURCE_NODEV}"
+          echo ""
+          
+          echo "* Target DOS partition table (/dev/$TARGET_NODEV):"
           echo "$SFDISK_TARGET"
+          echo ""
 
-          printf "\033[40m\033[1;31mERROR: Target partition(s) mismatches with source. Unable to update partition table (--add)! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+      fi
+
+      # GPT
+      if [ -f "gdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        GDISK_TARGET="$(gdisk -l "/dev/${TARGET_NODEV}" |grep -E '^[[:blank:]]+[0-9]')"
+        if [ -z "$GDISK_TARGET" ]; then
+          printf "\033[40m\033[1;31m\nERROR: Unable to get GPT partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+
+        MISMATCH=0
+        IFS=$EOL
+        for PART in $GDISK_TARGET; do
+          # Check entry on source
+          if ! grep -q -x "$PART" "gdisk.${IMAGE_SOURCE_NODEV}"; then
+            MISMATCH=1
+            break;
+          fi
+        done
+
+        if [ $MISMATCH -eq 1 ]; then
+          printf "\033[40m\033[1;31mERROR: Target GPT partition(s) mismatches with source. Unable to update GPT partition table (--add)! Quitting...\n\033[0m" >&2
+
+          #TODO: Show source/target?
+          echo "* Source GPT partition table (/dev/$IMAGE_SOURCE_NODEV):"
+          grep -E '^[[:blank:]]+[0-9]') "gdisk.${IMAGE_SOURCE_NODEV}"
+          echo ""
+          
+          echo "* Target GPT partition table (/dev/$TARGET_NODEV):"
+          echo "$GDISK_TARGET"
+          echo ""
+
           do_exit 5
         fi
       fi
@@ -1078,9 +1115,8 @@ restore_disks()
         fi
         PARTPROBE=1
       fi
-
     fi
-    
+
     if [ $PARTPROBE -eq 1 ]; then
       echo ""
       # Re-read partition table
@@ -1260,7 +1296,7 @@ test_target_partitions()
         MISMATCH=1
       fi
     else
-      GFDISK_TARGET_PART="$(sgdisk -l "$TARGET_DISK" |grep -E "^[[:blank:]]+$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
+      GDISK_TARGET_PART="$(gdisk -l "$TARGET_DISK" |grep -E "^[[:blank:]]+$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
       if [ -n "$SGDISK_TARGET_PART" ]; then
         SGDISK_SOURCE_PART="$(grep -E "^[[:blank:]]+$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" "sgdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
 
@@ -1325,10 +1361,10 @@ create_swaps()
 
       if ! echo "$SGDISK_OUTPUT" |grep -q -i -e "GPT: not present"; then
         IFS=$EOL
-        echo "$SGDISK_OUTPUT" |grep -E -i "[[:blank:]]8200[[:blank:]]+Linux swap$" |while read LINE; do
+        echo "$SGDISK_OUTPUT" |grep -E -i "[[:blank:]]8200[[:blank:]]+Linux swap" |while read LINE; do
           NUM="$DEVICE/$(echo "$LINE" |awk '{ print $1 }')"
           PART="$(add_partition_number "$DEVICE" "$NUM")"
-          if ! -L "SWAP${SWAP_COUNT}" "$PART"; then
+          if ! mkswap -L "SWAP${SWAP_COUNT}" "$PART"; then
             printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
           fi
           SWAP_COUNT=$(($SWAP_COUNT + 1))
