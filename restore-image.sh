@@ -158,7 +158,7 @@ show_block_device_info()
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
-    printf "$(($SIZE / 2 / 1024 / 1024)) GiB"
+    printf "\t$(($SIZE / 2 / 1024 / 1024)) GiB"
   fi
 }
 
@@ -171,13 +171,13 @@ list_device_partitions()
   # MBR/DOS Partitions:
   IFS=$EOL
   if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
-    printf "* DOS partition table:\n${FDISK_OUTPUT}\n"
+    printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
   fi
 
   if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
     # GPT partition table found
     GDISK_OUTPUT="$(gdisk -p "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
-    printf "* GPT partition table:\n${GDISK_OUTPUT}\n"
+    printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
   fi
 }
 

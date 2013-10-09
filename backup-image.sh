@@ -148,7 +148,7 @@ show_block_device_info()
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
-    printf "$(($SIZE / 2 / 1024 / 1024)) GiB"
+    printf "\t$(($SIZE / 2 / 1024 / 1024)) GiB"
   fi
 }
 
