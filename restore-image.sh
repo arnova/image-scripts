@@ -818,8 +818,8 @@ show_available_disks()
   
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
-    DEVICE="/dev/$(echo "$BLK_DEVICE" |sed s,'^/sys/block',,)"
-    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' || [ ! -e "$DEVICE" ] || [ $(cat "$BLK_DEVICE/size") -eq 0 ]; then
+    DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' || [ ! -e "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
       continue; # Ignore device
     fi
 
