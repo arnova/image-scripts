@@ -143,22 +143,22 @@ show_block_device_info()
 
   local VENDOR="$(cat "${DEVICE}/device/vendor")"
   if [ -n "$VENDOR" ]; then
-    printf "$VENDOR "
+    printf "%s " "$VENDOR"
   fi
 
   local MODEL="$(cat "${DEVICE}/device/model")"
   if [ -n "$MODEL" ]; then
-    printf "$MODEL "
+    printf "%s " "$MODEL"
   fi
 
   local REV="$(cat "${DEVICE}/device/rev")"
   if [ -n "$REV" ]; then
-    printf "$REV "
+    printf "%s " "$REV"
   fi
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
-    printf "\t$(($SIZE / 2 / 1024 / 1024)) GiB"
+    printf "\t%s GiB" "$(($SIZE / 2 / 1024 / 1024))"
   fi
 }
 
