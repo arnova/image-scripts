@@ -956,7 +956,7 @@ check_disks()
 
           #TODO: Show source/target?
           echo "* Source GPT partition table (/dev/$IMAGE_SOURCE_NODEV):"
-          grep -E '^[[:blank:]]+[0-9]') "gdisk.${IMAGE_SOURCE_NODEV}"
+          grep -E '^[[:blank:]]+[0-9]' "gdisk.${IMAGE_SOURCE_NODEV}"
           echo ""
           
           echo "* Target GPT partition table (/dev/$TARGET_NODEV):"
