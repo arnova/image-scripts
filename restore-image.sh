@@ -819,7 +819,7 @@ show_available_disks()
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
     DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
-    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' || [ ! -e "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -e "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
       continue; # Ignore device
     fi
 
@@ -1292,7 +1292,7 @@ test_target_partitions()
       fi
 
       # Check geometry/type of partition
-      if [ "$(echo "$SFDISK_TARGET_PART" |sed -r -e s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)" != "$(echo "$SFDISK_SOURCE_PART" |sed -r -e s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)"; then
+      if [ "$(echo "$SFDISK_TARGET_PART" |sed -r -e s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)" != "$(echo "$SFDISK_SOURCE_PART" |sed -r -e s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)" ]; then
         MISMATCH=1
       fi
     else
