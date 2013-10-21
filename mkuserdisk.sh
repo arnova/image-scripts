@@ -3,8 +3,20 @@
 # Auto create d: drive (user disk). Note that this script only works for a
 # restore to a single disk!
 
+####################
+# Global variables #
+####################
+
 # The primary partition number to use for the user partition (with Win7, 1 and 2 are used by the OS)
 USER_PART_ID="3"
+
+USER_DISK=""
+USER_DISK_NODEV=""
+
+
+#############
+# Functions #
+#############
 
 mkud_get_disks()
 {
@@ -200,7 +212,6 @@ mkud_select_disk()
 # Mainline #
 ############
 
-USER_DISK_NODEV=""
 # Get $USER_DISK_NODEV:
 mkud_select_disk;
 
