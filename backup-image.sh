@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA13-GPT-DEVEL"
+MY_VERSION="3.10-BETA14-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: October 9, 2013
+# Last update: October 21, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -131,24 +131,43 @@ show_block_device_info()
     DEVICE="/sys/class/block/${DEVICE}"
   fi
 
-  local VENDOR="$(cat "${DEVICE}/device/vendor")"
+  local VENDOR="$(cat "${DEVICE}/device/vendor" |sed s!' *$'!!g)"
   if [ -n "$VENDOR" ]; then
-    printf "$VENDOR "
+    printf "%s " "$VENDOR"
   fi
 
-  local MODEL="$(cat "${DEVICE}/device/model")"
+  local MODEL="$(cat "${DEVICE}/device/model" |sed s!' *$'!!g)"
   if [ -n "$MODEL" ]; then
-    printf "$MODEL "
+    printf "%s " "$MODEL"
   fi
 
-  local REV="$(cat "${DEVICE}/device/rev")"
+  local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
-    printf "$REV "
+    printf "%s " "$REV"
   fi
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
-    printf "\t$(($SIZE / 2 / 1024 / 1024)) GiB"
+    printf "\t%s GiB" "$(($SIZE / 2 / 1024 / 1024))"
+  fi
+}
+
+
+list_device_partitions()
+{
+  local DEVICE="$1"
+
+  FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
+  # MBR/DOS Partitions:
+  IFS=$EOL
+  if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
+    printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
+  fi
+
+  if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
+    # GPT partition table found
+    GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
+    printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
   fi
 }
 
@@ -613,6 +632,8 @@ select_disks()
     local HDD_NODEV=`get_partition_disk "$PART"`
     if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
       echo "* Including /dev/$HDD_NODEV for backup: $(show_block_device_info $HDD_NODEV)"
+      list_device_partitions /dev/$HDD_NODEV
+
       BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
     fi
   done

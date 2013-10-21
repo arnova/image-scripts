@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA13-GPT-DEVEL"
+MY_VERSION="3.10-BETA14-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: October 21, 2013
@@ -141,17 +141,17 @@ show_block_device_info()
     DEVICE="/sys/class/block/${DEVICE}"
   fi
 
-  local VENDOR="$(cat "${DEVICE}/device/vendor")"
+  local VENDOR="$(cat "${DEVICE}/device/vendor" |sed s!' *$'!!g)"
   if [ -n "$VENDOR" ]; then
     printf "%s " "$VENDOR"
   fi
 
-  local MODEL="$(cat "${DEVICE}/device/model")"
+  local MODEL="$(cat "${DEVICE}/device/model" |sed s!' *$'!!g)"
   if [ -n "$MODEL" ]; then
     printf "%s " "$MODEL"
   fi
 
-  local REV="$(cat "${DEVICE}/device/rev")"
+  local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
     printf "%s " "$REV"
   fi
