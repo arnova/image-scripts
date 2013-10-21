@@ -467,7 +467,7 @@ sanity_check()
       CHECK_DEVICE_NODEV="$SOURCE_DEVICE_NODEV"
     fi
 
-    if [ ! -e "/sys/block/${CHECK_DEVICE_NODEV}" ]; then
+    if [ ! -e "/dev/$CHECK_DEVICE_NODEV" ]; then
       echo ""
       printf "\033[40m\033[1;31mERROR: Specified (target) block device /dev/$CHECK_DEVICE_NODEV does NOT exist! Quitting...\n\033[0m" >&2
       echo ""
@@ -861,7 +861,7 @@ check_disks()
       fi
 
       # Check if target device exists
-      if [ ! -e "/sys/block/${TARGET_NODEV}" ]; then
+      if [ ! -e "/dev/$TARGET_NODEV" ]; then
         echo ""
         printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist!\n\n\033[0m" >&2
         continue;
