@@ -36,7 +36,7 @@ mkud_get_partitions()
 
 mkud_create_user_dos_partition()
 {
-  # Create NTFS partition:
+  local PART_ID="$USER_PART_ID"
   local FDISK_CMD=""
 
   if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
@@ -64,6 +64,7 @@ mkud_create_user_dos_partition()
               "
   fi
 
+  # Create NTFS partition:
   echo "* Creating user NTFS DOS partition $USER_PART"
   if ! echo "$FDISK_CMD" |fdisk $USER_DISK >/dev/null; then
     return 1
@@ -75,7 +76,7 @@ mkud_create_user_dos_partition()
 
 mkud_create_user_gpt_partition()
 {
-  # Create NTFS partition:
+  local PART_ID="$USER_PART_ID"
   local GDISK_CMD=""
 
   if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
@@ -100,8 +101,9 @@ mkud_create_user_gpt_partition()
               "
   fi
 
+  # Create NTFS partition:
   echo "* Creating user NTFS GPT partition $USER_PART"
-  
+
   if ! echo "$GDISK_CMD" |gdisk $USER_DISK >/dev/null; then
     return 1
   fi
@@ -197,9 +199,9 @@ mkud_select_disk()
 ############
 # Mainline #
 ############
-USER_DISK_NODEV=""
 
-# Get $USER_DISK_NODEV & $USER_PART_ID:
+USER_DISK_NODEV=""
+# Get $USER_DISK_NODEV:
 mkud_select_disk;
 
 if [ -z "$USER_DISK_NODEV" ]; then
