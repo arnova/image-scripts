@@ -10,17 +10,12 @@ USER_PART_ID="3"
 
 USER_DISK=""
 USER_DISK_NODEV=""
+USER_DISK_ON_OTHER_DEVICE=0
 EMPTY_PARTITION_TABLE=0
 
 #############
 # Functions #
 #############
-
-
-mkud_get_disks()
-{
-  cat /proc/partitions |grep -E '[sh]d[a-z]$' |awk '{ print $4 }' |sed s,'^/dev/',,
-}
 
 
 mkud_create_user_dos_partition()
@@ -92,7 +87,6 @@ mkud_create_user_gpt_partition()
 
   # Create NTFS partition:
   echo "* Creating user NTFS GPT partition $USER_PART"
-
   if ! echo "$GDISK_CMD" |gdisk $USER_DISK >/dev/null; then
     return 1
   fi
@@ -106,25 +100,23 @@ mkud_create_user_filesystem()
   local PART_ID=$USER_PART_ID
   local USER_PART="${USER_DISK}${PART_ID}"
 
-  local PARTITIONS_FOUND=`get_partitions |grep -E -x "${USER_DISK_NODEV}p?[0-9]+"`
+  local PARTITIONS_FOUND=`get_disk_partitions "${USER_DISK_NODEV}"`
   if ! echo "$PARTITIONS_FOUND" |grep -q "${USER_DISK_NODEV}${PART_ID}" || [ $CLEAN -eq 1 ]; then
-    # Automatically handle cases where we have 2 harddisks: one for the OS (Eg. ssd) and one for user data
-    if [ "$CLEAN" = "1" ] && [ -n "$TARGET_DEVICES" -o -n "$TARGET_NODEV" ] && \
-       ! echo "$TARGET_DEVICES" |grep -q -e " $USER_DISK " -e "^$USER_DISK " -e " $USER_DISK$" && \
-       ! echo "$TARGET_NODEV" |grep -q -e " $USER_DISK_NODEV " -e "^$USER_DISK_NODEV " -e " $USER_DISK_NODEV$"; then
+    # Automatically handle cases where we have 2 harddisks: one for the OS (Eg. ssd) and one for user data and empty disks
+    if [ "$CLEAN" = "1" -a $USER_DISK_ON_OTHER_DEVICE -eq 1 ] || [ -z "$PARTITIONS_FOUND" ]; then
       EMPTY_PARTITION_TABLE=1
     fi
 
-    # Check whether target device is (already) empty
-    if [ -z "$PARTITIONS_FOUND" ]; then
-      EMPTY_PARTITION_TABLE=1
-    fi
-
-    # Detect GPT
-    if sfdisk -d $USER_DISK 2>/dev/null |grep -q -E -i '[[:blank:]]Id=ee'; then
-      mkud_create_user_gpt_partition;
+    # If user partition is on the same device as the images, check that it does not exist already
+    if [ $USER_DISK_ON_OTHER_DEVICE -eq 0 -a ! -e $USER_PART ]; then
+      # Detect GPT
+      if sfdisk -d $USER_DISK 2>/dev/null |grep -q -E -i '[[:blank:]]Id=ee'; then
+        mkud_create_user_gpt_partition;
+      else
+        mkud_create_user_dos_partition;
+      fi
     else
-      mkud_create_user_dos_partition;
+      echo "* Skipping creation of NTFS partition $USER_PART since it already exists"
     fi
 
     if ! partprobe /dev/$TARGET_NODEV; then
@@ -157,7 +149,7 @@ mkud_select_disk()
   # Check which partitions to backup, we ignore mounted ones
   local FIND_DISKS=""
   unset IFS
-  for DISK in `mkud_get_disks`; do
+  for DISK in `cat /proc/partitions |grep -E '[sh]d[a-z]$' |awk '{ print $4 }' |sed s,'^/dev/',,`; do
     # Ignore disks with swap/mounted partitions
     if ! grep -E -q "^/dev/${DISK}p?[0-9]+" /etc/mtab && ! grep -E -q "^/dev/${PART}p?[0-9]+" /proc/swaps; then
       FIND_DISKS="${FIND_DISKS}${FIND_DISKS:+ }$DISK"
@@ -170,6 +162,7 @@ mkud_select_disk()
     for DISK in $FIND_DISKS; do
       if [ "$DISK" != "$TARGET_NODEV" ] && ! echo "$TARGET_DEVICES" |grep -q -e " ${DISK} " -e "^${DISK} " -e "^${DISK}$" -e " ${DISK}$"; then
         USER_DISK_NODEV="$DISK"
+        USER_DISK_ON_OTHER_DEVICE=1
         break;
       fi
     done
@@ -180,6 +173,7 @@ mkud_select_disk()
   else
     # Only one disk, use that as default
     USER_DISK_NODEV="$FIND_DISKS"
+    USER_DISK_ON_OTHER_DEVICE=0
   fi
 }
 

@@ -129,7 +129,9 @@ get_partition_disk()
 # Get partitions from specified disk
 get_disk_partitions()
 {
-  get_partitions |grep -E -x "${1}p?[0-9]+"
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  get_partitions |grep -E -x "${DISK_NODEV}p?[0-9]+"
 }
 
 
