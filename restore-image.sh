@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA14-GPT-DEVEL"
+MY_VERSION="3.10-BETA15-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 21, 2013
+# Last update: October 22, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1394,7 +1394,8 @@ show_help()
   echo "--nonet|-n                  - Don't try to setup networking" >&2
   echo "--nomount|-m                - Don't mount anything" >&2
   echo "--noimage                   - Don't restore any partition images, only do partition-table/MBR operations" >&2
-  echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts" >&2
+  echo "--noccustomsh|--nosh        - Don't execute any custom shell script(s)" >&2
+  echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
   echo "--add                       - Add partition entries (don't overwrite like with --clean)" >&2
 }
 
@@ -1419,6 +1420,7 @@ load_config()
   FORCE=0
   PT_ADD=0
   NO_IMAGE=0
+  ONLY_SH=0
 
   # Check arguments
   unset IFS
@@ -1440,6 +1442,7 @@ load_config()
                                     --pt) PT_WRITE=1;;
                                    --add) PT_ADD=1;;
                      --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
+                           --onlysh|--sh) ONLY_SH=1;;
                         --noimage|--noim) NO_IMAGE=1;;
                                --help|-h) show_help;
                                           exit 0
@@ -1535,15 +1538,17 @@ fi
 # Show info about target devices to be used
 show_target_devices;
 
-if [ $CLEAN -eq 1 ]; then
-  echo "* WARNING: MBR/track0 & partition-table will ALWAYS be (over)written (--clean)!" >&2
-else
-  if [ $PT_WRITE -eq 1 ]; then
-    echo "* WARNING: Partition-table will ALWAYS be (over)written (--pt)!" >&2
-  fi
+if [ $ONLY_SH -eq 0 ]; then
+  if [ $CLEAN -eq 1 ]; then
+    echo "* WARNING: MBR/track0 & partition-table will ALWAYS be (over)written (--clean)!" >&2
+  else
+    if [ $PT_WRITE -eq 1 ]; then
+      echo "* WARNING: Partition-table will ALWAYS be (over)written (--pt)!" >&2
+    fi
 
-  if [ $MBR_WRITE -eq 1 ]; then
-    echo "* WARNING: MBR/track0 will ALWAYS be (over)written (--mbr)!" >&2
+    if [ $MBR_WRITE -eq 1 ]; then
+      echo "* WARNING: MBR/track0 will ALWAYS be (over)written (--mbr)!" >&2
+    fi
   fi
 fi
 
@@ -1559,9 +1564,11 @@ if ! get_user_yn "Continue with restore (Y/N)?"; then
 fi
 
 # Restore MBR/partition tables
-restore_disks;
+if [ $ONLY_SH -eq 0 ]; then
+  restore_disks;
+fi
 
-if [ $NO_IMAGE -eq 0 ]; then
+if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
   # Make sure the target is sane
   test_target_partitions;
 
@@ -1569,7 +1576,7 @@ if [ $NO_IMAGE -eq 0 ]; then
   restore_partitions;
 fi
 
-if [ $CLEAN -eq 1 ]; then
+if [ $CLEAN -eq 1 -a $ONLY_SH -eq 0 ]; then
   create_swaps;
 fi
 
@@ -1598,7 +1605,6 @@ IFS=' '
 for DEVICE in $TARGET_DEVICES; do
   echo "* $DEVICE: $(show_block_device_info "$DEVICE")"
   list_device_partitions "$DEVICE"
-  echo ""
 done
 
 if [ -n "$FAILED" ]; then

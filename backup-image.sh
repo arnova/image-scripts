@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA14-GPT-DEVEL"
+MY_VERSION="3.10-BETA15-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: October 21, 2013
+# Last update: October 22, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -714,7 +714,8 @@ show_help()
   echo "--nonet|-n                  - Don't try to setup networking" >&2
   echo "--nomount|-m                - Don't mount anything" >&2
   echo "--noimage                   - Don't create any partition images, only do partition-table/MBR operations" >&2
-  echo "--noccustomsh|--nosh        - Don't execute any custom shell scripts" >&2
+  echo "--noccustomsh|--nosh        - Don't execute any custom shell script(s)" >&2
+  echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
 }
 
 
@@ -734,6 +735,7 @@ load_config()
   NO_TRACK0=0
   NO_CUSTOM_SH=0
   NO_IMAGE=0
+  ONLY_SH=0
 
   # Check arguments
   unset IFS
@@ -755,6 +757,7 @@ load_config()
                                        --noconf) NO_CONF=1;;
                             --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
                                --noimage|--noim) NO_IMAGE=1;;
+                                  --onlysh|--sh) ONLY_SH=1;;
                                       --help|-h) show_help;
                                                  exit 0
                                                  ;;
@@ -853,11 +856,10 @@ fi
 # Determine which partitions to backup
 select_partitions;
 
-
 # Determine which disks to backup
 select_disks;
 
-if [ $NO_IMAGE -eq 0 ]; then
+if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
   if [ -n "$IGNORE_PARTITIONS" ]; then
     echo "* Partitions to ignore: $IGNORE_PARTITIONS"
   fi
@@ -871,12 +873,14 @@ fi
 
 echo ""
 
-printf "Please enter description: "
-read DESCRIPTION
-if [ -n "$DESCRIPTION" ]; then
-  echo "$DESCRIPTION" >"description.txt"
+if [ $ONLY_SH -eq 0 ]; then
+  printf "Please enter description: "
+  read DESCRIPTION
+  if [ -n "$DESCRIPTION" ]; then
+    echo "$DESCRIPTION" >"description.txt"
+  fi
+  echo ""
 fi
-echo ""
 
 # Run custom script, if specified
 if [ $NO_CUSTOM_SH -eq 0 -a -n "$BACKUP_CUSTOM_SCRIPT" -a -f "$BACKUP_CUSTOM_SCRIPT" ]; then
@@ -888,14 +892,14 @@ if [ $NO_CUSTOM_SH -eq 0 -a -n "$BACKUP_CUSTOM_SCRIPT" -a -f "$BACKUP_CUSTOM_SCR
 fi
 
 # Backup disk partitions/MBR's etc. :
-if [ $NO_TRACK0 -ne 1 ]; then
+if [ $NO_TRACK0 -ne 1 -a $ONLY_SH -eq 0 ]; then
   backup_disks;
 fi
 
 echo "--------------------------------------------------------------------------------"
 
 # Backup selected partitions to images
-if [ $NO_IMAGE -eq 0 ]; then
+if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
   backup_partitions;
 fi
 
