@@ -1,5 +1,3 @@
-#!/bin/sh
-
 # Auto create d: drive (user disk). Note that this script only works for a
 # restore to a single disk!
 
@@ -12,37 +10,16 @@ USER_PART_ID="3"
 
 USER_DISK=""
 USER_DISK_NODEV=""
-
+EMPTY_PARTITION_TABLE=0
 
 #############
 # Functions #
 #############
 
+
 mkud_get_disks()
 {
   cat /proc/partitions |grep -E '[sh]d[a-z]$' |awk '{ print $4 }' |sed s,'^/dev/',,
-}
-
-
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-mkud_get_partitions_with_size()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  local FIND_PARTS=`cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }'`
-
-  if [ -n "$DISK_NODEV" ]; then
-    echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}p?[0-9]+"
-  else
-    echo "$FIND_PARTS" # Show all
-  fi
-}
-
-
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-mkud_get_partitions()
-{
-  mkud_get_partitions_with_size "$1" |awk '{ print $1 }'
 }
 
 
@@ -129,10 +106,8 @@ mkud_create_user_filesystem()
   local PART_ID=$USER_PART_ID
   local USER_PART="${USER_DISK}${PART_ID}"
 
-  local PARTITIONS_FOUND=`mkud_get_partitions |grep -E -x "${USER_DISK_NODEV}p?[0-9]+"`
+  local PARTITIONS_FOUND=`get_partitions |grep -E -x "${USER_DISK_NODEV}p?[0-9]+"`
   if ! echo "$PARTITIONS_FOUND" |grep -q "${USER_DISK_NODEV}${PART_ID}" || [ $CLEAN -eq 1 ]; then
-    local EMPTY_PARTITION_TABLE=0
-
     # Automatically handle cases where we have 2 harddisks: one for the OS (Eg. ssd) and one for user data
     if [ "$CLEAN" = "1" ] && [ -n "$TARGET_DEVICES" -o -n "$TARGET_NODEV" ] && \
        ! echo "$TARGET_DEVICES" |grep -q -e " $USER_DISK " -e "^$USER_DISK " -e " $USER_DISK$" && \
@@ -152,9 +127,10 @@ mkud_create_user_filesystem()
       mkud_create_user_dos_partition;
     fi
 
-    if ! sfdisk -R $USER_DISK; then
+    if ! partprobe /dev/$TARGET_NODEV; then
       printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress enter to continue or CTRL-C to abort...\n\033[0m" >&2
       read
+      echo ""
     fi
 
     echo "* Creating user NTFS filesystem on $USER_PART"
