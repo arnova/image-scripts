@@ -563,11 +563,6 @@ select_partitions()
       BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }$PART"
     fi
   done
-
-  if [ -z "$BACKUP_PARTITIONS" ]; then
-    printf "\033[40m\033[1;31mWARNING: No partitions to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
-    read dummy
-  fi
 }
 
 
@@ -637,11 +632,6 @@ select_disks()
       BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
     fi
   done
-
-  if [ -z "$BACKUP_DISKS" ]; then
-    printf "\033[40m\033[1;31mWARNING: No disks to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
-    read dummy
-  fi
 }
 
 
@@ -868,6 +858,18 @@ if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
     echo "* Partitions to backup: $BACKUP_PARTITIONS"
   else
     echo "* Partitions to backup: none"
+  fi
+
+  if [ -z "$BACKUP_PARTITIONS" ]; then
+    printf "\033[40m\033[1;31mWARNING: No partitions to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+    read dummy
+  fi
+fi
+
+if [ $NO_TRACK0 -ne 1 -a $ONLY_SH -eq 0 ]; then
+  if [ -z "$BACKUP_DISKS" ]; then
+    printf "\033[40m\033[1;31mWARNING: No disks to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+    read dummy
   fi
 fi
 
