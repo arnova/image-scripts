@@ -16,7 +16,6 @@ for PART_NODEV in $BACKUP_PARTITIONS; do
       fi
     fi
     
-    umount /mnt/windows
+    umount /mnt/temp
   fi
 done
-
