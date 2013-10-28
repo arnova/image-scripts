@@ -1011,7 +1011,7 @@ check_disks()
         if [ $FORCE -eq 1 ]; then
           printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is mounted!\n\033[0m" >&2
         else
-          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified (Use --force to override)? Quitting...\n\033[0m" >&2
           do_exit 5
         fi
       fi
@@ -1022,7 +1022,7 @@ check_disks()
         if [ $FORCE -eq 1 ]; then
           printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is used as swap!\n\033[0m" >&2
         else
-          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified (Use --force to override)? Quitting...\n\033[0m" >&2
           do_exit 5
         fi
       fi
@@ -1219,24 +1219,14 @@ check_partitions()
     
     # Check for mounted partitions on target device
     if grep -E -q "^${TARGET_PARTITION}[[:blank:]]" /etc/mtab; then
-      echo ""
-      if [ $FORCE -eq 1 ]; then
-        printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is mounted!\n\033[0m" >&2
-      else
-        printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is mounted! Wrong target device specified? Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
+      printf "\033[40m\033[1;31m\nERROR: Target partition $TARGET_PARTITION is mounted! Wrong target partition/device specified? Quitting...\n\033[0m" >&2
+      do_exit 5
     fi
 
     # Check for swaps on this device
     if grep -E -q "^${TARGET_PARTITION}[[:blank:]]" /proc/swaps; then
-      echo ""
-      if [ $FORCE -eq 1 ]; then
-        printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is used as swap!\n\033[0m" >&2
-      else
-        printf "\033[40m\033[1;31mERROR: Partition $TARGET_PARTITION on target device is used as swap. Wrong target device specified? Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
+      printf "\033[40m\033[1;31m\nERROR: Target partition $TARGET_PARTITION is used as swap. Wrong target partition/device specified? Quitting...\n\033[0m" >&2
+      do_exit 5
     fi
   done
 

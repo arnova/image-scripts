@@ -107,11 +107,12 @@ get_partitions_with_size_type()
   get_partitions_with_size "$DISK_NODEV" |while read LINE; do
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
     local TYPE=`blkid -s TYPE -o value "/dev/${PART_NODEV}"`
+    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
     
     if [ -z "$TYPE" ]; then
       TYPE="other" # = eg. extended partition, disk device, sr0, loop0 etc.
     fi
-    echo "$LINE $TYPE"
+    echo "$LINE $(($SIZE / 1024 / 1024 / 1024))GiB $TYPE"
   done
 }
 
@@ -556,11 +557,27 @@ select_partitions()
   BACKUP_PARTITIONS=""
   IGNORE_PARTITIONS=""
   unset IFS
-  for PART in $SELECT_PARTITIONS; do
-    if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
-      IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }$PART"
+  for PART_NODEV in $SELECT_PARTITIONS; do
+    if grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /etc/mtab; then
+      # In case user specifically selected partition, hardfail:
+      if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
+        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART_NODEV is mounted! Wrong device/partition specified? Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+
+      echo "* WARNING: Ignoring partition $PART_NODEV!" >&2
+      IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
+    elif grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /proc/swaps; then
+      # In case user specifically selected partition, hardfail:
+      if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
+        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART_NODEV is used as swap! Wrong device/partition specified? Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+
+      echo "* WARNING: Ignoring partition $PART_NODEV!" >&2
+      IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
     else
-      BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }$PART"
+      BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }${PART_NODEV}"
     fi
   done
 }
@@ -677,11 +694,8 @@ backup_disks()
       do_exit 9
     fi
 
-    # Use wrapped function to only get info for this device
-    # TODO: Dump fancified /proc/partitions to file (including blkid info etc.)?
-
     # Dump device partitions as reported by the kernel
-    get_partitions_with_size_type "$HDD_NODEV" >"proc_partitions.${HDD_NODEV}"
+    get_partitions_with_size_type "$HDD_NODEV" >"partition_layout.${HDD_NODEV}"
   done
 }
 
@@ -734,7 +748,7 @@ load_config()
     ARGVAL=`echo "$arg" |cut -d= -f2 -s`
 
     case "$ARGNAME" in
-      --part|--partitions|-p|--dev|--devices|-d) DEVICES=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;;
+      --part|--partitions|-p|--dev|--devices|-d) DEVICES=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;; # Make list space seperated and remove /dev/ prefixes
                                      --notrack0) NO_TRACK0=1;;
                                --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
                                       --conf|-c) CONF="$ARGVAL";;
