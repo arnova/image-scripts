@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA15-GPT-DEVEL"
+MY_VERSION="3.10-BETA16-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: October 22, 2013
+# Last update: October 28, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -107,12 +107,30 @@ get_partitions_with_size_type()
   get_partitions_with_size "$DISK_NODEV" |while read LINE; do
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
     local TYPE=`blkid -s TYPE -o value "/dev/${PART_NODEV}"`
+
+    if [ -z "$TYPE" ]; then
+      TYPE="other" # = eg. extended partition, disk device, sr0, loop0 etc.
+    fi
+    echo "$LINE $TYPE"
+  done
+}
+
+
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
+get_partitions_fancified()
+{
+  local DISK_NODEV="$1"
+
+  IFS=$EOL
+  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+    local TYPE=`blkid -s TYPE -o value "/dev/${PART_NODEV}"`
     local SIZE=`echo "$LINE" |awk '{ print $2 }'`
     
     if [ -z "$TYPE" ]; then
       TYPE="other" # = eg. extended partition, disk device, sr0, loop0 etc.
     fi
-    echo "$LINE $(($SIZE / 1024 / 1024 / 1024))GiB $TYPE"
+    printf "${PART_NODEV}\t${SIZE} blocks\t$(($SIZE / 2 / 1024 / 1024)) GiB\t${TYPE}\n"
   done
 }
 
@@ -565,7 +583,9 @@ select_partitions()
         do_exit 5
       fi
 
-      echo "* WARNING: Ignoring partition $PART_NODEV!" >&2
+      if [ -n "$DEVICES" ]; then
+        echo "* WARNING: Ignoring mounted partition $PART_NODEV!" >&2
+      fi
       IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
     elif grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /proc/swaps; then
       # In case user specifically selected partition, hardfail:
@@ -574,7 +594,6 @@ select_partitions()
         do_exit 5
       fi
 
-      echo "* WARNING: Ignoring partition $PART_NODEV!" >&2
       IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
     else
       BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }${PART_NODEV}"
@@ -694,8 +713,8 @@ backup_disks()
       do_exit 9
     fi
 
-    # Dump device partitions as reported by the kernel
-    get_partitions_with_size_type "$HDD_NODEV" >"partition_layout.${HDD_NODEV}"
+    # Dump device partition layout in "fancified" format
+    get_partitions_fancified "$HDD_NODEV" >"partition_layout.${HDD_NODEV}"
   done
 }
 
