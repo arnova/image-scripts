@@ -130,7 +130,16 @@ get_partitions_fancified()
     if [ -z "$TYPE" ]; then
       TYPE="other" # = eg. extended partition, disk device, sr0, loop0 etc.
     fi
-    printf "${PART_NODEV}\t${SIZE} blocks\t$(($SIZE / 2 / 1024 / 1024)) GiB\t${TYPE}\n"
+
+    GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
+    if [ $GB_SIZE -eq 0 ]; then
+      MB_SIZE=$(($SIZE / 2 / 1024))
+      SIZE_HUMAN="${MB_SIZE} MiB"
+    else
+      SIZE_HUMAN="${GB_SIZE} GiB"
+    fi
+
+    printf "${PART_NODEV}\t${SIZE} blocks\t${SIZE_HUMAN}\t${TYPE}\n"
   done
 }
 
@@ -167,7 +176,13 @@ show_block_device_info()
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
-    printf "\t%s GiB" "$(($SIZE / 2 / 1024 / 1024))"
+    GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
+    if [ $GB_SIZE -eq 0 ]; then
+      MB_SIZE=$(($SIZE / 2 / 1024))
+      printf "\t${MB_SIZE} MiB"
+    else
+      printf "\t${GB_SIZE} GiB"
+    fi
   fi
 }
 
