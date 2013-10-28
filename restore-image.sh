@@ -1449,14 +1449,14 @@ load_config()
                                --help|-h) show_help;
                                           exit 0
                                           ;;
-                                      -*) echo "Bad argument: $ARGNAME" >&2
+                                      -*) echo "ERROR: Bad argument \"$arg\"" >&2
                                           show_help;
                                           exit 0
                                           ;;
                                        *) if [ -z "$IMAGE_NAME" ]; then
                                             IMAGE_NAME="$arg"
                                           else
-                                            echo "Bad command syntax" >&2
+                                            echo "ERROR: Bad command syntax with argument \"$arg\"" >&2
                                             show_help;
                                             exit 4
                                           fi
