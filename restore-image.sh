@@ -230,7 +230,7 @@ configure_network()
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        if ! get_user_yn "\n* Setup interface $CUR_IF statically (Y/N)? "; then
+        if ! get_user_yn "\n* Setup interface $CUR_IF statically (Y/N)?"; then
           continue;
         fi
 
