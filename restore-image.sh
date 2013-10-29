@@ -3,7 +3,7 @@
 MY_VERSION="3.10-BETA16-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 28, 2013
+# Last update: October 29, 2013
 # (C) Copyright 2004-2013 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -160,9 +160,9 @@ show_block_device_info()
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
-    GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
+    GB_SIZE=$(($SIZE / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
-      MB_SIZE=$(($SIZE / 2 / 1024))
+      MB_SIZE=$(($SIZE / 1024))
       printf "\t${MB_SIZE} MiB"
     else
       printf "\t${GB_SIZE} GiB"
