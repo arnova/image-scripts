@@ -705,11 +705,11 @@ backup_disks()
       do_exit 8
     fi
 
-    SFDISK_OUTPUT=`sfdisk -d /dev/$HDD_NODEV 2>/dev/null`
+    SFDISK_OUTPUT=`sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null`
     if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
       # GPT partition table found
       echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.$HDD_NODEV..."
-      sgdisk --backup="sgdisk.${HDD_NODEV}" /dev/$HDD_NODEV
+      sgdisk --backup="sgdisk.${HDD_NODEV}" "/dev/${HDD_NODEV}"
 
       # Dump gdisk -l info to file
       gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${HDD_NODEV}"
@@ -717,9 +717,6 @@ backup_disks()
       # DOS partition table found
       echo "* Storing DOS partition table for /dev/$HDD_NODEV in sfdisk.$HDD_NODEV..."
       echo "$SFDISK_OUTPUT" > "sfdisk.$HDD_NODEV"
-
-      # FIXME: Legacy. Must be removed in future releases
-      cp "sfdisk.${HDD_NODEV}" "partitions.${HDD_NODEV}"
 
       # Dump fdisk -l info to file
       fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${HDD_NODEV}"

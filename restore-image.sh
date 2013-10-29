@@ -439,7 +439,7 @@ sanity_check()
   [ "$NO_MOUNT" != "0" ] && check_command_error mount
   [ "$NO_MOUNT" != "0" ] && check_command_error umount
 
-# TODO: Need to do this for GPT implementation but only when GPT is used, so may need to move this
+  # FIXME: Need to do this for GPT implementation but only when GPT is used, so may need to move this
   check_command_warning gdisk
   check_command_warning sgdisk
 
@@ -636,13 +636,14 @@ set_image_source_dir()
            IMAGE_NAME="$IMAGE_DEFAULT"
         fi
 
-        if [ "$IMAGE_NAME" = "." -o -z "$IMAGE_NAME" ]; then
+        if [ -z "$IMAGE_NAME" -o "$IMAGE_NAME" = "." ]; then
           TEMP_IMAGE_DIR="$IMAGE_DIR"
         else
           TEMP_IMAGE_DIR="$IMAGE_DIR/$IMAGE_NAME"
         fi
-        
-        if ! ls "$TEMP_IMAGE_DIR"/partitions.* >/dev/null 2>&1; then
+
+        LOOKUP="$(find "$TEMP_IMAGE_DIR/" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" -o -iname "track0.*")"
+        if [ -z "$LOOKUP" ]; then
           printf "\033[40m\033[1;31m\nERROR: No valid image (directory) specified ($TEMP_IMAGE_DIR)!\n\n\033[0m" >&2
           continue;
         fi
@@ -849,11 +850,11 @@ check_disks()
   # Show disks/devices available for restoration
   show_available_disks;
 
-  # Restore MBR/track0/partitions
-  # FIXME: need to check track0 + images as well here!?
+  # Restore MBR/track0/partitions:
+  # FIXME: need to check images as well here!
   # FIXME, we should exclude disks not in --dev, if specified and consider --clean
   unset IFS
-  for FN in partitions.*; do
+  for FN in track0.*; do
     # Extract drive name from file
     IMAGE_SOURCE_NODEV="$(basename "$FN" |sed s/'.*\.'//)"
     IMAGE_TARGET_NODEV=`source_to_target_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
@@ -1093,7 +1094,8 @@ restore_disks()
       SFDISK_FILE=""
       if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         SFDISK_FILE="sfdisk.${IMAGE_SOURCE_NODEV}"
-      elif [ -f "partitions.${IMAGE_SOURCE_NODEV}" ]; then
+      elif [ -f "partitions.${IMAGE_SOURCE_NODEV}" ] && grep -q '^# partition table of' "partitions.${IMAGE_SOURCE_NODEV}"; then
+        # Legacy fallback
         SFDISK_FILE="partitions.${IMAGE_SOURCE_NODEV}"
       fi
 
@@ -1274,7 +1276,7 @@ test_target_partitions()
       # DOS partition found
       SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "sfdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
       # If empty, try old (legacy) file
-      if [ -z "$SFDISK_SOURCE_PART" ]; then
+      if [ -z "$SFDISK_SOURCE_PART" -a -f "partitions.${SOURCE_DISK_NODEV}" ] && grep -q '^# partition table of' "partitions.${SOURCE_DISK_NODEV}"; then
         SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "partitions.${SOURCE_DISK_NODEV}" 2>/dev/null)"
       fi
 
@@ -1385,7 +1387,7 @@ show_help()
   echo "--conf|-c={config_file}     - Specify alternate configuration file" >&2
   echo "--noconf                    - Don't read the config file" >&2
   echo "--mbr                       - Always write a new track0(MBR) (from track0.*)" >&2
-  echo "--pt                        - Always write a new partition-table (from partitions.*)" >&2
+  echo "--pt                        - Always write a new partition-table (from sfdisk/gdisk.*)" >&2
   echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)" >&2
   echo "--force                     - Continue, even if there are eg. mounted partitions (USE WITH CARE!)" >&2
   echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty" >&2
