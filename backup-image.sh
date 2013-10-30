@@ -468,6 +468,7 @@ set_image_target_dir()
 
       # Unmount mount point to be used
       umount "$IMAGE_ROOT" 2>/dev/null
+      echo ""
 
       if [ -n "$SERVER" -a -n "$DEFAULT_USERNAME" ]; then
         while true; do
@@ -855,12 +856,11 @@ sanity_check;
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET -ne 1 ]; then
   # Setup network (interface)
   configure_network;
-fi
 
-# Try to sync time against the server used, if ntpdate is available
-if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
-  ntpdate "$SERVER"
-  echo ""
+  # Try to sync time against the server used, if ntpdate is available
+  if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
+    ntpdate "$SERVER"
+  fi
 fi
 
 # Setup CTRL-C handler

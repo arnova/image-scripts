@@ -551,6 +551,7 @@ set_image_source_dir()
 
       # Unmount mount point to be used
       umount "$IMAGE_ROOT" 2>/dev/null
+      echo ""
 
       if [ -n "$SERVER" -a -n "$DEFAULT_USERNAME" ]; then
         while true; do
@@ -1495,14 +1496,13 @@ load_config $*;
 # Sanity check environment
 sanity_check;
 
-if [ "$NETWORK" != "none" -a -n "$NETWORK" -a "$NO_NET" != "1" ]; then
+if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET != 1 ]; then
   # Setup network (interface)
   configure_network;
 
   # Try to sync time against the server used, if ntpdate is available
   if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
     ntpdate "$SERVER"
-    echo ""
   fi
 fi
 
