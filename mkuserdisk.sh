@@ -108,7 +108,7 @@ mkud_create_user_filesystem()
     fi
 
     # If user partition is on the same device as the images, check that it does not exist already
-    if [ $USER_DISK_ON_OTHER_DEVICE -eq 0 -a ! -e $USER_PART ]; then
+    if [ ! -e $USER_PART -o $EMPTY_PARTITION_TABLE -eq 1 ]; then
       # Detect GPT
       if sfdisk -d $USER_DISK 2>/dev/null |grep -q -E -i '[[:blank:]]Id=ee'; then
         mkud_create_user_gpt_partition;
