@@ -23,6 +23,7 @@ mkud_create_user_dos_partition()
   local PART_ID="$USER_PART_ID"
   local FDISK_CMD=""
 
+  # TODO?: Use parted -s and auto detect PART_ID
   if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
     # Empty partition table"
     FDISK_CMD="o
@@ -63,6 +64,7 @@ mkud_create_user_gpt_partition()
   local PART_ID="$USER_PART_ID"
   local GDISK_CMD=""
 
+  # TODO?: Use parted -s and auto detect PART_ID
   if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
     # Empty partition table"
     GDISK_CMD="o
