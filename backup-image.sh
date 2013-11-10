@@ -28,6 +28,7 @@ DEFAULT_CONF="$(dirname $0)/image.cnf"
 ##################
 # Define globals #
 ##################
+BACKUP_IMAGES=""
 BACKUP_PARTITIONS=""
 IGNORE_PARTITIONS=""
 SUCCESS=""
@@ -641,6 +642,9 @@ backup_partitions()
             printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
             partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
             retval=$?
+            if [ retval -eq 0 ]; then
+              BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
+            fi
             ;;
       pc)   TARGET_FILE="$PART.pc.gz"
             PARTCLONE=`partclone_detect "/dev/$PART"`
@@ -650,6 +654,9 @@ backup_partitions()
               retval=$?
               if [ $retval -eq 0 ]; then
                 retval=`cat /tmp/.partclone.exitcode`
+                if [ retval -eq 0 ]; then
+                  BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
+                fi
               fi
             fi
             ;;
@@ -659,6 +666,9 @@ backup_partitions()
             retval=$?
             if [ $retval -eq 0 ]; then
               retval=`cat /tmp/.dd.exitcode`
+              if [ retval -eq 0 ]; then
+                BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
+              fi
             fi
             ;;
     esac
@@ -977,11 +987,14 @@ else
 fi
 
 # Check integrity of .gz-files:
-if [ -n "$(find . -maxdepth 1 -type f -iname "*\.gz*" 2>/dev/null)" ]; then
+if [ -n "$BACKUP_IMAGES" ]; then
   echo ""
-  echo "Verifying .gz images (CTRL-C to break):"
-  # Note that pigz seems to hang on broken archives, therefor use gzip
-  gzip -tv *\.gz*
+  echo "* Verifying images (CTRL-C to break): $BACKUP_IMAGES..."
+  IFS=' '
+  for BACKUP_IMAGE in $BACKUP_IMAGES; do
+    # Note that pigz seems to hang on broken archives, therefor use gzip
+    gzip -tv "$BACKUP_IMAGE"
+  done
 fi
 
 # Exit (+unmount)
