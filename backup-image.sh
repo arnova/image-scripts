@@ -24,9 +24,18 @@ MY_VERSION="3.10-BETA16-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 
 DEFAULT_CONF="$(dirname $0)/image.cnf"
+
+##################
+# Define globals #
+##################
+BACKUP_PARTITIONS=""
+IGNORE_PARTITIONS=""
+SUCCESS=""
+FAILED=""
+
 EOL='
 '
-
+  
 do_exit()
 {
   echo ""
@@ -588,8 +597,6 @@ select_partitions()
   fi
 
   # Check which partitions to backup, we ignore mounted ones
-  BACKUP_PARTITIONS=""
-  IGNORE_PARTITIONS=""
   unset IFS
   for PART_NODEV in $SELECT_PARTITIONS; do
     if grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /etc/mtab; then
@@ -760,8 +767,6 @@ load_config()
   # Set environment variables to default
   CONF="$DEFAULT_CONF"
   IMAGE_NAME=""
-  SUCCESS=""
-  FAILED=""
   DEVICES=""
   IMAGE_PROGRAM=""
   NO_NET=0

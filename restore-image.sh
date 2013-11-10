@@ -24,6 +24,19 @@ MY_VERSION="3.10-BETA16-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 
 DEFAULT_CONF="$(dirname $0)/image.cnf"
+
+##################
+# Define globals #
+##################
+SUCCESS=""
+FAILED=""
+
+# Reset global, used by other functions later on:
+TARGET_DEVICES=""
+  
+# Global used later on when restoring partition-tables etc.
+DEVICE_FILES=""
+
 SEP=':'
 EOL='
 '
@@ -842,12 +855,6 @@ show_available_disks()
 
 check_disks()
 {
-  # Reset global, used by other functions later on:
-  TARGET_DEVICES=""
-  
-  # Global used later on when restoring partition-tables etc.
-  DEVICE_FILES=""
-  
   # Show disks/devices available for restoration
   show_available_disks;
 
@@ -1406,8 +1413,6 @@ load_config()
   # Set environment variables to default
   CONF="$DEFAULT_CONF"
   IMAGE_NAME=""
-  SUCCESS=""
-  FAILED=""
   DEVICES=""
   PARTITIONS=""
   CLEAN=0
