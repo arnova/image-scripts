@@ -714,7 +714,7 @@ backup_partitions()
             printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
             partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
             retval=$?
-            if [ retval -eq 0 ]; then
+            if [ $retval -eq 0 ]; then
               BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
             fi
             ;;
@@ -726,7 +726,7 @@ backup_partitions()
               retval=$?
               if [ $retval -eq 0 ]; then
                 retval=`cat /tmp/.partclone.exitcode`
-                if [ retval -eq 0 ]; then
+                if [ $retval -eq 0 ]; then
                   BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
                 fi
               fi
@@ -738,7 +738,7 @@ backup_partitions()
             retval=$?
             if [ $retval -eq 0 ]; then
               retval=`cat /tmp/.dd.exitcode`
-              if [ retval -eq 0 ]; then
+              if [ $retval -eq 0 ]; then
                 BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
               fi
             fi
