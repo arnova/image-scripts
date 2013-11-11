@@ -31,6 +31,7 @@ DEFAULT_CONF="$(dirname $0)/image.cnf"
 BACKUP_IMAGES=""
 BACKUP_PARTITIONS=""
 IGNORE_PARTITIONS=""
+BACKUP_DISKS=""
 SUCCESS=""
 FAILED=""
 
@@ -213,24 +214,6 @@ list_device_partitions()
     GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
     printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
   fi
-}
-
-
-show_available_disks()
-{
-  echo "* Available devices/disks:"
-  
-  IFS=$EOL
-  for BLK_DEVICE in /sys/block/*; do
-    DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
-    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -e "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
-      continue; # Ignore device
-    fi
-
-    echo "  $DEVICE: $(show_block_device_info $BLK_DEVICE)"
-  done
-
-  echo ""
 }
 
 
@@ -585,9 +568,37 @@ set_image_target_dir()
 }
 
 
+select_disks()
+{
+  BACKUP_DISKS=""
+
+  IFS=' '
+  for PART in $BACKUP_PARTITIONS; do
+    local HDD_NODEV=`get_partition_disk "$PART"`
+    if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
+      BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
+    fi
+  done
+}
+
+
+show_backup_disks_info()
+{
+  IFS=' '
+  for HDD in $BACKUP_DISKS; do
+    HDD_NODEV=`get_partition_disk "$HDD"`
+    echo "* Available backup disk /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
+    list_device_partitions /dev/$HDD_NODEV
+  done
+
+  echo ""
+}
+
+
 select_partitions()
 {
   local SELECT_DEVICES="$DEVICES"
+  local LAST_BACKUP_DISKS=""
   local USER_SELECT=0
  
   # User select loop:
@@ -652,6 +663,14 @@ select_partitions()
     done
 
     if [ -n "$BACKUP_PARTITIONS" ]; then
+      select_disks; # Determine which disks the partitions are on
+
+      # Only show info when not shown before
+      if [ "$BACKUP_DISKS" != "$LAST_BACKUP_DISKS" ]; then
+        show_backup_disks_info;
+        LAST_BACKUP_DISKS="$BACKUP_DISKS"
+      fi
+
       if [ $USER_SELECT -eq 1 ]; then
         printf "* Select partitions to backup (default=$BACKUP_PARTITIONS): "
         read USER_DEVICES
@@ -666,12 +685,11 @@ select_partitions()
        else
          break;
       fi
-      select_disks;
     else
       echo "ERROR: No partitions to backup on $SELECT_DEVICES"
       echo ""
       SELECT_DEVICES=""
-      USERS_SELECT=1
+      USER_SELECT=1
     fi
   done
 }
@@ -734,23 +752,6 @@ backup_partitions()
       echo "****** Backuped /dev/$PART to $TARGET_FILE ******"
     fi
     echo ""
-  done
-}
-
-
-select_disks()
-{
-  BACKUP_DISKS=""
-
-  IFS=' '
-  for PART in $BACKUP_PARTITIONS; do
-    local HDD_NODEV=`get_partition_disk "$PART"`
-    if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
-      echo "* Available disk /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
-      list_device_partitions /dev/$HDD_NODEV
-
-      BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
-    fi
   done
 }
 
