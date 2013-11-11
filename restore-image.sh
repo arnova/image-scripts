@@ -203,6 +203,24 @@ list_device_partitions()
 }
 
 
+show_available_disks()
+{
+  echo "* Available devices/disks:"
+  
+  IFS=$EOL
+  for BLK_DEVICE in /sys/block/*; do
+    DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -e "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
+      continue; # Ignore device
+    fi
+
+    echo "  $DEVICE: $(show_block_device_info $BLK_DEVICE)"
+  done
+
+  echo ""
+}
+
+
 # Setup the ethernet interface
 configure_network()
 {
@@ -832,24 +850,6 @@ user_target_dev_select()
   if echo "$USER_TARGET_NODEV" |grep -q '^/dev/'; then
     USER_TARGET_NODEV="$(echo "$USER_TARGET_NODEV" |sed s,'^/dev/',,)"
   fi
-}
-
-
-show_available_disks()
-{
-  echo "* Available devices/disks:"
-  
-  IFS=$EOL
-  for BLK_DEVICE in /sys/block/*; do
-    DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
-    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -e "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
-      continue; # Ignore device
-    fi
-
-    echo "  $DEVICE: $(show_block_device_info $BLK_DEVICE)"
-  done
-
-  echo ""
 }
 
 

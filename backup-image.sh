@@ -36,7 +36,7 @@ FAILED=""
 
 EOL='
 '
-  
+
 do_exit()
 {
   echo ""
@@ -213,6 +213,24 @@ list_device_partitions()
     GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
     printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
   fi
+}
+
+
+show_available_disks()
+{
+  echo "* Available devices/disks:"
+  
+  IFS=$EOL
+  for BLK_DEVICE in /sys/block/*; do
+    DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -e "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
+      continue; # Ignore device
+    fi
+
+    echo "  $DEVICE: $(show_block_device_info $BLK_DEVICE)"
+  done
+
+  echo ""
 }
 
 
@@ -569,58 +587,91 @@ set_image_target_dir()
 
 select_partitions()
 {
-  local SELECT_PARTITIONS=""
+  local SELECT_DEVICES="$DEVICES"
+  local USER_SELECT=0
+ 
+  # User select loop:
+  while true; do
+    # Check if target device exists
+    if [ -n "$SELECT_DEVICES" ]; then
+      local SELECT_PARTITIONS=""
+      BACKUP_PARTITIONS=""
+      IGNORE_PARTITIONS=""
 
-  # Check if target device exists
-  if [ -n "$DEVICES" ]; then
-    unset IFS
-    for DEVICE in $DEVICES; do
-      if [ ! -e "/dev/$DEVICE" ]; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Specified source block device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
-        echo ""
-        exit 5
-      else
-        local FIND_PARTITIONS=`get_partitions_with_size_type /dev/$DEVICE`
-        # Does the device contain partitions?
-        if [ -n "$FIND_PARTITIONS" ]; then
-          local FILTER_PARTITIONS="$(echo "$FIND_PARTITIONS" |grep -v -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$' |awk '{ printf ("%s ",$1) }')"
-          SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FILTER_PARTITIONS}"
+      unset IFS
+      for DEVICE in $SELECT_DEVICES; do
+        if [ ! -e "/dev/$DEVICE" ]; then
+          echo ""
+          printf "\033[40m\033[1;31mERROR: Specified source block device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
+          echo ""
+          exit 5
         else
-          SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${DEVICE}"
+          local FIND_PARTITIONS=`get_partitions_with_size_type /dev/$DEVICE`
+          # Does the device contain partitions?
+          if [ -n "$FIND_PARTITIONS" ]; then
+            local FILTER_PARTITIONS="$(echo "$FIND_PARTITIONS" |grep -v -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$' |awk '{ printf ("%s ",$1) }')"
+            SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FILTER_PARTITIONS}"
+          else
+            SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${DEVICE}"
+          fi
         fi
+      done
+    else
+      USER_SELECT=1
+
+      # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
+      local FIND_PARTITIONS=`get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$'  -e ' squashfs$' |awk '{ printf ("%s ",$1) }'`
+      SELECT_PARTITIONS="$FIND_PARTITIONS"
+    fi
+
+    # Check which partitions to backup, we ignore mounted ones
+    unset IFS
+    for PART_NODEV in $SELECT_PARTITIONS; do
+      if grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /etc/mtab; then
+        # In case user specifically selected partition, hardfail:
+        if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
+          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART_NODEV is mounted! Wrong device/partition specified? Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+
+        if [ -n "$DEVICES" ]; then
+          echo "* WARNING: Ignoring mounted partition $PART_NODEV!" >&2
+        fi
+        IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
+      elif grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /proc/swaps; then
+        # In case user specifically selected partition, hardfail:
+        if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
+          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART_NODEV is used as swap! Wrong device/partition specified? Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+
+        IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
+      else
+        BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }${PART_NODEV}"
       fi
     done
-  else
-    # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-    local FIND_PARTITIONS=`get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$'  -e ' squashfs$' |awk '{ printf ("%s ",$1) }'`
-    SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
-  fi
 
-  # Check which partitions to backup, we ignore mounted ones
-  unset IFS
-  for PART_NODEV in $SELECT_PARTITIONS; do
-    if grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /etc/mtab; then
-      # In case user specifically selected partition, hardfail:
-      if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
-        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART_NODEV is mounted! Wrong device/partition specified? Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
+    if [ -n "$BACKUP_PARTITIONS" ]; then
+      if [ $USER_SELECT -eq 1 ]; then
+        printf "* Select partitions to backup (default=$BACKUP_PARTITIONS): "
+        read USER_DEVICES
 
-      if [ -n "$DEVICES" ]; then
-        echo "* WARNING: Ignoring mounted partition $PART_NODEV!" >&2
+        if [ -z "$USER_DEVICES" ]; then
+          break;
+        else
+          SELECT_DEVICES="$USER_DEVICES"
+          USER_SELECT=0
+          continue; # Redo loop
+        fi
+       else
+         break;
       fi
-      IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
-    elif grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /proc/swaps; then
-      # In case user specifically selected partition, hardfail:
-      if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
-        printf "\033[40m\033[1;31mERROR: Partition /dev/$PART_NODEV is used as swap! Wrong device/partition specified? Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
+      select_disks;
     else
-      BACKUP_PARTITIONS="${BACKUP_PARTITIONS}${BACKUP_PARTITIONS:+ }${PART_NODEV}"
+      echo "ERROR: No partitions to backup on $SELECT_DEVICES"
+      echo ""
+      SELECT_DEVICES=""
+      USERS_SELECT=1
     fi
   done
 }
@@ -695,7 +746,7 @@ select_disks()
   for PART in $BACKUP_PARTITIONS; do
     local HDD_NODEV=`get_partition_disk "$PART"`
     if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
-      echo "* Including /dev/$HDD_NODEV for backup: $(show_block_device_info $HDD_NODEV)"
+      echo "* Available disk /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
       list_device_partitions /dev/$HDD_NODEV
 
       BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
@@ -903,11 +954,8 @@ if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   echo ""
 fi
 
-# Determine which partitions to backup
+# Determine which partitions to backup, else determines disks they're on
 select_partitions;
-
-# Determine which disks to backup
-select_disks;
 
 if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
   if [ -n "$IGNORE_PARTITIONS" ]; then
