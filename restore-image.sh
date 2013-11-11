@@ -217,9 +217,9 @@ get_partitions_fancified()
     GB_SIZE=$(($SIZE / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
       MB_SIZE=$(($SIZE / 1024))
-      SIZE_HUMAN="${MB_SIZE}MiB"
+      SIZE_HUMAN="${MB_SIZE} MiB"
     else
-      SIZE_HUMAN="${GB_SIZE}GiB"
+      SIZE_HUMAN="${GB_SIZE} GiB"
     fi
 
     if [ -z "$BLKINFO" ]; then
@@ -234,7 +234,7 @@ get_partitions_fancified()
 show_available_disks()
 {
   echo "* Available devices/disks:"
-  
+
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
     DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
@@ -673,7 +673,7 @@ set_image_source_dir()
       if [ -z "$IMAGE_RESTORE_DEFAULT" ]; then
         IMAGE_RESTORE_DEFAULT="."
       fi
-      
+
       # Ask user for IMAGE_NAME
       IMAGE_DEFAULT="$IMAGE_RESTORE_DEFAULT"
       while true; do

@@ -141,9 +141,9 @@ get_partitions_fancified()
     GB_SIZE=$(($SIZE / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
       MB_SIZE=$(($SIZE / 1024))
-      SIZE_HUMAN="${MB_SIZE}MiB"
+      SIZE_HUMAN="${MB_SIZE} MiB"
     else
-      SIZE_HUMAN="${GB_SIZE}GiB"
+      SIZE_HUMAN="${GB_SIZE} GiB"
     fi
 
     if [ -z "$BLKINFO" ]; then
@@ -165,7 +165,7 @@ get_partition_disk()
 show_block_device_info()
 {
   local DEVICE=`echo "$1" |sed s,'^/dev/',,`
-  
+
   if ! echo "$DEVICE" |grep -q '^/'; then
     DEVICE="/sys/class/block/${DEVICE}"
   fi
@@ -663,10 +663,11 @@ select_partitions()
 
       # Only show info when not shown before
       if [ "$BACKUP_DISKS" != "$LAST_BACKUP_DISKS" ]; then
-        show_backup_disks_info;
         if [ -n "IGNORE_PARTITIONS" ]; then
           echo "NOTE: Ignored (mounted/swap) partitions: $IGNORE_PARTITIONS"
         fi
+
+        show_backup_disks_info;
 
         LAST_BACKUP_DISKS="$BACKUP_DISKS"
       fi
