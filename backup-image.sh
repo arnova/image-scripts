@@ -1037,7 +1037,7 @@ fi
 # Check integrity of .gz-files:
 if [ -n "$BACKUP_IMAGES" ]; then
   echo ""
-  echo "* Verifying images (CTRL-C to break): $BACKUP_IMAGES..."
+  echo "* Verifying image(s) ($BACKUP_IMAGES) (CTRL-C to break)..."
   IFS=' '
   for BACKUP_IMAGE in $BACKUP_IMAGES; do
     # Note that pigz seems to hang on broken archives, therefor use gzip
