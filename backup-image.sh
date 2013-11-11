@@ -135,7 +135,7 @@ get_partitions_fancified()
   IFS=$EOL
   get_partitions_with_size "$DISK_NODEV" |while read LINE; do
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
-    local BLKID="$(blkid "/dev/${PART_NODEV}" |sed s/' *$'//)"
+    local BLKINFO="$(blkid "/dev/$PART_NODEV" |sed s/' *$'//)"
     local SIZE=`echo "$LINE" |awk '{ print $2 }'`
 
     GB_SIZE=$(($SIZE / 1024 / 1024))
@@ -146,7 +146,11 @@ get_partitions_fancified()
       SIZE_HUMAN="${GB_SIZE}GiB"
     fi
 
-    echo "$BLKID SIZE=$SIZE ($SIZE_HUMAN)"
+    if [ -z "$BLKINFO" ]; then
+      BLKINFO="/dev/$PART_NODEV TYPE=other"
+    fi
+
+    echo "$BLKINFO SIZE=$SIZE ($SIZE_HUMAN)"
   done
 }
 

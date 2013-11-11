@@ -203,6 +203,34 @@ list_device_partitions()
 }
 
 
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
+get_partitions_fancified()
+{
+  local DISK_NODEV="$1"
+
+  IFS=$EOL
+  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+    local BLKINFO="$(blkid "/dev/$PART_NODEV" |sed s/' *$'//)"
+    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
+
+    GB_SIZE=$(($SIZE / 1024 / 1024))
+    if [ $GB_SIZE -eq 0 ]; then
+      MB_SIZE=$(($SIZE / 1024))
+      SIZE_HUMAN="${MB_SIZE}MiB"
+    else
+      SIZE_HUMAN="${GB_SIZE}GiB"
+    fi
+
+    if [ -z "$BLKINFO" ]; then
+      BLKINFO="/dev/$PART_NODEV TYPE=other"
+    fi
+
+    echo "$BLKINFO SIZE=$SIZE ($SIZE_HUMAN)"
+  done
+}
+
+
 show_available_disks()
 {
   echo "* Available devices/disks:"
@@ -914,7 +942,7 @@ check_disks()
     
     if [ -n "$PARTITIONS_FOUND" ]; then
       echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions:"
-      list_device_partitions /dev/$TARGET_NODEV
+      get_partitions_fancified /dev/$TARGET_NODEV
     fi
 
     if [ $PT_ADD -eq 1 ]; then
@@ -1609,7 +1637,7 @@ echo "--------------------------------------------------------------------------
 IFS=' '
 for DEVICE in $TARGET_DEVICES; do
   echo "* $DEVICE: $(show_block_device_info "$DEVICE")"
-  list_device_partitions "$DEVICE"
+  get_partitions_fancified "$DEVICE"
 done
 
 if [ -n "$FAILED" ]; then
