@@ -135,12 +135,8 @@ get_partitions_fancified()
   IFS=$EOL
   get_partitions_with_size "$DISK_NODEV" |while read LINE; do
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
-    local TYPE=`blkid -s TYPE -o value "/dev/${PART_NODEV}"`
+    local BLKID="$(blkid "/dev/${PART_NODEV}" |sed s/' *$'//)"
     local SIZE=`echo "$LINE" |awk '{ print $2 }'`
-    
-    if [ -z "$TYPE" ]; then
-      TYPE="other" # = eg. extended partition, disk device, sr0, loop0 etc.
-    fi
 
     GB_SIZE=$(($SIZE / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
@@ -150,7 +146,7 @@ get_partitions_fancified()
       SIZE_HUMAN="${GB_SIZE}GiB"
     fi
 
-    printf "${PART_NODEV} ${SIZE} ${SIZE_HUMAN} ${TYPE}\n"
+    echo "$BLKID SIZE=$SIZE ($SIZE_HUMAN)"
   done
 }
 
@@ -588,7 +584,8 @@ show_backup_disks_info()
   for HDD in $BACKUP_DISKS; do
     HDD_NODEV=`get_partition_disk "$HDD"`
     echo "* Available backup disk /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
-    list_device_partitions /dev/$HDD_NODEV
+    get_partitions_fancified /dev/$HDD_NODEV
+    echo ""
   done
 }
 
