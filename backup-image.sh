@@ -590,8 +590,6 @@ show_backup_disks_info()
     echo "* Available backup disk /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
     list_device_partitions /dev/$HDD_NODEV
   done
-
-  echo ""
 }
 
 
@@ -645,9 +643,6 @@ select_partitions()
           do_exit 5
         fi
 
-        if [ -n "$DEVICES" ]; then
-          echo "* WARNING: Ignoring mounted partition $PART_NODEV!" >&2
-        fi
         IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
       elif grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /proc/swaps; then
         # In case user specifically selected partition, hardfail:
@@ -668,12 +663,18 @@ select_partitions()
       # Only show info when not shown before
       if [ "$BACKUP_DISKS" != "$LAST_BACKUP_DISKS" ]; then
         show_backup_disks_info;
+        if [ -n "IGNORE_PARTITIONS" ]; then
+          echo "NOTE: Ignored (mounted/swap) partitions: $IGNORE_PARTITIONS"
+        fi
+
         LAST_BACKUP_DISKS="$BACKUP_DISKS"
       fi
 
       if [ $USER_SELECT -eq 1 ]; then
         printf "* Select partitions to backup (default=$BACKUP_PARTITIONS): "
         read USER_DEVICES
+
+        IGNORE_PARTITIONS="" # Don't confuse user by showing ignored partitions
 
         if [ -z "$USER_DEVICES" ]; then
           break;
@@ -959,10 +960,6 @@ fi
 select_partitions;
 
 if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
-  if [ -n "$IGNORE_PARTITIONS" ]; then
-    echo "* Partitions to ignore: $IGNORE_PARTITIONS"
-  fi
-
   if [ -n "$BACKUP_PARTITIONS" ]; then
     echo "* Partitions to backup: $BACKUP_PARTITIONS"
   else
