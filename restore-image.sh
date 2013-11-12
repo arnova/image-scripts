@@ -94,7 +94,6 @@ get_user_yn()
 get_partitions_with_size()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
   local FIND_PARTS=`cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }'`
 
   if [ -n "$DISK_NODEV" ]; then
@@ -206,7 +205,7 @@ list_device_partitions()
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions_fancified()
 {
-  local DISK_NODEV="$1"
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
   IFS=$EOL
   get_partitions_with_size "$DISK_NODEV" |while read LINE; do
@@ -223,10 +222,10 @@ get_partitions_fancified()
     fi
 
     if [ -z "$BLKINFO" ]; then
-      BLKINFO="/dev/$PART_NODEV TYPE=other"
+      BLKINFO="/dev/${PART_NODEV}: TYPE=\"other\""
     fi
 
-    echo "$BLKINFO SIZE=$SIZE ($SIZE_HUMAN)"
+    echo "$BLKINFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
 }
 
@@ -402,7 +401,7 @@ partwait()
   
   echo "Waiting for kernel to reread the partition on $DEVICE..."
     
-  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
+  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
   IFS=' '
   local TRY=10
   while [ $TRY -gt 0 ]; do
@@ -447,7 +446,7 @@ partprobe()
 
   echo "(Re)reading partition-table on $DEVICE..."
 
-  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm or blkid)
+  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
   local TRY=10
   while [ $TRY -gt 0 ]; do
     TRY=$(($TRY - 1))

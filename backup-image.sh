@@ -112,7 +112,7 @@ get_partitions()
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions_with_size_type()
 {
-  local DISK_NODEV="$1"
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
   IFS=$EOL
   get_partitions_with_size "$DISK_NODEV" |while read LINE; do
@@ -130,7 +130,7 @@ get_partitions_with_size_type()
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions_fancified()
 {
-  local DISK_NODEV="$1"
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
   IFS=$EOL
   get_partitions_with_size "$DISK_NODEV" |while read LINE; do
@@ -147,10 +147,10 @@ get_partitions_fancified()
     fi
 
     if [ -z "$BLKINFO" ]; then
-      BLKINFO="/dev/$PART_NODEV TYPE=other"
+      BLKINFO="/dev/${PART_NODEV}: TYPE=\"other\""
     fi
 
-    echo "$BLKINFO SIZE=$SIZE ($SIZE_HUMAN)"
+    echo "$BLKINFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
 }
 
@@ -616,7 +616,7 @@ select_partitions()
           echo ""
           exit 5
         else
-          local FIND_PARTITIONS=`get_partitions_with_size_type /dev/$DEVICE`
+          local FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE)"
           # Does the device contain partitions?
           if [ -n "$FIND_PARTITIONS" ]; then
             local FILTER_PARTITIONS="$(echo "$FIND_PARTITIONS" |grep -v -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$' |awk '{ printf ("%s ",$1) }')"
@@ -630,8 +630,7 @@ select_partitions()
       USER_SELECT=1
 
       # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-      local FIND_PARTITIONS=`get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$'  -e ' squashfs$' |awk '{ printf ("%s ",$1) }'`
-      SELECT_PARTITIONS="$FIND_PARTITIONS"
+      SELECT_PARTITIONS="$(get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$'  -e ' squashfs$' |awk '{ printf ("%s ",$1) }')"
     fi
 
     # Check which partitions to backup, we ignore mounted ones
