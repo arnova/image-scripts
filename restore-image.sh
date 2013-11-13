@@ -1639,6 +1639,7 @@ IFS=' '
 for DEVICE in $TARGET_DEVICES; do
   echo "* $DEVICE: $(show_block_device_info "$DEVICE")"
   get_partitions_fancified "$DEVICE"
+  echo ""
 done
 
 if [ -n "$FAILED" ]; then
