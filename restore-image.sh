@@ -167,7 +167,7 @@ show_block_device_info()
 
   local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
-    printf "%s " "$REV"
+    printf "%s - " "$REV"
   fi
 
   local SIZE="$(cat "${DEVICE}/size")"
@@ -175,9 +175,9 @@ show_block_device_info()
     GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
       MB_SIZE=$(($SIZE / 2 / 1024))
-      printf "\t${MB_SIZE} MiB"
+      printf "${MB_SIZE} MiB"
     else
-      printf "\t${GB_SIZE} GiB"
+      printf "${GB_SIZE} GiB"
     fi
   fi
 }
@@ -225,7 +225,7 @@ get_partitions_fancified()
       BLKINFO="/dev/${PART_NODEV}: TYPE=\"other\""
     fi
 
-    echo "$BLKINFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
+    echo "$BLKINFO SIZE=$SIZE SIZEH=\"$SIZE_HUMAN\""
   done
 }
 
@@ -1045,6 +1045,7 @@ check_disks()
     DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
     TARGET_DEVICES="${TARGET_DEVICES}/dev/${TARGET_NODEV} "
 
+    if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $MBR_WRITE -eq 1 ]; then
     IFS=$EOL
     for PART in $PARTITIONS_FOUND; do
       # Check for mounted partitions on target device
@@ -1069,6 +1070,7 @@ check_disks()
         fi
       fi
     done
+    fi
   done
 }
 
@@ -1197,7 +1199,7 @@ check_image_files()
       fi
 
       IMAGE_FILE=`basename "$LOOKUP"`
-      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//')`
+      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
       TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
       
       # Add item to list
@@ -1429,7 +1431,7 @@ show_help()
   echo "--nonet|-n                  - Don't try to setup networking" >&2
   echo "--nomount|-m                - Don't mount anything" >&2
   echo "--noimage                   - Don't restore any partition images, only do partition-table/MBR operations" >&2
-  echo "--noccustomsh|--nosh        - Don't execute any custom shell script(s)" >&2
+  echo "--nocustomsh|--nosh         - Don't execute any custom shell script(s)" >&2
   echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
   echo "--add                       - Add partition entries (don't overwrite like with --clean)" >&2
 }

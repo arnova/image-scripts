@@ -150,7 +150,7 @@ get_partitions_fancified()
       BLKINFO="/dev/${PART_NODEV}: TYPE=\"other\""
     fi
 
-    echo "$BLKINFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
+    echo "$BLKINFO SIZE=$SIZE SIZEH=\"$SIZE_HUMAN\""
   done
 }
 
@@ -182,7 +182,7 @@ show_block_device_info()
 
   local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
-    printf "%s " "$REV"
+    printf "%s - " "$REV"
   fi
 
   local SIZE="$(cat "${DEVICE}/size")"
@@ -190,9 +190,9 @@ show_block_device_info()
     GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
       MB_SIZE=$(($SIZE / 2 / 1024))
-      printf "\t${MB_SIZE} MiB"
+      printf "${MB_SIZE} MiB"
     else
-      printf "\t${GB_SIZE} GiB"
+      printf "${GB_SIZE} GiB"
     fi
   fi
 }
