@@ -1046,30 +1046,30 @@ check_disks()
     TARGET_DEVICES="${TARGET_DEVICES}/dev/${TARGET_NODEV} "
 
     if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $MBR_WRITE -eq 1 ]; then
-    IFS=$EOL
-    for PART in $PARTITIONS_FOUND; do
-      # Check for mounted partitions on target device
-      if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
-        echo ""
-        if [ $FORCE -eq 1 ]; then
-          printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is mounted!\n\033[0m" >&2
-        else
-          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified (Use --force to override)? Quitting...\n\033[0m" >&2
-          do_exit 5
+      IFS=$EOL
+      for PART in $PARTITIONS_FOUND; do
+        # Check for mounted partitions on target device
+        if grep -E -q "^/dev/${PART}[[:blank:]]" /etc/mtab; then
+          echo ""
+          if [ $FORCE -eq 1 ]; then
+            printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is mounted!\n\033[0m" >&2
+          else
+            printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified (Use --force to override)? Quitting...\n\033[0m" >&2
+            do_exit 5
+          fi
         fi
-      fi
 
-      # Check for swap on target device
-      if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
-        echo ""
-        if [ $FORCE -eq 1 ]; then
-          printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is used as swap!\n\033[0m" >&2
-        else
-          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified (Use --force to override)? Quitting...\n\033[0m" >&2
-          do_exit 5
+        # Check for swap on target device
+        if grep -E -q "^/dev/${PART}[[:blank:]]" /proc/swaps; then
+          echo ""
+          if [ $FORCE -eq 1 ]; then
+            printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is used as swap!\n\033[0m" >&2
+          else
+            printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified (Use --force to override)? Quitting...\n\033[0m" >&2
+            do_exit 5
+          fi
         fi
-      fi
-    done
+      done
     fi
   done
 }
