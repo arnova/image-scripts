@@ -1214,13 +1214,18 @@ check_image_files()
       SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
       TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
 
+      if echo "$IMAGE_FILES" |grep -q -e "${SEP}${TARGET_PARTITION}$" -e "${SEP}${TARGET_PARTITION} "; then
+        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $TARGET_PARTITION! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+
       # Add item to list
       IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
     done
   fi
 
   if [ -z "$IMAGE_FILES" ]; then
-    printf "\033[40m\033[1;31m\nERROR: No matching image files found to restore! Quitting...\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nERROR: No (matching) image files found to restore! Quitting...\n\033[0m" >&2
     do_exit 5
   fi
 
