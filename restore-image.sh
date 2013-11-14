@@ -737,6 +737,7 @@ image_type_detect()
   fi
 }
 
+
 # $1 = source without /dev/
 # stdout = target with /dev/
 source_to_target_remap()
@@ -1042,8 +1043,8 @@ check_disks()
       read dummy
     fi
 
-    DEVICE_FILES="${DEVICE_FILES}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV} "
-    TARGET_DEVICES="${TARGET_DEVICES}/dev/${TARGET_NODEV} "
+    DEVICE_FILES="${DEVICE_FILES}${DEVICE_FILES:+ }${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV}"
+    TARGET_DEVICES="${TARGET_DEVICES}${TARGET_DEVICE:+ }/dev/${TARGET_NODEV}"
 
     if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $MBR_WRITE -eq 1 ]; then
       IFS=$EOL
@@ -1259,7 +1260,7 @@ check_partitions()
     if [ -z "$PART_DISK" ]; then
       echo "* WARNING: Unable to obtain device for target partition $TARGET_PARTITION" >&2
     elif ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DISK " -e " $PART_DISK " -e " $PART_DISK$" -e "^PART_DISK$"; then
-      TARGET_DEVICES="${TARGET_DEVICES}${PART_DISK} "
+      TARGET_DEVICES="${TARGET_DEVICES}${TARGET_DEVICES:+ }${PART_DISK} "
     fi
     
     # Check for mounted partitions on target device

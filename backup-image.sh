@@ -594,6 +594,40 @@ show_backup_disks_info()
 }
 
 
+detect_partitions()
+{
+  local DEVICE="$1"
+  local FIND_PARTITIONS=""
+
+  if [ -n "$DEVICE" ]; then  
+    FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE)"
+  else
+    FIND_PARTITIONS="$(get_partitions_with_size_type)"
+  fi
+
+  # Does the device contain partitions?
+  if [ -n "$FIND_PARTITIONS" ]; then
+    local SELECT_PARTITIONS=""
+    IFS=$EOL
+    for LINE in $FIND_PARTITIONS; do
+      if echo "$PART" |grep -q -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$'; then
+        continue; # Ignore swap etc. partitions
+      fi
+      
+      local PART=`echo "$LINE" |awk '{ print $1 }'`
+      SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART}"
+    done
+
+    if [ -n "$SELECT_PARTITIONS" ]; then
+      echo "$SELECT_PARTITIONS"
+      return 0
+    fi
+  fi
+  
+  return 1 # Nothing found
+}
+
+
 select_partitions()
 {
   local SELECT_DEVICES="$DEVICES"
@@ -616,11 +650,10 @@ select_partitions()
           echo ""
           exit 5
         else
-          local FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE)"
+          local FIND_PARTITIONS="$(detect_partitions /dev/$DEVICE)"
           # Does the device contain partitions?
           if [ -n "$FIND_PARTITIONS" ]; then
-            local FILTER_PARTITIONS="$(echo "$FIND_PARTITIONS" |grep -v -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$' |awk '{ printf ("%s ",$1) }')"
-            SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FILTER_PARTITIONS}"
+            SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
           else
             SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${DEVICE}"
           fi
@@ -628,9 +661,8 @@ select_partitions()
       done
     else
       USER_SELECT=1
-
       # If no argument(s) given, "detect" all partitions (but ignore swap & extended partitions, etc.)
-      SELECT_PARTITIONS="$(get_partitions_with_size_type |grep -v -e ' swap$' -e ' other$' -e ' unknown$'  -e ' squashfs$' |awk '{ printf ("%s ",$1) }')"
+      SELECT_PARTITIONS="$(detect_partitions)"
     fi
 
     # Check which partitions to backup, we ignore mounted ones
@@ -703,6 +735,7 @@ backup_partitions()
   unset IFS
   for PART in $BACKUP_PARTITIONS; do
     local retval=1
+    local TARGET_FILE=""
     case "$IMAGE_PROGRAM" in
       fsa)  TARGET_FILE="$PART.fsa"
             printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
@@ -713,9 +746,6 @@ backup_partitions()
             printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
             partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
             retval=$?
-            if [ $retval -eq 0 ]; then
-              BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
-            fi
             ;;
       pc)   TARGET_FILE="$PART.pc.gz"
             PARTCLONE=`partclone_detect "/dev/$PART"`
@@ -725,9 +755,6 @@ backup_partitions()
               retval=$?
               if [ $retval -eq 0 ]; then
                 retval=`cat /tmp/.partclone.exitcode`
-                if [ $retval -eq 0 ]; then
-                  BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
-                fi
               fi
             fi
             ;;
@@ -737,9 +764,6 @@ backup_partitions()
             retval=$?
             if [ $retval -eq 0 ]; then
               retval=`cat /tmp/.dd.exitcode`
-              if [ $retval -eq 0 ]; then
-                BACKUP_IMAGES="${BACKUP_IMAGES}${TARGET_FILE} "
-              fi
             fi
             ;;
     esac
@@ -751,6 +775,7 @@ backup_partitions()
       read dummy
     else
       SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
+      BACKUP_IMAGES="${BACKUP_IMAGES}${BACKUP_IMAGES:+ }${TARGET_FILE}"
       echo "****** Backuped /dev/$PART to $TARGET_FILE ******"
     fi
     echo ""
@@ -1039,6 +1064,9 @@ if [ -n "$BACKUP_IMAGES" ]; then
   echo "* Verifying image(s) ($BACKUP_IMAGES) (CTRL-C to break)..."
   IFS=' '
   for BACKUP_IMAGE in $BACKUP_IMAGES; do
+    if ! echo "$BACKUP_IMAGE" |grep -q '\.gz$'; then
+      continue; # Can only verify .gz
+    fi
     # Note that pigz seems to hang on broken archives, therefor use gzip
     gzip -tv "$BACKUP_IMAGE"
   done
