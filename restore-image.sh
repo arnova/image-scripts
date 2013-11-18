@@ -492,6 +492,7 @@ sanity_check()
   check_command_error sfdisk
   check_command_error fdisk
   check_command_error dd
+  check_command_error blkid
 
   [ "$NO_NET" != "0" ] && check_command_error ifconfig
   [ "$NO_MOUNT" != "0" ] && check_command_error mount
@@ -1177,75 +1178,52 @@ restore_disks()
 }
 
 
-detect_partitions()
-{
-  local DEVICE="$1"
-  local FIND_PARTITIONS=""
-
-  if [ -n "$DEVICE" ]; then  
-    FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE)"
-  else
-    FIND_PARTITIONS="$(get_partitions_with_size_type)"
-  fi
-
-  # Does the device contain partitions?
-  if [ -n "$FIND_PARTITIONS" ]; then
-    SELECT_PARTITIONS=""
-    IFS=$EOL
-    for LINE in $FIND_PARTITIONS; do
-      if echo "$PART" |grep -q -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$'; then
-        continue; # Ignore swap etc. partitions
-      fi
-
-      PART=`echo "$LINE" |awk '{ print $1 }'`
-      SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART}"
-    done
-
-    if [ -n "$SELECT_PARTITIONS" ]; then
-      echo "$SELECT_PARTITIONS"
-      return 0
-    fi
-  fi
-  
-  return 1 # Nothing found
-}
-
-
 check_image_files()
 {
   IMAGE_FILES=""
-  local SELECT_PARTITIONS="$PARTITIONS"
+  if [ -n "$PARTITIONS" ]; then
+    IFS=','
+    for ITEM in $PARTITIONS; do
+      PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
 
-  if [ -z "$SELECT_PARTITIONS" ]; then
-    # Detect available partitions
-    CHECK_PARTITIONS="$(detect_partitions)"
-  fi
+      IFS=$EOL
+      LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
 
-  IFS=' '
-  for ITEM in $SELECT_PARTITIONS; do
-    PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      if [ -z "$LOOKUP" ]; then
+        printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
 
+      if [ $(echo "$LOOKUP" |wc -l) -gt 1 ]; then
+        echo "$LOOKUP"
+        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+
+      IMAGE_FILE=`basename "$LOOKUP"`
+      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
+      TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
+      
+      # Add item to list
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
+    done
+  else
     IFS=$EOL
-    LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
+    for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
+      # FIXME: Can have multiple images here!
+      IMAGE_FILE=`basename "$ITEM"`
+      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
+      TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
 
-    if [ -z "$LOOKUP" ]; then
-      printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
-      do_exit 5
-    fi
+      if echo "$IMAGE_FILES" |grep -q -e "${SEP}${TARGET_PARTITION}$" -e "${SEP}${TARGET_PARTITION} "; then
+        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $TARGET_PARTITION! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
 
-    if [ $(echo "$LOOKUP" |wc -l) -gt 1 ]; then
-      echo "$LOOKUP"
-      printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
-      do_exit 5
-    fi
-
-    IMAGE_FILE=`basename "$LOOKUP"`
-    SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
-    TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
-    
-    # Add item to list
-    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
-  done
+      # Add item to list
+      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
+    done
+  fi
 
   if [ -z "$IMAGE_FILES" ]; then
     printf "\033[40m\033[1;31m\nERROR: No (matching) image files found to restore! Quitting...\n\033[0m" >&2
