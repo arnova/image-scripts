@@ -1287,7 +1287,7 @@ check_partitions()
     PART_DISK=`get_partition_disk "$TARGET_PARTITION"`
     if [ -z "$PART_DISK" ]; then
       echo "* WARNING: Unable to obtain device for target partition $TARGET_PARTITION" >&2
-    elif ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DISK " -e " $PART_DISK " -e " $PART_DISK$" -e "^PART_DISK$"; then
+    elif ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DISK " -e " $PART_DISK " -e " $PART_DISK$" -e "^$PART_DISK$"; then
       TARGET_DEVICES="${TARGET_DEVICES}${TARGET_DEVICES:+ }${PART_DISK} "
     fi
     
