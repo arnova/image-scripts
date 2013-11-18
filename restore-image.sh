@@ -502,7 +502,7 @@ sanity_check()
   check_command_warning sgdisk
 
   # Sanity check devices and check if target devices exist
-  IFS=','
+  IFS=' '
   for ITEM in $DEVICES; do
     SOURCE_DEVICE_NODEV=""
 
@@ -542,7 +542,7 @@ sanity_check()
   done
 
   # Sanity check partitions
-  IFS=','
+  IFS=' '
   for ITEM in $PARTITIONS; do
     SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -748,7 +748,7 @@ source_to_target_remap()
   local TARGET_DEVICE="/dev/$IMAGE_PARTITION_NODEV"
 
   # We want another target device than specified in the image name?:
-  IFS=' ,'
+  IFS=' '
   for ITEM in $DEVICES; do
     SOURCE_DEVICE_NODEV=""
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -774,7 +774,7 @@ source_to_target_remap()
   done
 
   # We want another target partition than specified in the image name?:
-  IFS=' ,'
+  IFS=' '
   for ITEM in $PARTITIONS; do
     SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -797,7 +797,7 @@ update_source_to_target_device_remap()
   local TARGET_DEVICE="$2"
 
   local DEVICES_TEMP=""
-  IFS=' ,'
+  IFS=' '
   for ITEM in $DEVICES; do
     SOURCE_DEVICE_NODEV=""
     TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -1177,52 +1177,75 @@ restore_disks()
 }
 
 
+detect_partitions()
+{
+  local DEVICE="$1"
+  local FIND_PARTITIONS=""
+
+  if [ -n "$DEVICE" ]; then  
+    FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE)"
+  else
+    FIND_PARTITIONS="$(get_partitions_with_size_type)"
+  fi
+
+  # Does the device contain partitions?
+  if [ -n "$FIND_PARTITIONS" ]; then
+    SELECT_PARTITIONS=""
+    IFS=$EOL
+    for LINE in $FIND_PARTITIONS; do
+      if echo "$PART" |grep -q -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$'; then
+        continue; # Ignore swap etc. partitions
+      fi
+
+      PART=`echo "$LINE" |awk '{ print $1 }'`
+      SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART}"
+    done
+
+    if [ -n "$SELECT_PARTITIONS" ]; then
+      echo "$SELECT_PARTITIONS"
+      return 0
+    fi
+  fi
+  
+  return 1 # Nothing found
+}
+
+
 check_image_files()
 {
   IMAGE_FILES=""
-  if [ -n "$PARTITIONS" ]; then
-    IFS=','
-    for ITEM in $PARTITIONS; do
-      PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+  local SELECT_PARTITIONS="$PARTITIONS"
 
-      IFS=$EOL
-      LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
-
-      if [ -z "$LOOKUP" ]; then
-        printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      if [ $(echo "$LOOKUP" |wc -l) -gt 1 ]; then
-        echo "$LOOKUP"
-        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      IMAGE_FILE=`basename "$LOOKUP"`
-      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
-      TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
-      
-      # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
-    done
-  else
-    IFS=$EOL
-    for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
-      # FIXME: Can have multiple images here!
-      IMAGE_FILE=`basename "$ITEM"`
-      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
-      TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
-
-      if echo "$IMAGE_FILES" |grep -q -e "${SEP}${TARGET_PARTITION}$" -e "${SEP}${TARGET_PARTITION} "; then
-        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $TARGET_PARTITION! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
-    done
+  if [ -z "$SELECT_PARTITIONS" ]; then
+    # Detect available partitions
+    CHECK_PARTITIONS="$(detect_partitions)"
   fi
+
+  IFS=' '
+  for ITEM in $SELECT_PARTITIONS; do
+    PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+
+    IFS=$EOL
+    LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
+
+    if [ -z "$LOOKUP" ]; then
+      printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
+      do_exit 5
+    fi
+
+    if [ $(echo "$LOOKUP" |wc -l) -gt 1 ]; then
+      echo "$LOOKUP"
+      printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
+      do_exit 5
+    fi
+
+    IMAGE_FILE=`basename "$LOOKUP"`
+    SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
+    TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
+    
+    # Add item to list
+    IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
+  done
 
   if [ -z "$IMAGE_FILES" ]; then
     printf "\033[40m\033[1;31m\nERROR: No (matching) image files found to restore! Quitting...\n\033[0m" >&2
@@ -1470,8 +1493,8 @@ load_config()
     ARGVAL=`echo "$arg" |cut -d= -f2 -s`
 
     case "$ARGNAME" in
-      --partitions|--partition|--part|-p) PARTITIONS="$ARGVAL";;
-             --devices|--device|--dev|-d) DEVICES="$ARGVAL";;
+      --partitions|--partition|--part|-p) PARTITIONS=`echo "$ARGVAL" |sed 's|,| |g'`;; # Make list space seperated
+             --devices|--device|--dev|-d) DEVICES=`echo "$ARGVAL" |sed 's|,| |g'`;; # Make list space seperated
                         --clean|--track0) CLEAN=1;;
                                  --force) FORCE=1;;
                               --notrack0) NO_TRACK0=1;;

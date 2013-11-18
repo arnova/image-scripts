@@ -607,14 +607,14 @@ detect_partitions()
 
   # Does the device contain partitions?
   if [ -n "$FIND_PARTITIONS" ]; then
-    local SELECT_PARTITIONS=""
+    SELECT_PARTITIONS=""
     IFS=$EOL
     for LINE in $FIND_PARTITIONS; do
       if echo "$PART" |grep -q -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$'; then
         continue; # Ignore swap etc. partitions
       fi
-      
-      local PART=`echo "$LINE" |awk '{ print $1 }'`
+
+      PART=`echo "$LINE" |awk '{ print $1 }'`
       SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART}"
     done
 
