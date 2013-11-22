@@ -610,7 +610,7 @@ detect_partitions()
     SELECT_PARTITIONS=""
     IFS=$EOL
     for LINE in $FIND_PARTITIONS; do
-      if echo "$PART" |grep -q -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$'; then
+      if echo "$LINE" |grep -q -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$'; then
         continue; # Ignore swap etc. partitions
       fi
 
@@ -694,7 +694,7 @@ select_partitions()
 
       # Only show info when not shown before
       if [ "$BACKUP_DISKS" != "$LAST_BACKUP_DISKS" ]; then
-        if [ -n "IGNORE_PARTITIONS" ]; then
+        if [ -n "$IGNORE_PARTITIONS" ]; then
           echo "NOTE: Ignored (mounted/swap) partitions: $IGNORE_PARTITIONS"
         fi
 
