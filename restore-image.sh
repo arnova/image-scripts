@@ -392,9 +392,9 @@ check_command_warning()
 partwait()
 {
   local DEVICE="$1"
-  
+
   echo "Waiting for kernel to reread the partition on $DEVICE..."
-    
+
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
   IFS=' '
   local TRY=10
@@ -417,10 +417,10 @@ partwait()
         fi
       fi
     done
-    
+
     # Sleep 1 second:
     sleep 1
-    
+
     if [ $FAIL -eq 0 ]; then
       return 0
     fi
@@ -431,7 +431,7 @@ partwait()
 }
 
 
-# Wrapper for partprobe (call when performing a partition table update with eg. fdisk/sfdisk).
+# Wrapper for partprobe (call after performing a partition table update)
 # $1 = Device to re-read
 partprobe()
 {
@@ -447,7 +447,7 @@ partprobe()
 
     # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
     result="$(sfdisk -R "$DEVICE" 2>&1)"
-    
+
     # Wait a sec for things to settle
     sleep 1
 
@@ -455,12 +455,12 @@ partprobe()
       break;
     fi
   done
-  
+
   if [ -n "$result" ]; then
     printf "\033[40m\033[1;31m${result}\n\033[0m" >&2
     return 1
   fi
-  
+
   # Wait till the kernel reread the partition table
   if ! partwait "$DEVICE"; then
     return 2
@@ -998,7 +998,7 @@ check_disks()
           echo "* Source GPT partition table (/dev/$IMAGE_SOURCE_NODEV):"
           grep -E '^[[:blank:]]+[0-9]' "gdisk.${IMAGE_SOURCE_NODEV}"
           echo ""
-          
+
           echo "* Target GPT partition table (/dev/$TARGET_NODEV):"
           echo "$GDISK_TARGET"
           echo ""
@@ -1124,6 +1124,9 @@ restore_disks()
 
     # Check for partition restore
     if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 -o $PT_ADD -eq 1 ]; then
+      # Zap GPT, in case it exists
+      sgdisk --zap "/dev/$TARGET_NODEV" >/dev/null 2>&1
+
       SFDISK_FILE=""
       if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         SFDISK_FILE="sfdisk.${IMAGE_SOURCE_NODEV}"
@@ -1144,13 +1147,13 @@ restore_disks()
         fi
         PARTPROBE=1
       fi
-      
+
       SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
       if [ -f "$SGDISK_FILE" ]; then
         echo "* Updating GPT partition-table on /dev/$TARGET_NODEV"
         sgdisk --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV
         retval=$?
-          
+
         if [ $retval -ne 0 ]; then
           printf "\033[40m\033[1;31mGPT partition-table restore failed($retval). Quitting...\n\033[0m" >&2
           echo ""
