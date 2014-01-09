@@ -158,11 +158,12 @@ show_block_device_info()
 
   local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
-    printf "%s - " "$REV"
+    printf "%s" "$REV"
   fi
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
+    printf "$SIZE blocks - "
     GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
       MB_SIZE=$(($SIZE / 2 / 1024))
@@ -171,6 +172,8 @@ show_block_device_info()
       printf "${GB_SIZE} GiB"
     fi
   fi
+
+  echo ""
 }
 
 
@@ -243,7 +246,7 @@ show_available_disks()
 configure_network()
 {
   IFS=$EOL
-  for CUR_IF in "$(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan')"; do
+  for CUR_IF in $(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan'); do
     IF_INFO="$(ifconfig $CUR_IF)"
     MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
     IP_TEST=""
@@ -400,7 +403,7 @@ partwait()
 
     FAIL=0
     IFS=$EOL
-    for LINE in "$(sfdisk -d "$DEVICE" |grep '^/dev/')"; do
+    for LINE in $(sfdisk -d "$DEVICE" |grep '^/dev/'); do
       PART=`echo "$LINE" |awk '{ print $1 }'`
       if echo "$LINE" |grep -i -q "id= 0"; then
         if [ -e "$PART" ]; then
@@ -1200,7 +1203,7 @@ check_image_files()
     done
   else
     IFS=$EOL
-    for ITEM in "$(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort)"; do
+    for ITEM in $(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort); do
       # FIXME: Can have multiple images here!
       IMAGE_FILE=`basename "$ITEM"`
       SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`

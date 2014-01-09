@@ -182,11 +182,12 @@ show_block_device_info()
 
   local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
-    printf "%s - " "$REV"
+    printf "%s" "$REV"
   fi
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
+    printf "- $SIZE blocks - "
     GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
       MB_SIZE=$(($SIZE / 2 / 1024))
@@ -195,6 +196,8 @@ show_block_device_info()
       printf "${GB_SIZE} GiB"
     fi
   fi
+
+  echo ""
 }
 
 
@@ -221,7 +224,7 @@ list_device_partitions()
 configure_network()
 {
   IFS=$EOL
-  for CUR_IF in "$(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan')"; do
+  for CUR_IF in $(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan'); do
     IF_INFO="$(ifconfig $CUR_IF)"
     MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
     IP_TEST=""
