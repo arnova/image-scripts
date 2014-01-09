@@ -123,7 +123,8 @@ get_partition_number()
 # $2 = number
 add_partition_number()
 {
-  if echo "$1" |grep -q '[0-9]'; then
+  # FIXME: Not sure if this is correct:
+  if echo "$1" |grep -q '[0-9]$'; then
     echo "${1}p${2}"
   else
     echo "${1}${2}"
@@ -388,6 +389,26 @@ check_command_warning()
 }
 
 
+# Get partitions directly from disk using sfdisk/gdisk
+get_disk_partitions()
+{
+  local DEVICE="$1"
+
+  local SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null |grep '^/dev/')"
+  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
+    local DEV_PREFIX="$DEVICE"
+    # FIXME: Not sure if this is correct:
+    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
+      DEV_PREFIX="${DEV_PREFIX}p"
+    fi
+
+    sgdisk -p "$DEVICE" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
+  else
+    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
+  fi
+}
+
+
 # Function which waits till the kernel ACTUALLY re-read the partition table
 partwait()
 {
@@ -402,21 +423,30 @@ partwait()
     TRY=$(($TRY - 1))
 
     FAIL=0
-    IFS=$EOL
-    for LINE in $(sfdisk -d "$DEVICE" |grep '^/dev/'); do
-      PART=`echo "$LINE" |awk '{ print $1 }'`
-      if echo "$LINE" |grep -i -q "id= 0"; then
-        if [ -e "$PART" ]; then
-          FAIL=1
-          break;
-        fi
-      else
+
+    # First make sure all partitions reported by the disk exist according to the kernel in /dev/
+    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE")"
+    if [ -n "$DISK_PARTITIONS" ]; then
+      IFS=$EOL
+      for PART in $DISK_PARTITIONS; do
         if [ ! -e "$PART" ]; then
           FAIL=1
           break;
         fi
-      fi
-    done
+      done
+    fi
+
+    # Second make sure all partitions reported by the kernel in /dev/ exist according to the disk
+    KERNEL_PARTITIONS="$(get_partitions "$DEVICE")"
+    if [ -n "$DISK_PARTITIONS" ]; then
+      IFS=$EOL
+      for PART_NODEV in $KERNEL_PARTITIONS; do
+        if ! echo "$DISK_PARTITIONS" |grep -x -q "/dev/$PART_NODEV"; then
+          FAIL=1
+          break;
+        fi
+      done
+    fi
 
     # Sleep 1 second:
     sleep 1
