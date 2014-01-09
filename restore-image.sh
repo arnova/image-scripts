@@ -94,7 +94,7 @@ get_user_yn()
 get_partitions_with_size()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-  local FIND_PARTS=`cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }'`
+  local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
 
   if [ -n "$DISK_NODEV" ]; then
     echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}p?[0-9]+"
@@ -252,8 +252,8 @@ show_available_disks()
 configure_network()
 {
   IFS=$EOL
-  for CUR_IF in `ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan'`; do
-    IF_INFO=`ifconfig $CUR_IF`
+  for CUR_IF in "$(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan')"; do
+    IF_INFO="$(ifconfig $CUR_IF)"
     MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
     IP_TEST=""
     if [ -n "$MAC_ADDR" ]; then 
@@ -409,7 +409,7 @@ partwait()
 
     FAIL=0
     IFS=$EOL
-    for LINE in `sfdisk -d "$DEVICE" |grep "^/dev/"`; do
+    for LINE in "$(sfdisk -d "$DEVICE" |grep '^/dev/')"; do
       PART=`echo "$LINE" |awk '{ print $1 }'`
       if echo "$LINE" |grep -i -q "id= 0"; then
         if [ -e "$PART" ]; then
@@ -452,7 +452,7 @@ partprobe()
     TRY=$(($TRY - 1))
 
     # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
-    result=`sfdisk -R "$DEVICE" 2>&1`
+    result="$(sfdisk -R "$DEVICE" 2>&1)"
     
     # Wait a sec for things to settle
     sleep 1
@@ -934,7 +934,7 @@ check_disks()
     done
 
     # Check whether device already contains partitions
-    PARTITIONS_FOUND=`get_disk_partitions "$TARGET_NODEV"`
+    PARTITIONS_FOUND="$(get_disk_partitions "$TARGET_NODEV")"
 
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
@@ -1087,7 +1087,7 @@ restore_disks()
     TARGET_NODEV=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     # Check whether device already contains partitions
-    PARTITIONS_FOUND=`get_disk_partitions "$TARGET_NODEV"`
+    PARTITIONS_FOUND="$(get_disk_partitions "$TARGET_NODEV")"
 
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
@@ -1108,13 +1108,13 @@ restore_disks()
       echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
       
       if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
-#        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1`
+#        result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1)"
         # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
-        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV 2>&1 bs=512 count=2048` 
+        result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV 2>&1 bs=512 count=2048)"
         retval=$?
       else
         # FIXME: Need to detect the empty space before the first partition since Grub2 may be longer than 32256 bytes!
-        result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62 2>&1`
+        result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62 2>&1)"
         retval=$?
       fi
       
@@ -1209,7 +1209,7 @@ check_image_files()
     done
   else
     IFS=$EOL
-    for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort`; do
+    for ITEM in "$(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort)"; do
       # FIXME: Can have multiple images here!
       IMAGE_FILE=`basename "$ITEM"`
       SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
@@ -1262,7 +1262,7 @@ check_partitions()
     echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
 
     # Check whether we need to add this to our included devices list
-    PART_DISK=`get_partition_disk "$TARGET_PARTITION"`
+    PART_DISK="$(get_partition_disk "$TARGET_PARTITION")"
     if [ -z "$PART_DISK" ]; then
       echo "* WARNING: Unable to obtain device for target partition $TARGET_PARTITION" >&2
     elif ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DISK " -e " $PART_DISK " -e " $PART_DISK$" -e "^$PART_DISK$"; then

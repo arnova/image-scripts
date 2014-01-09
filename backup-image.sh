@@ -92,7 +92,7 @@ get_partitions_with_size()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
-  local FIND_PARTS=`cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }'`
+  local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
 
   if [ -n "$DISK_NODEV" ]; then
     echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}p?[0-9]+"
@@ -221,8 +221,8 @@ list_device_partitions()
 configure_network()
 {
   IFS=$EOL
-  for CUR_IF in `ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan'`; do
-    IF_INFO=`ifconfig $CUR_IF`
+  for CUR_IF in "$(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan')"; do
+    IF_INFO="$(ifconfig $CUR_IF)"
     MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
     IP_TEST=""
     if [ -n "$MAC_ADDR" ]; then 
@@ -574,7 +574,7 @@ select_disks()
 
   IFS=' '
   for PART in $BACKUP_PARTITIONS; do
-    local HDD_NODEV=`get_partition_disk "$PART"`
+    local HDD_NODEV="$(get_partition_disk "$PART")"
     if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
       BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
     fi
@@ -586,7 +586,7 @@ show_backup_disks_info()
 {
   IFS=' '
   for HDD in $BACKUP_DISKS; do
-    HDD_NODEV=`get_partition_disk "$HDD"`
+    HDD_NODEV="$(get_partition_disk "$HDD")"
     echo "* Available backup disk /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
     get_partitions_fancified /dev/$HDD_NODEV
     echo ""
@@ -794,7 +794,7 @@ backup_disks()
 
     echo "* Storing track0 for /dev/$HDD_NODEV in track0.$HDD_NODEV..."
     # Dump hdd info for all disks in the current system
-    result=`dd if=/dev/$HDD_NODEV of="track0.$HDD_NODEV" bs=512 count=2048 2>&1` # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
+    result="$(dd if=/dev/$HDD_NODEV of="track0.$HDD_NODEV" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
     retval=$?
     if [ $retval -ne 0 ]; then
       echo "$result" >&2
@@ -802,7 +802,7 @@ backup_disks()
       do_exit 8
     fi
 
-    SFDISK_OUTPUT=`sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null`
+    SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
     if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
       # GPT partition table found
       echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.$HDD_NODEV..."
