@@ -138,15 +138,6 @@ get_partition_disk()
 }
 
 
-# Get partitions from specified disk
-get_disk_partitions()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  get_partitions |grep -E -x "${DISK_NODEV}p?[0-9]+"
-}
-
-
 show_block_device_info()
 {
   local DEVICE=`echo "$1" |sed s,'^/dev/',,`
@@ -934,7 +925,7 @@ check_disks()
     done
 
     # Check whether device already contains partitions
-    PARTITIONS_FOUND="$(get_disk_partitions "$TARGET_NODEV")"
+    PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
 
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
@@ -1087,7 +1078,7 @@ restore_disks()
     TARGET_NODEV=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
     # Check whether device already contains partitions
-    PARTITIONS_FOUND="$(get_disk_partitions "$TARGET_NODEV")"
+    PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
 
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
