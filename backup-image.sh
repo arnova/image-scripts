@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA16-GPT-DEVEL"
+MY_VERSION="3.10-BETA17-GPT-DEVEL"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: October 29, 2013
-# (C) Copyright 2004-2013 by Arno van Amersfoort
+# Last update: January 9, 2013
+# (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
