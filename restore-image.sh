@@ -139,6 +139,117 @@ get_partition_disk()
 }
 
 
+# Get partitions directly from disk using sfdisk/gdisk
+get_disk_partitions()
+{
+  local DEVICE="$1"
+
+  local SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null |grep '^/dev/')"
+  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
+    local DEV_PREFIX="$DEVICE"
+    # FIXME: Not sure if this is correct:
+    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
+      DEV_PREFIX="${DEV_PREFIX}p"
+    fi
+
+    sgdisk -p "$DEVICE" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
+  else
+    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
+  fi
+}
+
+
+# Function which waits till the kernel ACTUALLY re-read the partition table
+partwait()
+{
+  local DEVICE="$1"
+
+  echo "Waiting for kernel to reread the partition on $DEVICE..."
+
+  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
+  IFS=' '
+  local TRY=10
+  while [ $TRY -gt 0 ]; do
+    TRY=$(($TRY - 1))
+
+    FAIL=0
+
+    # First make sure all partitions reported by the disk exist according to the kernel in /dev/
+    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE")"
+    if [ -n "$DISK_PARTITIONS" ]; then
+      IFS=$EOL
+      for PART in $DISK_PARTITIONS; do
+        if [ ! -e "$PART" ]; then
+          FAIL=1
+          break;
+        fi
+      done
+    fi
+
+    # Second make sure all partitions reported by the kernel in /dev/ exist according to the disk
+    KERNEL_PARTITIONS="$(get_partitions "$DEVICE")"
+    if [ -n "$DISK_PARTITIONS" ]; then
+      IFS=$EOL
+      for PART_NODEV in $KERNEL_PARTITIONS; do
+        if ! echo "$DISK_PARTITIONS" |grep -x -q "/dev/$PART_NODEV"; then
+          FAIL=1
+          break;
+        fi
+      done
+    fi
+
+    # Sleep 1 second:
+    sleep 1
+
+    if [ $FAIL -eq 0 ]; then
+      return 0
+    fi
+  done
+
+  printf "\033[40m\033[1;31mWaiting for the kernel to reread the partition FAILED!\n\033[0m" >&2
+  return 1
+}
+
+
+# Wrapper for partprobe (call after performing a partition table update)
+# $1 = Device to re-read
+partprobe()
+{
+  local DEVICE="$1"
+  local result=""
+
+  echo "(Re)reading partition-table on $DEVICE..."
+
+  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
+  local TRY=10
+  while [ $TRY -gt 0 ]; do
+    TRY=$(($TRY - 1))
+
+    # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
+    result="$(sfdisk -R "$DEVICE" 2>&1)"
+
+    # Wait a sec for things to settle
+    sleep 1
+
+    if [ -z "$result" ]; then
+      break;
+    fi
+  done
+
+  if [ -n "$result" ]; then
+    printf "\033[40m\033[1;31m${result}\n\033[0m" >&2
+    return 1
+  fi
+
+  # Wait till the kernel reread the partition table
+  if ! partwait "$DEVICE"; then
+    return 2
+  fi
+
+  return 0
+}
+
+
 show_block_device_info()
 {
   local DEVICE=`echo "$1" |sed s,'^/dev/',,`
@@ -386,117 +497,6 @@ check_command_warning()
   fi
 
   return $retval
-}
-
-
-# Get partitions directly from disk using sfdisk/gdisk
-get_disk_partitions()
-{
-  local DEVICE="$1"
-
-  local SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null |grep '^/dev/')"
-  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
-    local DEV_PREFIX="$DEVICE"
-    # FIXME: Not sure if this is correct:
-    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
-      DEV_PREFIX="${DEV_PREFIX}p"
-    fi
-
-    sgdisk -p "$DEVICE" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
-  else
-    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
-  fi
-}
-
-
-# Function which waits till the kernel ACTUALLY re-read the partition table
-partwait()
-{
-  local DEVICE="$1"
-
-  echo "Waiting for kernel to reread the partition on $DEVICE..."
-
-  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
-  IFS=' '
-  local TRY=10
-  while [ $TRY -gt 0 ]; do
-    TRY=$(($TRY - 1))
-
-    FAIL=0
-
-    # First make sure all partitions reported by the disk exist according to the kernel in /dev/
-    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE")"
-    if [ -n "$DISK_PARTITIONS" ]; then
-      IFS=$EOL
-      for PART in $DISK_PARTITIONS; do
-        if [ ! -e "$PART" ]; then
-          FAIL=1
-          break;
-        fi
-      done
-    fi
-
-    # Second make sure all partitions reported by the kernel in /dev/ exist according to the disk
-    KERNEL_PARTITIONS="$(get_partitions "$DEVICE")"
-    if [ -n "$DISK_PARTITIONS" ]; then
-      IFS=$EOL
-      for PART_NODEV in $KERNEL_PARTITIONS; do
-        if ! echo "$DISK_PARTITIONS" |grep -x -q "/dev/$PART_NODEV"; then
-          FAIL=1
-          break;
-        fi
-      done
-    fi
-
-    # Sleep 1 second:
-    sleep 1
-
-    if [ $FAIL -eq 0 ]; then
-      return 0
-    fi
-  done
-
-  printf "\033[40m\033[1;31mWaiting for the kernel to reread the partition FAILED!\n\033[0m" >&2
-  return 1
-}
-
-
-# Wrapper for partprobe (call after performing a partition table update)
-# $1 = Device to re-read
-partprobe()
-{
-  local DEVICE="$1"
-  local result=""
-
-  echo "(Re)reading partition-table on $DEVICE..."
-
-  # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
-  local TRY=10
-  while [ $TRY -gt 0 ]; do
-    TRY=$(($TRY - 1))
-
-    # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
-    result="$(sfdisk -R "$DEVICE" 2>&1)"
-
-    # Wait a sec for things to settle
-    sleep 1
-
-    if [ -z "$result" ]; then
-      break;
-    fi
-  done
-
-  if [ -n "$result" ]; then
-    printf "\033[40m\033[1;31m${result}\n\033[0m" >&2
-    return 1
-  fi
-
-  # Wait till the kernel reread the partition table
-  if ! partwait "$DEVICE"; then
-    return 2
-  fi
-
-  return 0
 }
 
 
