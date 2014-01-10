@@ -158,7 +158,7 @@ get_partitions_fancified()
 # Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
-  echo "$1" |sed -r s,'p?[0-9]+$',,
+  echo "$1" |sed -r s,'[p/]?[0-9]+$',,
 }
 
 

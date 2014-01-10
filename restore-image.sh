@@ -114,7 +114,7 @@ get_partitions()
 # Get partition number from argument and return to stdout
 get_partition_number()
 {
-  echo "$1" |sed -r -e s,'^[/a-z]+',, -e s,'^[0-9]+p',,
+  echo "$1" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',,
 }
 
 
@@ -135,7 +135,7 @@ add_partition_number()
 # Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
-  echo "$1" |sed -r s,'p?[0-9]+$',,
+  echo "$1" |sed -r s,'[p/]?[0-9]+$',,
 }
 
 
@@ -173,11 +173,12 @@ partwait()
     TRY=$(($TRY - 1))
 
     # First make sure all partitions reported by the disk exist according to the kernel in /dev/
-    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE" |sed -r -e s,'^[/a-z]+',, -e s,'^[0-9]+p',,)"
+    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',,)"
 
     # Second make sure all partitions reported by the kernel in /dev/ exist according to the disk
-    KERNEL_PARTITIONS="$(get_partitions "$DEVICE" |sed -r -e s,'^[/a-z]+',, -e s,'^[0-9]+p',,)"
+    KERNEL_PARTITIONS="$(get_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',,)"
 
+    # Compare the partition numbers
     if [ "$DISK_PARTITIONS" = "$KERNEL_PARTITIONS" ]; then
       return 0
     fi
