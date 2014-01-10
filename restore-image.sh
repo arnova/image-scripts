@@ -172,30 +172,14 @@ partwait()
   while [ $TRY -gt 0 ]; do
     TRY=$(($TRY - 1))
 
-    FAIL=0
-
     # First make sure all partitions reported by the disk exist according to the kernel in /dev/
-    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE")"
-    if [ -n "$DISK_PARTITIONS" ]; then
-      IFS=$EOL
-      for PART in $DISK_PARTITIONS; do
-        if [ ! -e "$PART" ]; then
-          FAIL=1
-          break;
-        fi
-      done
-    fi
+    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE" |sed -r -e s,'^[/a-z]+',, -e s,'^[0-9]+p',,)"
 
     # Second make sure all partitions reported by the kernel in /dev/ exist according to the disk
-    KERNEL_PARTITIONS="$(get_partitions "$DEVICE")"
-    if [ -n "$DISK_PARTITIONS" ]; then
-      IFS=$EOL
-      for PART_NODEV in $KERNEL_PARTITIONS; do
-        if ! echo "$DISK_PARTITIONS" |grep -x -q "/dev/$PART_NODEV"; then
-          FAIL=1
-          break;
-        fi
-      done
+    KERNEL_PARTITIONS="$(get_partitions "$DEVICE" |sed -r -e s,'^[/a-z]+',, -e s,'^[0-9]+p',,)"
+
+    if [ "$DISK_PARTITIONS" = "$KERNEL_PARTITIONS" ]; then
+      return 0
     fi
 
     # Sleep 1 second:
@@ -253,7 +237,7 @@ partprobe()
 show_block_device_info()
 {
   local DEVICE=`echo "$1" |sed s,'^/dev/',,`
-  
+
   if ! echo "$DEVICE" |grep -q '^/'; then
     DEVICE="/sys/class/block/${DEVICE}"
   fi
