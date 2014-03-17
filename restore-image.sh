@@ -711,7 +711,7 @@ set_image_source_dir()
           TEMP_IMAGE_DIR="$IMAGE_DIR/$IMAGE_NAME"
         fi
 
-        LOOKUP="$(find "$TEMP_IMAGE_DIR/" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" -o -iname "track0.*")"
+        LOOKUP="$(find "$TEMP_IMAGE_DIR/" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz")"
         if [ -z "$LOOKUP" ]; then
           printf "\033[40m\033[1;31m\nERROR: No valid image (directory) specified ($TEMP_IMAGE_DIR)!\n\n\033[0m" >&2
           continue;
@@ -945,11 +945,12 @@ check_disks()
     # Check whether device already contains partitions
     PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
 
+    # GPT FIXME:
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
       TRACK0_CLEAN=1
     fi
-    
+
     if [ -n "$PARTITIONS_FOUND" ]; then
       echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions:"
       get_partitions_fancified /dev/$TARGET_NODEV
@@ -1038,6 +1039,7 @@ check_disks()
           ENTER=1
         fi
 
+        # GPT FIXME:
         if [ $MBR_WRITE -eq 0 ]; then
           echo "" >&2
           printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
@@ -1098,6 +1100,7 @@ restore_disks()
     # Check whether device already contains partitions
     PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
 
+    # GPT FIXME:
     TRACK0_CLEAN=0
     if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
       TRACK0_CLEAN=1
@@ -1106,6 +1109,7 @@ restore_disks()
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
+    # GPT FIXME:
     # Check for MBR restore.
     if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
       DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
@@ -1137,32 +1141,17 @@ restore_disks()
       PARTPROBE=1
     fi
 
+    # Clear GPT data in case we're going to write a GPT partition table:
+    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN eq -1 ] && [ -f "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
+      # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
+      sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
+
+      # Completely zap GPT, MBR and legacy partition data, if we're using GPT on one of the devices
+      sgdisk --zap-all /dev/$TARGET_NODEV >/dev/null 2>&1
+    fi
+
     # Check for partition restore
     if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 -o $PT_ADD -eq 1 ]; then
-      # Zap GPT, in case it exists
-      sgdisk --zap "/dev/$TARGET_NODEV" >/dev/null 2>&1
-
-      SFDISK_FILE=""
-      if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        SFDISK_FILE="sfdisk.${IMAGE_SOURCE_NODEV}"
-      elif [ -f "partitions.${IMAGE_SOURCE_NODEV}" ] && grep -q '^# partition table of' "partitions.${IMAGE_SOURCE_NODEV}"; then
-        # Legacy fallback
-        SFDISK_FILE="partitions.${IMAGE_SOURCE_NODEV}"
-      fi
-
-      if [ -n "$SFDISK_FILE" ]; then
-        echo "* Updating DOS partition-table on /dev/$TARGET_NODEV"
-        sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE"
-        retval=$?
-          
-        if [ $retval -ne 0 ]; then
-          printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
-          echo ""
-          do_exit 5
-        fi
-        PARTPROBE=1
-      fi
-
       SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
       if [ -f "$SGDISK_FILE" ]; then
         echo "* Updating GPT partition-table on /dev/$TARGET_NODEV"
@@ -1175,6 +1164,27 @@ restore_disks()
           do_exit 5
         fi
         PARTPROBE=1
+      else
+        SFDISK_FILE=""
+        if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+          SFDISK_FILE="sfdisk.${IMAGE_SOURCE_NODEV}"
+        elif [ -f "partitions.${IMAGE_SOURCE_NODEV}" ] && grep -q '^# partition table of' "partitions.${IMAGE_SOURCE_NODEV}"; then
+          # Legacy fallback
+          SFDISK_FILE="partitions.${IMAGE_SOURCE_NODEV}"
+        fi
+
+        if [ -n "$SFDISK_FILE" ]; then
+          echo "* Updating DOS partition-table on /dev/$TARGET_NODEV"
+          sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE"
+          retval=$?
+
+          if [ $retval -ne 0 ]; then
+            printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
+            echo ""
+            do_exit 5
+          fi
+          PARTPROBE=1
+        fi
       fi
     fi
 
