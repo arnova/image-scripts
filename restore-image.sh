@@ -907,7 +907,7 @@ get_used_disks()
   for FN in track0.*; do
     # Extract drive name from file
     IMAGE_SOURCE_NODEV="$(basename "$FN" |sed s/'.*\.'//)"
-    USED_DISKS="${USED_DISKS}$[IMAGE_SOURCE_NODEV] "
+    USED_DISKS="${USED_DISKS}${IMAGE_SOURCE_NODEV} "
   done
 
   echo "$USED_DISKS"
@@ -1008,7 +1008,7 @@ check_disks()
 
           do_exit 5
         fi
-      else if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+      elif [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # DOS/MBR:
         SFDISK_TARGET="$(sfdisk -d "/dev/${TARGET_NODEV}" |grep -i '^/dev/.*Id=' |grep -i -v 'Id= 0$' |sed s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)"
         if [ -z "$SFDISK_TARGET" ]; then
@@ -1192,13 +1192,17 @@ restore_disks()
 
         if [ -n "$SFDISK_FILE" ]; then
           echo "* Updating DOS partition-table on /dev/$TARGET_NODEV"
-          sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE"
+          result="$(sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE" 2>&1)"
           retval=$?
 
-          if [ $retval -ne 0 ]; then
+          # Can't check sfdisk's error code as it sometimes fails rereading the partition table (handled below with partprobe)
+          if [ $retval -ne 0 ] && ! echo "$result" |grep -i -q "^Successfully wrote"; then
+            echo "$result" >&2
             printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
             echo ""
             do_exit 5
+          else
+            echo "$result"
           fi
           PARTPROBE=1
         fi
