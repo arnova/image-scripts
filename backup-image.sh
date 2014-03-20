@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA17"
+MY_VERSION="3.10-BETA18"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: January 14, 2014
+# Last update: March 20, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -212,7 +212,7 @@ list_device_partitions()
     printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
   fi
 
-  if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
+  if which gdisk >/dev/null 2>&1 && echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
     # GPT partition table found
     GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
     printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
@@ -411,6 +411,7 @@ sanity_check()
   check_command_error dd
   check_command_error blkid
 
+  # FIXME: Only required when GPT partitions are found
   check_command_warning sgdisk
   check_command_warning gdisk
 
@@ -807,9 +808,14 @@ backup_disks()
 
     SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
     if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
-      # GPT partition table found
-      echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.$HDD_NODEV..."
-      sgdisk --backup="sgdisk.${HDD_NODEV}" "/dev/${HDD_NODEV}"
+      if which gdisk >/dev/null 2>&1 && which sgdisk >/dev/null 2>&1; then
+        # GPT partition table found
+        echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.$HDD_NODEV..."
+        sgdisk --backup="sgdisk.${HDD_NODEV}" "/dev/${HDD_NODEV}"
+      else
+        printf "\033[40m\033[1;31mERROR: Unable to save GPT partition as gdisk/sgdisk was not found! Quitting...\n\033[0m" >&2
+        do_exit 9
+      fi
 
       # Dump gdisk -l info to file
       gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${HDD_NODEV}"

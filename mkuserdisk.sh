@@ -17,7 +17,6 @@ EMPTY_PARTITION_TABLE=0
 # Functions #
 #############
 
-
 mkud_create_user_dos_partition()
 {
   local PART_ID="$USER_PART_ID"
@@ -106,7 +105,7 @@ mkud_create_user_filesystem()
   local PART_ID=$USER_PART_ID
   local USER_PART="${USER_DISK}${PART_ID}"
 
-  local PARTITIONS_FOUND="$(get_partitions "$USER_DISK_NODEV")"
+  local PARTITIONS_FOUND="$(get_partitions /dev/$USER_DISK_NODEV)"
 
   if [ $USER_DISK_ON_OTHER_DEVICE -eq 1 ]; then
     echo "* NOTE: User partition $USER_PART will be created on a seperate disk"
@@ -132,7 +131,7 @@ mkud_create_user_filesystem()
       echo "* Skipping creation of NTFS partition $USER_PART since it already exists"
     fi
 
-    if ! partprobe /dev/$TARGET_NODEV; then
+    if ! partprobe $USER_DISK; then
       printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress enter to continue or CTRL-C to abort...\n\033[0m" >&2
       read
       echo ""
