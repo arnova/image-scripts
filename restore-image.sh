@@ -149,17 +149,17 @@ get_partition_disk()
 # Get partitions directly from disk using sfdisk/gdisk
 get_disk_partitions()
 {
-  local DEVICE="$1"
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
-  local SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null |grep '^/dev/')"
+  local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
   if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
-    local DEV_PREFIX="$DEVICE"
+    local DEV_PREFIX="/dev/$DISK_NODEV"
     # FIXME: Not sure if this is correct:
     if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
       DEV_PREFIX="${DEV_PREFIX}p"
     fi
 
-    sgdisk -p "$DEVICE" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
+    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
   else
     echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
   fi
@@ -1158,8 +1158,8 @@ restore_disks()
       PARTPROBE=1
     fi
 
-    # Clear GPT data in case we're going to write a GPT partition table:
-    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN eq -1 ] && [ -f "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
+    # Clear (GPT) partition data:
+    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN eq -1 ] && which sgdisk >/dev/null 2>&1; then
       # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
       sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
 

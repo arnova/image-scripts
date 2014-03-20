@@ -25,6 +25,7 @@ mkud_create_user_dos_partition()
 
   # TODO?: Use parted -s and auto detect PART_ID
   if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
+    echo "* Creating new (empty) DOS partition"
     # Empty partition table"
     FDISK_CMD="o
                n
@@ -37,6 +38,7 @@ mkud_create_user_dos_partition()
                w
               "
   else
+    echo "* Adding user partition to (existing) DOS partition"
     FDISK_CMD="n
                p
                $PART_ID
@@ -66,6 +68,7 @@ mkud_create_user_gpt_partition()
 
   # TODO?: Use parted -s and auto detect PART_ID
   if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
+    echo "* Creating new (empty) GPT partition"
     # Empty partition table"
     GDISK_CMD="o
                n
@@ -76,6 +79,7 @@ mkud_create_user_gpt_partition()
                w
               "
   else
+    echo "* Adding user partition to (existing) GPT partition"
     GDISK_CMD="n
                $PART_ID
 
@@ -102,10 +106,14 @@ mkud_create_user_filesystem()
   local PART_ID=$USER_PART_ID
   local USER_PART="${USER_DISK}${PART_ID}"
 
-  local PARTITIONS_FOUND="$(get_disk_partitions "$USER_DISK_NODEV")"
+  local PARTITIONS_FOUND="$(get_partitions "$USER_DISK_NODEV")"
+
+  if [ $USER_DISK_ON_OTHER_DEVICE -eq 1 ]; then
+    echo "* NOTE: User partition $USER_PART will be created on a seperate disk"
+  fi
 
   # TODO: Skip the block below if our target disk already *exactly* matches?!
-  
+
   if ! echo "$PARTITIONS_FOUND" |grep -q "${USER_DISK_NODEV}${PART_ID}$" || [ $CLEAN -eq 1 ]; then
     # Automatically handle cases where we have 2 harddisks: one for the OS (Eg. ssd) and one for user data and empty disks
     if [ "$CLEAN" = "1" -a $USER_DISK_ON_OTHER_DEVICE -eq 1 ] || [ -z "$PARTITIONS_FOUND" ]; then
