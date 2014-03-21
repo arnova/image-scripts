@@ -934,7 +934,7 @@ get_auto_target_device()
     IFS=' '
     for DISK in `get_available_disks`; do
       # Checked for mounted partitions
-      if ! grep -E -q "^/dev/${DISK}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps
+      if ! grep -E -q "^/dev/${DISK}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
         SOURCE_NODEV=`echo "$DISK" |sed s,'^/dev/',,`
         break;
       fi
