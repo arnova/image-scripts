@@ -87,7 +87,27 @@ get_user_yn()
 }
 
 
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
+# Get partitions directly from disk using sfdisk/gdisk
+get_disk_partitions()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
+  if which sgdisk >/dev/null 2>&1 && echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
+    local DEV_PREFIX="/dev/$DISK_NODEV"
+    # FIXME: Not sure if this is correct:
+    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
+      DEV_PREFIX="${DEV_PREFIX}p"
+    fi
+
+    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
+  else
+    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
+  fi
+}
+
+
+# $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
 get_partitions_with_size()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
@@ -198,25 +218,6 @@ show_block_device_info()
   fi
 
   echo ""
-}
-
-
-list_device_partitions()
-{
-  local DEVICE="$1"
-
-  FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
-  # MBR/DOS Partitions:
-  IFS=$EOL
-  if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
-    printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
-  fi
-
-  if which gdisk >/dev/null 2>&1 && echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
-    # GPT partition table found
-    GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
-    printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
-  fi
 }
 
 
@@ -591,7 +592,7 @@ show_backup_disks_info()
   IFS=' '
   for HDD in $BACKUP_DISKS; do
     HDD_NODEV="$(get_partition_disk "$HDD")"
-    echo "* Available backup disk /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
+    echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
     get_partitions_fancified /dev/$HDD_NODEV
     echo ""
   done
