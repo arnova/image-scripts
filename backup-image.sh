@@ -798,7 +798,7 @@ backup_disks()
 
     echo "* Storing track0 for /dev/$HDD_NODEV in track0.$HDD_NODEV..."
     # Dump hdd info for all disks in the current system
-    result="$(dd if=/dev/$HDD_NODEV of="track0.$HDD_NODEV" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to Grub2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
+    result="$(dd if=/dev/$HDD_NODEV of="track0.$HDD_NODEV" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
     retval=$?
     if [ $retval -ne 0 ]; then
       echo "$result" >&2
@@ -808,14 +808,14 @@ backup_disks()
 
     SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
     if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
-      if which gdisk >/dev/null 2>&1 && which sgdisk >/dev/null 2>&1; then
-        # GPT partition table found
-        echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.$HDD_NODEV..."
-        sgdisk --backup="sgdisk.${HDD_NODEV}" "/dev/${HDD_NODEV}"
-      else
-        printf "\033[40m\033[1;31mERROR: Unable to save GPT partition as gdisk/sgdisk was not found! Quitting...\n\033[0m" >&2
+      # GPT partition table found
+      if ! which gdisk >/dev/null 2>&1 || ! which sgdisk >/dev/null 2>&1; then
+        printf "\033[40m\033[1;31mERROR: Unable to save GPT partition as gdisk/sgdisk binaries were not found! Quitting...\n\033[0m" >&2
         do_exit 9
       fi
+
+      echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.$HDD_NODEV..."
+      sgdisk --backup="sgdisk.${HDD_NODEV}" "/dev/${HDD_NODEV}"
 
       # Dump gdisk -l info to file
       gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${HDD_NODEV}"
