@@ -614,6 +614,7 @@ detect_partitions()
     SELECT_PARTITIONS=""
     IFS=$EOL
     for LINE in $FIND_PARTITIONS; do
+      # FIXME: Need to handle ef00/ef02 GRUB partitions here
       if echo "$LINE" |grep -q -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$'; then
         continue; # Ignore swap etc. partitions
       fi

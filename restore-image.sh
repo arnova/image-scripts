@@ -329,9 +329,9 @@ get_partitions_fancified()
 }
 
 
-show_available_disks()
+get_available_disks()
 {
-  echo "* Available devices/disks:"
+  local GET_DISKS=""
 
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
@@ -340,6 +340,19 @@ show_available_disks()
       continue; # Ignore device
     fi
 
+    echo "${GET_DISKS}${BLK_DEVICE} "
+  done
+
+  echo "$GET_DISKS"
+}
+
+
+show_available_disks()
+{
+  echo "* Available devices/disks:"
+
+  IFS=' '
+  for BLK_DEVICE in `get_available_disks`; do
     echo "  $DEVICE: $(show_block_device_info $BLK_DEVICE)"
   done
 
@@ -911,6 +924,27 @@ get_used_disks()
 }
 
 
+# Returns all available unmounted disks (without /dev/ prefix)
+get_auto_target_device()
+{
+  local SOURCE_NODEV="$1"
+
+  # Check for device existance and mounted partitions
+  if [ ! -b "/dev/$SOURCE_NODEV" ] || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+    IFS=' '
+    for DISK in `get_available_disks`; do
+      # Checked for mounted partitions
+      if ! grep -E -q "^/dev/${DISK}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps
+        SOURCE_NODEV=`echo "$DISK" |sed s,'^/dev/',,`
+        break;
+      fi
+    done
+  fi
+
+  echo "$SOURCE_NODEV"
+}
+
+
 check_disks()
 {
   # Show disks/devices available for restoration
@@ -921,12 +955,17 @@ check_disks()
   for IMAGE_SOURCE_NODEV in `get_used_disks`; do
     IMAGE_TARGET_NODEV=`source_to_target_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
 
-    echo "* Selecting target device for image source device /dev/$IMAGE_SOURCE_NODEV"
+    if [ "$IMAGE_TARGET_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
+      # Check whether device is available (eg. not mounted partitions and fallback to other default device if
+      IMAGE_TARGET_NODEV=`get_auto_target_device "$IMAGE_SOURCE_NODEV"`
+    fi
+
+    echo "* Auto preselecting target device /dev/$IMAGE_TARGET_NODEV for image source $IMAGE_SOURCE_NODEV"
 
     while true; do
       user_target_dev_select "$IMAGE_TARGET_NODEV"
       TARGET_NODEV="$USER_TARGET_NODEV"
-      
+
       if [ -z "$TARGET_NODEV" ]; then
         continue;
       fi
@@ -1299,7 +1338,7 @@ check_partitions()
     elif ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DISK " -e " $PART_DISK " -e " $PART_DISK$" -e "^$PART_DISK$"; then
       TARGET_DEVICES="${TARGET_DEVICES}${TARGET_DEVICES:+ }${PART_DISK} "
     fi
-    
+
     # Check for mounted partitions on target device
     if grep -E -q "^${TARGET_PARTITION}[[:blank:]]" /etc/mtab; then
       printf "\033[40m\033[1;31m\nERROR: Target partition $TARGET_PARTITION is mounted! Wrong target partition/device specified? Quitting...\n\033[0m" >&2
@@ -1688,6 +1727,8 @@ for DEVICE in $TARGET_DEVICES; do
   get_partitions_fancified "$DEVICE"
   echo ""
 done
+
+echo "* Image restored from: $IMAGE_DIR"
 
 if [ -n "$FAILED" ]; then
   echo "* Partitions restored with errors: $FAILED"
