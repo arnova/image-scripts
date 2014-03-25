@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA19"
+MY_VERSION="3.10-BETA20"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: March 20, 2014
+# Last update: March 25, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -268,7 +268,7 @@ show_block_device_info()
 
   local SIZE="$(cat "${DEVICE}/size")"
   if [ -n "$SIZE" ]; then
-    printf "$SIZE blocks - "
+    printf " - $SIZE blocks - "
     GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
     if [ $GB_SIZE -eq 0 ]; then
       MB_SIZE=$(($SIZE / 2 / 1024))
@@ -329,21 +329,22 @@ get_partitions_fancified()
 }
 
 
+# Get available devices/disks with /dev/ prefix
 get_available_disks()
 {
-  local GET_DISKS=""
-
+  local DEV_FOUND=""
+  
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
     DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
-    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -e "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
       continue; # Ignore device
     fi
 
-    echo "${GET_DISKS}${BLK_DEVICE} "
+   DEV_FOUND="${DEV_FOUND}${DEVICE} "
   done
 
-  echo "$GET_DISKS"
+  echo "$DEV_FOUND"
 }
 
 
@@ -352,8 +353,8 @@ show_available_disks()
   echo "* Available devices/disks:"
 
   IFS=' '
-  for BLK_DEVICE in `get_available_disks`; do
-    echo "  $DEVICE: $(show_block_device_info $BLK_DEVICE)"
+  for DISK_DEV in `get_available_disks`; do
+    echo "  $DISK_DEV: $(show_block_device_info $DISK_DEV)"
   done
 
   echo ""
@@ -894,7 +895,7 @@ restore_partitions()
 user_target_dev_select()
 {
   local DEFAULT_TARGET_NODEV="$1"
-  printf "Select target device (Default=/dev/$DEFAULT_TARGET_NODEV): "
+  printf "Select target device (default=/dev/$DEFAULT_TARGET_NODEV): "
   read USER_TARGET_NODEV
 
   if [ -z "$USER_TARGET_NODEV" ]; then
@@ -924,7 +925,7 @@ get_used_disks()
 }
 
 
-# Returns all available unmounted disks (without /dev/ prefix)
+# Returns preferred taget, unmounted disks first (without /dev/ prefix)
 get_auto_target_device()
 {
   local SOURCE_NODEV="$1"
@@ -932,12 +933,14 @@ get_auto_target_device()
   # Check for device existance and mounted partitions
   if [ ! -b "/dev/$SOURCE_NODEV" ] || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
     IFS=' '
-    for DISK in `get_available_disks`; do
+    for DISK_DEV in `get_available_disks`; do
       # Checked for mounted partitions
-      if ! grep -E -q "^/dev/${DISK}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
-        SOURCE_NODEV=`echo "$DISK" |sed s,'^/dev/',,`
+      if ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+        SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
         break;
       fi
+    #FIXME: Check disk-size
+    #FIXME: Skip check above when --clean is not specified?
     done
   fi
 
