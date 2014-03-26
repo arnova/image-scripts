@@ -88,6 +88,7 @@ get_user_yn()
 
 
 # $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
+# Note that size is represented in 1KiB blocks
 get_partitions_with_size()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
@@ -114,20 +115,24 @@ get_partitions_with_size_type()
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
   IFS=$EOL
-  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
+  get_partitions "$DISK_NODEV" |while read LINE; do
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
-    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
 
-    # Note that SIZE is in (1KiB) blocks already
-    GB_SIZE=$(($SIZE / 1024 / 1024))
+    local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
+    local GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
     if [ $GB_SIZE -ne 0 ]; then
-      SIZE_HUMAN="${GB_SIZE}GiB"
+      local SIZE_HUMAN="${GB_SIZE}GiB"
     else
-      MB_SIZE=$(($SIZE / 1024))
+      local MB_SIZE=$(($SIZE / 1024 / 1024))
       if [ $MB_SIZE -ne 0 ]; then
         SIZE_HUMAN="${MB_SIZE}MiB"
       else
-        SIZE_HUMAN="${SIZE}KiB"
+        local KB_SIZE=$(($SIZE / 1024))
+        if [ $KB_SIZE -ne 0 ]; then
+          SIZE_HUMAN="${SIZE}KiB"
+        else
+          SIZE_HUMAN="${SIZE}B"
+        fi
       fi
     fi
 
@@ -171,36 +176,41 @@ get_disk_partitions()
 
 show_block_device_info()
 {
-  local DEVICE=`echo "$1" |sed s,'^/dev/',,`
+  local BLK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
-  if ! echo "$DEVICE" |grep -q '^/'; then
-    DEVICE="/sys/class/block/${DEVICE}"
+  if ! echo "$BLK_NODEV" |grep -q '^/'; then
+    BLK_NODEV="/sys/class/block/${BLK_NODEV}"
   fi
 
-  local VENDOR="$(cat "${DEVICE}/device/vendor" |sed s!' *$'!!g)"
+  local VENDOR="$(cat "${BLK_NODEV}/BLK_NODEV/vendor" |sed s!' *$'!!g)"
   if [ -n "$VENDOR" ]; then
     printf "%s " "$VENDOR"
   fi
 
-  local MODEL="$(cat "${DEVICE}/device/model" |sed s!' *$'!!g)"
+  local MODEL="$(cat "${BLK_NODEV}/BLK_NODEV/model" |sed s!' *$'!!g)"
   if [ -n "$MODEL" ]; then
     printf "%s " "$MODEL"
   fi
 
-  local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
+  local REV="$(cat "${BLK_NODEV}/BLK_NODEV/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
     printf "%s " "$REV"
   fi
 
-  local SIZE="$(cat "${DEVICE}/size")"
+  local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
   if [ -n "$SIZE" ]; then
-    printf -- "- $SIZE blocks - "
-    GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
-    if [ $GB_SIZE -eq 0 ]; then
-      MB_SIZE=$(($SIZE / 2 / 1024))
-      printf "${MB_SIZE} MiB"
+    printf -- "- $SIZE bytes"
+    GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
+    if [ $GB_SIZE -ne 0 ]; then
+      printf -- " - ${GB_SIZE} GiB"
     else
-      printf "${GB_SIZE} GiB"
+      MB_SIZE=$(($SIZE / 1024 / 1024))
+      if [ $MB_SIZE -ne 0 ]; then
+        printf -- " - ${MB_SIZE} MiB"
+      else
+        KB_SIZE=$(($SIZE / 1024))
+        printf -- " - ${KB_SIZE} KiB"
+      fi
     fi
   fi
 
@@ -398,6 +408,7 @@ sanity_check()
   check_command_error fdisk
   check_command_error dd
   check_command_error blkid
+  check_command_error blockdev
 
   # FIXME: Only required when GPT partitions are found
   check_command_warning sgdisk
