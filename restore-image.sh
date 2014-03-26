@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA20"
+MY_VERSION="3.10-BETA21"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: March 25, 2014
+# Last update: March 265, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -91,7 +91,7 @@ get_user_yn()
 }
 
 
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
+# $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
 get_partitions_with_size()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
@@ -109,6 +109,121 @@ get_partitions_with_size()
 get_partitions()
 {
   get_partitions_with_size "$1" |awk '{ print $1 }'
+}
+
+
+# Figure out to which disk the specified partition ($1) belongs
+get_partition_disk()
+{
+  echo "$1" |sed -r s,'[p/]?[0-9]+$',,
+}
+
+
+# Get partitions directly from disk using sfdisk/gdisk
+get_disk_partitions()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
+  if which sgdisk >/dev/null 2>&1 && echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
+    local DEV_PREFIX="/dev/$DISK_NODEV"
+    # FIXME: Not sure if this is correct:
+    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
+      DEV_PREFIX="${DEV_PREFIX}p"
+    fi
+
+    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
+  else
+    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
+  fi
+}
+
+
+show_block_device_info()
+{
+  local DEVICE=`echo "$1" |sed s,'^/dev/',,`
+
+  if ! echo "$DEVICE" |grep -q '^/'; then
+    DEVICE="/sys/class/block/${DEVICE}"
+  fi
+
+  local VENDOR="$(cat "${DEVICE}/device/vendor" |sed s!' *$'!!g)"
+  if [ -n "$VENDOR" ]; then
+    printf "%s " "$VENDOR"
+  fi
+
+  local MODEL="$(cat "${DEVICE}/device/model" |sed s!' *$'!!g)"
+  if [ -n "$MODEL" ]; then
+    printf "%s " "$MODEL"
+  fi
+
+  local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
+  if [ -n "$REV" ]; then
+    printf "%s " "$REV"
+  fi
+
+  local SIZE="$(cat "${DEVICE}/size")"
+  if [ -n "$SIZE" ]; then
+    printf -- "- $SIZE blocks - "
+    GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
+    if [ $GB_SIZE -eq 0 ]; then
+      MB_SIZE=$(($SIZE / 2 / 1024))
+      printf "${MB_SIZE} MiB"
+    else
+      printf "${GB_SIZE} GiB"
+    fi
+  fi
+
+  echo ""
+}
+
+
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
+get_partitions_size_type()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  IFS=$EOL
+  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
+
+    GB_SIZE=$(($SIZE / 1024 / 1024))
+    if [ $GB_SIZE -eq 0 ]; then
+      MB_SIZE=$(($SIZE / 1024))
+      SIZE_HUMAN="${MB_SIZE} MiB"
+    else
+      SIZE_HUMAN="${GB_SIZE} GiB"
+    fi
+
+    printf "$PART_NODEV: SIZE=$SIZE SIZEH=\"$SIZE_HUMAN\""
+    IFS=$EOL
+    blkid -o export "/dev/$PART_NODEV" |grep -v '^DEVNAME=' |while read ITEM; do
+      printf " $ITEM"
+    done
+
+    echo "" # EOL
+  done
+}
+
+
+# Show block device partitions, automatically showing either DOS or GPT partition table
+list_device_partitions()
+{
+  local DEVICE="$1"
+
+  FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
+  # MBR/DOS Partitions:
+  IFS=$EOL
+  if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
+    printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
+  fi
+
+  if which gdisk >/dev/null 2>&1 && echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
+    # GPT partition table found
+    GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
+    printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
+  fi
 }
 
 
@@ -140,30 +255,35 @@ add_partition_number()
 }
 
 
-# Figure out to which disk the specified partition ($1) belongs
-get_partition_disk()
+# Get available devices/disks with /dev/ prefix
+get_available_disks()
 {
-  echo "$1" |sed -r s,'[p/]?[0-9]+$',,
+  local DEV_FOUND=""
+  
+  IFS=$EOL
+  for BLK_DEVICE in /sys/block/*; do
+    DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
+      continue; # Ignore device
+    fi
+
+   DEV_FOUND="${DEV_FOUND}${DEVICE} "
+  done
+
+  echo "$DEV_FOUND"
 }
 
 
-# Get partitions directly from disk using sfdisk/gdisk
-get_disk_partitions()
+show_available_disks()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  echo "* Available devices/disks:"
 
-  local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
-  if which sgdisk >/dev/null 2>&1 && echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
-    local DEV_PREFIX="/dev/$DISK_NODEV"
-    # FIXME: Not sure if this is correct:
-    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
-      DEV_PREFIX="${DEV_PREFIX}p"
-    fi
+  IFS=' '
+  for DISK_DEV in `get_available_disks`; do
+    echo "  $DISK_DEV: $(show_block_device_info $DISK_DEV)"
+  done
 
-    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
-  else
-    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
-  fi
+  echo ""
 }
 
 
@@ -243,124 +363,6 @@ partprobe()
 }
 
 
-show_block_device_info()
-{
-  local DEVICE=`echo "$1" |sed s,'^/dev/',,`
-
-  if ! echo "$DEVICE" |grep -q '^/'; then
-    DEVICE="/sys/class/block/${DEVICE}"
-  fi
-
-  local VENDOR="$(cat "${DEVICE}/device/vendor" |sed s!' *$'!!g)"
-  if [ -n "$VENDOR" ]; then
-    printf "%s " "$VENDOR"
-  fi
-
-  local MODEL="$(cat "${DEVICE}/device/model" |sed s!' *$'!!g)"
-  if [ -n "$MODEL" ]; then
-    printf "%s " "$MODEL"
-  fi
-
-  local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
-  if [ -n "$REV" ]; then
-    printf "%s" "$REV"
-  fi
-
-  local SIZE="$(cat "${DEVICE}/size")"
-  if [ -n "$SIZE" ]; then
-    printf " - $SIZE blocks - "
-    GB_SIZE=$(($SIZE / 2 / 1024 / 1024))
-    if [ $GB_SIZE -eq 0 ]; then
-      MB_SIZE=$(($SIZE / 2 / 1024))
-      printf "${MB_SIZE} MiB"
-    else
-      printf "${GB_SIZE} GiB"
-    fi
-  fi
-
-  echo ""
-}
-
-
-list_device_partitions()
-{
-  local DEVICE="$1"
-
-  FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
-  # MBR/DOS Partitions:
-  IFS=$EOL
-  if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
-    printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
-  fi
-
-  if which gdisk >/dev/null 2>&1 && echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
-    # GPT partition table found
-    GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
-    printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
-  fi
-}
-
-
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions_fancified()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  IFS=$EOL
-  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
-    local BLKINFO="$(blkid "/dev/$PART_NODEV" |sed s/' *$'//)"
-    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
-
-    GB_SIZE=$(($SIZE / 1024 / 1024))
-    if [ $GB_SIZE -eq 0 ]; then
-      MB_SIZE=$(($SIZE / 1024))
-      SIZE_HUMAN="${MB_SIZE} MiB"
-    else
-      SIZE_HUMAN="${GB_SIZE} GiB"
-    fi
-
-    if [ -z "$BLKINFO" ]; then
-      BLKINFO="/dev/${PART_NODEV}: TYPE=\"other\""
-    fi
-
-    echo "$BLKINFO SIZE=$SIZE SIZEH=\"$SIZE_HUMAN\""
-  done
-}
-
-
-# Get available devices/disks with /dev/ prefix
-get_available_disks()
-{
-  local DEV_FOUND=""
-  
-  IFS=$EOL
-  for BLK_DEVICE in /sys/block/*; do
-    DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
-    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
-      continue; # Ignore device
-    fi
-
-   DEV_FOUND="${DEV_FOUND}${DEVICE} "
-  done
-
-  echo "$DEV_FOUND"
-}
-
-
-show_available_disks()
-{
-  echo "* Available devices/disks:"
-
-  IFS=' '
-  for DISK_DEV in `get_available_disks`; do
-    echo "  $DISK_DEV: $(show_block_device_info $DISK_DEV)"
-  done
-
-  echo ""
-}
-
-
 # Setup the ethernet interface
 configure_network()
 {
@@ -384,7 +386,7 @@ configure_network()
 
     if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
       echo "* Network interface $CUR_IF is not active (yet)"
-          
+
       if echo "$NETWORK" |grep -q -e 'dhcp'; then
         if which dhcpcd >/dev/null 2>&1; then
           echo "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
@@ -510,7 +512,7 @@ check_command_warning()
 sanity_check()
 {
   # root check
-  if [ "$(id -u)" != "0" ]; then 
+  if [ "$(id -u)" != "0" ]; then
     printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
     exit 1
   fi
@@ -597,18 +599,18 @@ sanity_check()
 chdir_safe()
 {
   local IMAGE_DIR="$1"
-  
+
   if [ ! -d "$IMAGE_DIR" ]; then
-    printf "\033[40m\033[1;31m\nERROR: Image directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nERROR: Image source directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
     return 2
   fi
-  
+
   # Make the image dir our working directory
   if ! cd "$IMAGE_DIR"; then
     printf "\033[40m\033[1;31m\nERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
     return 3
   fi
-
+  
   return 0
 }
 
@@ -622,7 +624,7 @@ set_image_source_dir()
     if ! chdir_safe "$IMAGE_DIR"; then
       do_exit 7
     fi
-    
+
     # Reset mount device since we've been overruled
     MOUNT_DEVICE=""
   else
@@ -930,12 +932,12 @@ get_auto_target_device()
 {
   local SOURCE_NODEV="$1"
 
-  # Check for device existance and mounted partitions
-  if [ ! -b "/dev/$SOURCE_NODEV" ] || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+  # Check for device existence and mounted partitions, prefer non-removable devices
+  if [ ! -b "/dev/$SOURCE_NODEV" ] || [ $(cat /sys/block/$SOURCE_NODEV/removable) -eq 1 ] || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
       # Checked for mounted partitions
-      if ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+      if [ $(cat /sys/block/$SOURCE_NODEV/removable) -eq 0 ] && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
         break;
       fi
@@ -1005,7 +1007,7 @@ check_disks()
 
     if [ -n "$PARTITIONS_FOUND" ]; then
       echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions:"
-      get_partitions_fancified /dev/$TARGET_NODEV
+      get_partitions_size_type /dev/$TARGET_NODEV
     fi
 
     if [ $PT_ADD -eq 1 ]; then
@@ -1727,7 +1729,7 @@ echo "--------------------------------------------------------------------------
 IFS=' '
 for DEVICE in $TARGET_DEVICES; do
   echo "* $DEVICE: $(show_block_device_info "$DEVICE")"
-  get_partitions_fancified "$DEVICE"
+  get_partitions_size_type "$DEVICE"
   echo ""
 done
 

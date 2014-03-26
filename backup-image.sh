@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA18"
+MY_VERSION="3.10-BETA21"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: March 20, 2014
+# Last update: March 26, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -42,7 +42,7 @@ do_exit()
 {
   echo ""
   echo ""
-  
+
   # Auto unmount?
   if [ "$AUTO_UNMOUNT" = "1" ] && [ -n "$MOUNT_DEVICE" ] && grep -q " $IMAGE_ROOT " /etc/mtab; then
     # Go to root else we can't umount
@@ -87,31 +87,10 @@ get_user_yn()
 }
 
 
-# Get partitions directly from disk using sfdisk/gdisk
-get_disk_partitions()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
-  if which sgdisk >/dev/null 2>&1 && echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
-    local DEV_PREFIX="/dev/$DISK_NODEV"
-    # FIXME: Not sure if this is correct:
-    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
-      DEV_PREFIX="${DEV_PREFIX}p"
-    fi
-
-    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
-  else
-    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
-  fi
-}
-
-
 # $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
 get_partitions_with_size()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
   local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
 
   if [ -n "$DISK_NODEV" ]; then
@@ -129,56 +108,30 @@ get_partitions()
 }
 
 
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions_with_size_type()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  IFS=$EOL
-  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
-    local TYPE=`blkid -s TYPE -o value "/dev/${PART_NODEV}"`
-
-    if [ -z "$TYPE" ]; then
-      TYPE="other" # = eg. extended partition, disk device, sr0, loop0 etc.
-    fi
-    echo "$LINE $TYPE"
-  done
-}
-
-
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions_fancified()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  IFS=$EOL
-  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
-    local BLKINFO="$(blkid "/dev/$PART_NODEV" |sed s/' *$'//)"
-    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
-
-    GB_SIZE=$(($SIZE / 1024 / 1024))
-    if [ $GB_SIZE -eq 0 ]; then
-      MB_SIZE=$(($SIZE / 1024))
-      SIZE_HUMAN="${MB_SIZE} MiB"
-    else
-      SIZE_HUMAN="${GB_SIZE} GiB"
-    fi
-
-    if [ -z "$BLKINFO" ]; then
-      BLKINFO="/dev/${PART_NODEV}: TYPE=\"other\""
-    fi
-
-    echo "$BLKINFO SIZE=$SIZE SIZEH=\"$SIZE_HUMAN\""
-  done
-}
-
-
 # Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
   echo "$1" |sed -r s,'[p/]?[0-9]+$',,
+}
+
+
+# Get partitions directly from disk using sfdisk/gdisk
+get_disk_partitions()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
+  if which sgdisk >/dev/null 2>&1 && echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
+    local DEV_PREFIX="/dev/$DISK_NODEV"
+    # FIXME: Not sure if this is correct:
+    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
+      DEV_PREFIX="${DEV_PREFIX}p"
+    fi
+
+    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
+  else
+    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
+  fi
 }
 
 
@@ -202,7 +155,7 @@ show_block_device_info()
 
   local REV="$(cat "${DEVICE}/device/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
-    printf "%s" "$REV"
+    printf "%s " "$REV"
   fi
 
   local SIZE="$(cat "${DEVICE}/size")"
@@ -218,6 +171,35 @@ show_block_device_info()
   fi
 
   echo ""
+}
+
+
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
+get_partitions_size_type()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  IFS=$EOL
+  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
+
+    GB_SIZE=$(($SIZE / 1024 / 1024))
+    if [ $GB_SIZE -eq 0 ]; then
+      MB_SIZE=$(($SIZE / 1024))
+      SIZE_HUMAN="${MB_SIZE} MiB"
+    else
+      SIZE_HUMAN="${GB_SIZE} GiB"
+    fi
+
+    printf "$PART_NODEV: SIZE=$SIZE SIZEH=\"$SIZE_HUMAN\""
+    IFS=$EOL
+    blkid -o export "/dev/$PART_NODEV" |grep -v '^DEVNAME=' |while read ITEM; do
+      printf " $ITEM"
+    done
+
+    echo "" # EOL
+  done
 }
 
 
@@ -446,7 +428,7 @@ mkdir_safe()
   fi
 
   if [ ! -d "$IMAGE_DIR" ]; then
-    printf "\033[40m\033[1;31m\nERROR: Image target directory $IMAGE_DIR does NOT exist!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nERROR: Image target directory ($IMAGE_DIR) does NOT exist!\n\033[0m" >&2
     return 2
   fi
 
@@ -593,7 +575,7 @@ show_backup_disks_info()
   for HDD in $BACKUP_DISKS; do
     HDD_NODEV="$(get_partition_disk "$HDD")"
     echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
-    get_partitions_fancified /dev/$HDD_NODEV
+    get_partitions_size_type /dev/$HDD_NODEV
     echo ""
   done
 }
@@ -615,12 +597,17 @@ detect_partitions()
     SELECT_PARTITIONS=""
     IFS=$EOL
     for LINE in $FIND_PARTITIONS; do
-      # FIXME: Need to handle ef00/ef02 GRUB partitions here
-      if echo "$LINE" |grep -q -e ' swap$' -e ' other$' -e ' unknown$' -e ' squashfs$'; then
+      # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
+      if echo "$LINE" |grep -q -i -E -e 'TYPE=(swap|squashfs|unknown)' -e 'PTTYPE=dos'; then
         continue; # Ignore swap etc. partitions
       fi
 
-      PART=`echo "$LINE" |awk '{ print $1 }'`
+      # Extra strict regex for making sure it's really a filesystem
+#      if ! echo "$LINE" |grep -q -i ' TYPE=' && ! echo "$LINE" |grep -q -i -E -e ' LABEL=' -e '  ; then
+#        continue;
+#      fi
+
+      PART=`echo "$LINE" |awk -F: '{ print $1 }'`
       SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART}"
     done
 
@@ -834,7 +821,7 @@ backup_disks()
     fi
 
     # Dump device partition layout in "fancified" format
-    get_partitions_fancified "$HDD_NODEV" >"partition_layout.${HDD_NODEV}"
+    get_partitions_size_type "$HDD_NODEV" >"partition_layout.${HDD_NODEV}"
   done
 }
 
