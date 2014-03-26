@@ -829,7 +829,7 @@ source_to_target_remap()
       break;
     fi
   done
-  
+
   echo "$TARGET_DEVICE"
 }
 
@@ -926,27 +926,33 @@ user_target_dev_select()
 }
 
 
-get_used_disks()
+get_source_disks()
 {
   local USED_DISKS=""
 
-  # FIXME: we should exclude disks/items not in --dev, if specified and consider --clean
-  IFS=$EOL
-  for ITEM in `find . -maxdepth 1 -name "track0.*" -o -name "sgdisk.*" -o -name "sfdisk.*"`; do
-    # Extract drive name from file
-    IMAGE_SOURCE_NODEV="$(basename "$ITEM" |sed s/'.*\.'//)"
+  # Only check disk files if no partitions specified and the rule "all" applies
+  if [ -z "$PARTITIONS" -o $CLEAN -eq 1 ]; then
+    IFS=$EOL
+    for ITEM in `find . -maxdepth 1 -name "track0.*" -o -name "sgdisk.*" -o -name "sfdisk.*"`; do
+      # Extract drive name from file
+      IMAGE_SOURCE_NODEV="$(basename "$ITEM" |sed s/'.*\.'//)"
 
-    # Skip duplicates
-    if ! echo "$USEDR_DISKS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV} " -e " ${IMAGE_SOURCE_NODEV} "; then
-      USED_DISKS="${USED_DISKS}${IMAGE_SOURCE_NODEV} "
-    fi
-  done
+      # Skip duplicates
+      if ! echo "$USED_DISKS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV} " -e " ${IMAGE_SOURCE_NODEV} "; then
+        USED_DISKS="${USED_DISKS}${IMAGE_SOURCE_NODEV} "
+      fi
+    done
+  fi
 
-  # Check image files as well
+  # Check image files:
   IFS=$EOL
   for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
     # Extract drive name from file
     IMAGE_SOURCE_NODEV=`get_partition_disk "$(basename "$ITEM" |sed s/'\..*'//)"`
+
+    if [ -n "$PARTITIONS" ] && ! echo "$PARTITIONS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV}[ :]" -e " ${IMAGE_SOURCE_NODEV}[ :]"; then
+      continue; # Not specified in --partitions, skip
+    fi
 
     # Skip duplicates
     if ! echo "$USED_DISKS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV} " -e " ${IMAGE_SOURCE_NODEV} "; then
@@ -994,14 +1000,13 @@ check_disks()
 
   # Restore MBR/track0/partitions:
   IFS=' '
-  for IMAGE_SOURCE_NODEV in `get_used_disks`; do
+  for IMAGE_SOURCE_NODEV in `get_source_disks`; do
     IMAGE_TARGET_NODEV=`source_to_target_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
 
     if [ "$IMAGE_TARGET_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
       # Check whether device is available (eg. not mounted partitions and fallback to other default device if
       IMAGE_TARGET_NODEV=`get_auto_target_device "$IMAGE_SOURCE_NODEV"`
-    else
-      echo "TODO"
+#    else
       # FIXME: Fail here when size is too small
     fi
 
@@ -1543,9 +1548,10 @@ show_help()
   echo "" >&2
   echo "Options:" >&2
   echo "--help|-h                   - Print this help" >&2
-  echo "--dev|-d={dev1,dev2}        - Restore image to target device(s) (instead of default). Optionally use source:/dev/target" >&2
-  echo "                              like sdb:/dev/sda or sdb1:/dev/sda to restore to a different device/partition" >&2
-  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all" >&2
+  echo "--dev|-d={dev1,dev2}        - Restore image to target device(s) (instead of default from source)." >&2
+  echo "                              Optionally use source:/dev/target like sdb:/dev/sda to restore to a different device" >&2
+  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all." >&2
+  echo "                              Optionally use source:/dev/target like sdb1:/dev/sda1 to restore to a different partition" >&2
   echo "--conf|-c={config_file}     - Specify alternate configuration file" >&2
   echo "--noconf                    - Don't read the config file" >&2
   echo "--mbr                       - Always write a new track0(MBR) (from track0.*)" >&2
