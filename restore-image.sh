@@ -122,7 +122,7 @@ get_partitions_with_size_type()
   get_partitions "$DISK_NODEV" |while read LINE; do
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
 
-    local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
+    local SIZE="$(blockdev --getsize64 "/dev/$PART_NODEV" 2>/dev/null)"
     local GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
     if [ $GB_SIZE -ne 0 ]; then
       local SIZE_HUMAN="${GB_SIZE}GiB"
@@ -186,17 +186,17 @@ show_block_device_info()
     BLK_NODEV="/sys/class/block/${BLK_NODEV}"
   fi
 
-  local VENDOR="$(cat "${BLK_NODEV}/BLK_NODEV/vendor" |sed s!' *$'!!g)"
+  local VENDOR="$(cat "${BLK_NODEV}/device/vendor" |sed s!' *$'!!g)"
   if [ -n "$VENDOR" ]; then
     printf "%s " "$VENDOR"
   fi
 
-  local MODEL="$(cat "${BLK_NODEV}/BLK_NODEV/model" |sed s!' *$'!!g)"
+  local MODEL="$(cat "${BLK_NODEV}/device/model" |sed s!' *$'!!g)"
   if [ -n "$MODEL" ]; then
     printf "%s " "$MODEL"
   fi
 
-  local REV="$(cat "${BLK_NODEV}/BLK_NODEV/rev" |sed s!' *$'!!g)"
+  local REV="$(cat "${BLK_NODEV}/device/rev" |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
     printf "%s " "$REV"
   fi
@@ -947,6 +947,7 @@ get_used_disks()
 get_auto_target_device()
 {
   local SOURCE_NODEV="$1"
+  local MIN_SIZE="$2"
 
   # Check for device existence and mounted partitions, prefer non-removable devices
   if [ ! -b "/dev/$SOURCE_NODEV" ] || [ $(cat /sys/block/$SOURCE_NODEV/removable) -eq 1 ] || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
