@@ -108,6 +108,39 @@ get_partitions()
 }
 
 
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
+get_partitions_with_size_type()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  IFS=$EOL
+  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
+
+    GB_SIZE=$(($SIZE / 1024 / 1024))
+    if [ $GB_SIZE -ne 0 ]; then
+      SIZE_HUMAN="${GB_SIZE}GiB"
+    else
+      MB_SIZE=$(($SIZE / 1024))
+      if [ $MB_SIZE ne 0 ]; then
+        SIZE_HUMAN="${MB_SIZE}MiB"
+      else
+        SIZE_HUMAN="${SIZE}B"
+      fi
+    fi
+
+    printf "$PART_NODEV: SIZE=$SIZE SIZEH=$SIZE_HUMAN"
+    IFS=$EOL
+    blkid -o export "/dev/$PART_NODEV" |grep -v '^DEVNAME=' |while read ITEM; do
+      printf " $ITEM"
+    done
+
+    echo "" # EOL
+  done
+}
+
+
 # Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
@@ -171,35 +204,6 @@ show_block_device_info()
   fi
 
   echo ""
-}
-
-
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions_size_type()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  IFS=$EOL
-  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
-    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
-
-    GB_SIZE=$(($SIZE / 1024 / 1024))
-    if [ $GB_SIZE -eq 0 ]; then
-      MB_SIZE=$(($SIZE / 1024))
-      SIZE_HUMAN="${MB_SIZE} MiB"
-    else
-      SIZE_HUMAN="${GB_SIZE} GiB"
-    fi
-
-    printf "$PART_NODEV: SIZE=$SIZE SIZEH=\"$SIZE_HUMAN\""
-    IFS=$EOL
-    blkid -o export "/dev/$PART_NODEV" |grep -v '^DEVNAME=' |while read ITEM; do
-      printf " $ITEM"
-    done
-
-    echo "" # EOL
-  done
 }
 
 
@@ -575,7 +579,7 @@ show_backup_disks_info()
   for HDD in $BACKUP_DISKS; do
     HDD_NODEV="$(get_partition_disk "$HDD")"
     echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
-    get_partitions_size_type /dev/$HDD_NODEV
+    get_partitions_with_size_type /dev/$HDD_NODEV
     echo ""
   done
 }
@@ -821,7 +825,7 @@ backup_disks()
     fi
 
     # Dump device partition layout in "fancified" format
-    get_partitions_size_type "$HDD_NODEV" >"partition_layout.${HDD_NODEV}"
+    get_partitions_with_size_type "$HDD_NODEV" >"partition_layout.${HDD_NODEV}"
   done
 }
 

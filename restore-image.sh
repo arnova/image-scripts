@@ -112,6 +112,39 @@ get_partitions()
 }
 
 
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
+get_partitions_with_size_type()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  IFS=$EOL
+  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
+
+    GB_SIZE=$(($SIZE / 1024 / 1024))
+    if [ $GB_SIZE -ne 0 ]; then
+      SIZE_HUMAN="${GB_SIZE}GiB"
+    else
+      MB_SIZE=$(($SIZE / 1024))
+      if [ $MB_SIZE ne 0 ]; then
+        SIZE_HUMAN="${MB_SIZE}MiB"
+      else
+        SIZE_HUMAN="${SIZE}B"
+      fi
+    fi
+
+    printf "$PART_NODEV: SIZE=$SIZE SIZEH=$SIZE_HUMAN"
+    IFS=$EOL
+    blkid -o export "/dev/$PART_NODEV" |grep -v '^DEVNAME=' |while read ITEM; do
+      printf " $ITEM"
+    done
+
+    echo "" # EOL
+  done
+}
+
+
 # Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
@@ -178,51 +211,22 @@ show_block_device_info()
 }
 
 
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions_size_type()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  IFS=$EOL
-  get_partitions_with_size "$DISK_NODEV" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
-    local SIZE=`echo "$LINE" |awk '{ print $2 }'`
-
-    GB_SIZE=$(($SIZE / 1024 / 1024))
-    if [ $GB_SIZE -eq 0 ]; then
-      MB_SIZE=$(($SIZE / 1024))
-      SIZE_HUMAN="${MB_SIZE} MiB"
-    else
-      SIZE_HUMAN="${GB_SIZE} GiB"
-    fi
-
-    printf "$PART_NODEV: SIZE=$SIZE SIZEH=\"$SIZE_HUMAN\""
-    IFS=$EOL
-    blkid -o export "/dev/$PART_NODEV" |grep -v '^DEVNAME=' |while read ITEM; do
-      printf " $ITEM"
-    done
-
-    echo "" # EOL
-  done
-}
-
-
 # Show block device partitions, automatically showing either DOS or GPT partition table
 list_device_partitions()
 {
   local DEVICE="$1"
 
   FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
-  # MBR/DOS Partitions:
-  IFS=$EOL
-  if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
-    printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
-  fi
-
   if which gdisk >/dev/null 2>&1 && echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
     # GPT partition table found
     GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
     printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
+  else
+    # MBR/DOS Partitions:
+    IFS=$EOL
+    if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
+      printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
+    fi
   fi
 }
 
@@ -1007,7 +1011,7 @@ check_disks()
 
     if [ -n "$PARTITIONS_FOUND" ]; then
       echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions:"
-      get_partitions_size_type /dev/$TARGET_NODEV
+      get_partitions_with_size_type /dev/$TARGET_NODEV
     fi
 
     if [ $PT_ADD -eq 1 ]; then
@@ -1729,7 +1733,7 @@ echo "--------------------------------------------------------------------------
 IFS=' '
 for DEVICE in $TARGET_DEVICES; do
   echo "* $DEVICE: $(show_block_device_info "$DEVICE")"
-  get_partitions_size_type "$DEVICE"
+  get_partitions_with_size_type "$DEVICE"
   echo ""
 done
 
