@@ -160,7 +160,7 @@ get_disk_partitions()
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
   local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
-  if which sgdisk >/dev/null 2>&1 && echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
+  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && which sgdisk >/dev/null 2>&1; then
     local DEV_PREFIX="/dev/$DISK_NODEV"
     # FIXME: Not sure if this is correct:
     if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
@@ -801,16 +801,6 @@ backup_disks()
     # Check if DMA is enabled for HDD
     check_dma /dev/$HDD_NODEV
 
-    echo "* Storing track0 for /dev/$HDD_NODEV in track0.$HDD_NODEV..."
-    # Dump hdd info for all disks in the current system
-    result="$(dd if=/dev/$HDD_NODEV of="track0.$HDD_NODEV" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
-    retval=$?
-    if [ $retval -ne 0 ]; then
-      echo "$result" >&2
-      printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
-      do_exit 8
-    fi
-
     SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
     if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
       # GPT partition table found
@@ -831,6 +821,16 @@ backup_disks()
 
       # Dump fdisk -l info to file
       fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${HDD_NODEV}"
+
+      echo "* Storing track0 for /dev/$HDD_NODEV in track0.$HDD_NODEV..."
+      # Dump hdd info for all disks in the current system
+      result="$(dd if=/dev/$HDD_NODEV of="track0.$HDD_NODEV" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
+      retval=$?
+      if [ $retval -ne 0 ]; then
+        echo "$result" >&2
+        printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
+        do_exit 8
+      fi
     else
       printf "\033[40m\033[1;31mERROR: Unable to obtain GPT or DOS partition table for /dev/$HDD_NODEV! Quitting...\n\033[0m" >&2
       do_exit 9
@@ -1031,7 +1031,7 @@ if [ $ONLY_SH -eq 0 ]; then
 fi
 
 # Run custom script, if specified
-if [ $NO_CUSTOM_SH -eq 0 -a -n "$BACKUP_CUSTOM_SCRIPT" -a -f "$BACKUP_CUSTOM_SCRIPT" ]; then
+if [ $NO_CUSTOM_SH -eq 0 -a -n "$BACKUP_CUSTOM_SCRIPT" -a -e "$BACKUP_CUSTOM_SCRIPT" ]; then
   echo "--------------------------------------------------------------------------------"
   echo "* Executing custom script \"$BACKUP_CUSTOM_SCRIPT\""
   # Source script:

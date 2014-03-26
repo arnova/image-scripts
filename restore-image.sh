@@ -30,7 +30,6 @@ DEFAULT_CONF="$(dirname $0)/image.cnf"
 ##################
 SUCCESS=""
 FAILED=""
-GPT_ENABLE=0
 
 # Reset global, used by other functions later on:
 TARGET_DEVICES=""
@@ -164,7 +163,7 @@ get_disk_partitions()
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
   local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
-  if which sgdisk >/dev/null 2>&1 && echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
+  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && which sgdisk >/dev/null 2>&1; then
     local DEV_PREFIX="/dev/$DISK_NODEV"
     # FIXME: Not sure if this is correct:
     if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
@@ -228,7 +227,7 @@ list_device_partitions()
   local DEVICE="$1"
 
   FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
-  if which gdisk >/dev/null 2>&1 && echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]'; then
+  if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]' && which gdisk >/dev/null 2>&1; then
     # GPT partition table found
     GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
     printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
@@ -949,12 +948,17 @@ get_auto_target_device()
   local SOURCE_NODEV="$1"
   local MIN_SIZE="$2"
 
-  # Check for device existence and mounted partitions, prefer non-removable devices
-  if [ ! -b "/dev/$SOURCE_NODEV" ] || [ $(cat /sys/block/$SOURCE_NODEV/removable) -eq 1 ] || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+  if [ -z "$MIN_SIZE" ]; then
+    MIN_SIZE=0
+  fi
+
+  # Check for device existence and mounted partitions, prefer non-removable devices. Also check size of target
+  if [ ! -b "/dev/$SOURCE_NODEV" ] || [ "$(cat /sys/block/$SOURCE_NODEV/removable 2>/dev/null)" = "1" ] || [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -lt $MIN_SIZE ] \
+  || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
       # Checked for mounted partitions
-      if [ $(cat /sys/block/$SOURCE_NODEV/removable) -eq 0 ] && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+      if [ "$(cat /sys/block/$SOURCE_NODEV/removable 2>/dev/null)" = "0 " ] && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
         break;
       fi
@@ -980,6 +984,14 @@ check_disks()
     if [ "$IMAGE_TARGET_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
       # Check whether device is available (eg. not mounted partitions and fallback to other default device if
       IMAGE_TARGET_NODEV=`get_auto_target_device "$IMAGE_SOURCE_NODEV"`
+    else
+      echo "TODO"
+      # FIXME: Fail here when size is too small
+    fi
+
+    if [ -z "$IMAGE_TARGET_NODEV" ]; then
+      printf "\033[40m\033[1;31m\nERROR: No suitable device (disk) found for restore (too small?)! Quitting...\n\033[0m" >&2
+      do_exit 5
     fi
 
     echo "* Auto preselecting target device /dev/$IMAGE_TARGET_NODEV for image source $IMAGE_SOURCE_NODEV"
@@ -1028,7 +1040,7 @@ check_disks()
     fi
 
     if [ $PT_ADD -eq 1 ]; then
-      if [ $GPT_ENABLE -eq 1 ]; then
+      if [ -e "gdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # GPT:
         GDISK_TARGET="$(gdisk -l "/dev/${TARGET_NODEV}" |grep -E '^[[:blank:]]+[0-9]')"
         if [ -z "$GDISK_TARGET" ]; then
@@ -1036,7 +1048,7 @@ check_disks()
           do_exit 5
         fi
 
-        MISMATCH=0
+        local MISMATCH=0
         IFS=$EOL
         for PART in $GDISK_TARGET; do
           # Check entry on source
@@ -1060,7 +1072,7 @@ check_disks()
 
           do_exit 5
         fi
-      elif [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+      elif [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # DOS/MBR:
         SFDISK_TARGET="$(sfdisk -d "/dev/${TARGET_NODEV}" |grep -i '^/dev/.*Id=' |grep -i -v 'Id= 0$' |sed s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)"
         if [ -z "$SFDISK_TARGET" ]; then
@@ -1097,7 +1109,7 @@ check_disks()
     if [ $CLEAN -eq 0 -a -n "$PARTITIONS_FOUND" ]; then
       if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
         echo "" >&2
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table/boot-loader, it will NOT be updated!\n\033[0m" >&2
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table (+ possible boot-loader), it will NOT be updated!\n\033[0m" >&2
         echo "To override this you must specify --clean or --pt --mbr..." >&2
         ENTER=1
       else
@@ -1108,7 +1120,7 @@ check_disks()
           ENTER=1
         fi
 
-        if [ $MBR_WRITE -eq 0 -a $GPT_ENABLE -eq 0 ]; then
+        if [ $MBR_WRITE -eq 0 -a -e "track0.${IMAGE_SOURCE_NODEV}" ]; then
           echo "" >&2
           printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --mbr..." >&2
@@ -1168,47 +1180,43 @@ restore_disks()
     # Check whether device already contains partitions
     PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
 
-    TRACK0_CLEAN=0
-    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ] && [ $GPT_ENABLE -eq 0 ]; then
-      TRACK0_CLEAN=1
-    fi
-
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
-    # Check for MBR restore:
-    if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
-      DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
-      if [ ! -f "$DD_SOURCE" ]; then
-        echo "WARNING: No $DD_SOURCE found. MBR will be zeroed instead!" >&2
-        DD_SOURCE="/dev/zero"
+    DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
+    if [ -e "$DD_SOURCE" ]; then
+      TRACK0_CLEAN=0
+      if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
+        TRACK0_CLEAN=1
       fi
 
-      echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
-      
-      if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
-#        result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1)"
-        # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
-        result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV 2>&1 bs=512 count=2048)"
-        retval=$?
-      else
-        # FIXME: Need to detect the empty space before the first partition since GRUB2 may be longer than 32256 bytes!
-        result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62 2>&1)"
-        retval=$?
-      fi
-      
-      if [ $retval -ne 0 ]; then
-        if [ -n "$result" ]; then
-          echo "$result" >&2
+      # Check for MBR restore:
+      if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
+        echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
+
+        if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
+  #        result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1)"
+          # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
+          result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV 2>&1 bs=512 count=2048)"
+          retval=$?
+        else
+          # FIXME: Need to detect the empty space before the first partition since GRUB2 may be longer than 32256 bytes!
+          result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62 2>&1)"
+          retval=$?
         fi
-        printf "\033[40m\033[1;31mERROR: Track0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
-        do_exit 5
+        
+        if [ $retval -ne 0 ]; then
+          if [ -n "$result" ]; then
+            echo "$result" >&2
+          fi
+          printf "\033[40m\033[1;31mERROR: Track0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+        PARTPROBE=1
       fi
-      PARTPROBE=1
-    fi
 
     # Clear (GPT) partition data:
-    if which sgdisk >/dev/null 2>&1 && [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN eq -1 ]; then
+    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN eq -1 ] && which sgdisk >/dev/null 2>&1; then
       # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
       sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
 
@@ -1218,8 +1226,8 @@ restore_disks()
 
     # Check for partition restore
     if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 -o $PT_ADD -eq 1 ]; then
-      if [ $GPT_ENABLE -eq 1 ]; then
-        SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
+      SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
+      if [ -e "$SGDISK_FILE" ]; then
         echo "* Updating GPT partition-table on /dev/$TARGET_NODEV"
         sgdisk --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV
         retval=$?
@@ -1232,9 +1240,9 @@ restore_disks()
         PARTPROBE=1
       else
         SFDISK_FILE=""
-        if [ -f "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
           SFDISK_FILE="sfdisk.${IMAGE_SOURCE_NODEV}"
-        elif [ -f "partitions.${IMAGE_SOURCE_NODEV}" ] && grep -q '^# partition table of' "partitions.${IMAGE_SOURCE_NODEV}"; then
+        elif [ -e "partitions.${IMAGE_SOURCE_NODEV}" ] && grep -q '^# partition table of' "partitions.${IMAGE_SOURCE_NODEV}"; then
           # Legacy fallback
           SFDISK_FILE="partitions.${IMAGE_SOURCE_NODEV}"
         fi
@@ -1407,7 +1415,7 @@ test_target_partitions()
     SOURCE_DISK_NODEV=$(get_partition_disk "$IMAGE_PARTITION_NODEV")
     TARGET_DISK=$(get_partition_disk "$TARGET_PARTITION")
 
-    if [ $GPT_ENABLE -eq 1 ]; then
+    if [ -e "sgdisk.${SOURCE_DISK_NODEV}" ]; then
       GDISK_TARGET_PART="$(gdisk -l "$TARGET_DISK" |grep -E "^[[:blank:]]+$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
       if [ -n "$SGDISK_TARGET_PART" ]; then
         SGDISK_SOURCE_PART="$(grep -E "^[[:blank:]]+$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" "sgdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
@@ -1436,7 +1444,7 @@ test_target_partitions()
         # DOS partition found
         SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "sfdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
         # If empty, try old (legacy) file
-        if [ -z "$SFDISK_SOURCE_PART" -a -f "partitions.${SOURCE_DISK_NODEV}" ] && grep -q '^# partition table of' "partitions.${SOURCE_DISK_NODEV}"; then
+        if [ -z "$SFDISK_SOURCE_PART" -a -e "partitions.${SOURCE_DISK_NODEV}" ] && grep -q '^# partition table of' "partitions.${SOURCE_DISK_NODEV}"; then
           SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "partitions.${SOURCE_DISK_NODEV}" 2>/dev/null)"
         fi
 
@@ -1481,8 +1489,9 @@ create_swaps()
 
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
-    if [ $GPT_ENABLE -eq 1 ]; then
-      # GPT partition table found
+    SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null)"
+    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && which sgdisk >/dev/null 2>&1; then
+      # GPT partition table:
       SGDISK_OUTPUT="$(sgdisk -p "$DEVICE" 2>/dev/null)"
 
       if ! echo "$SGDISK_OUTPUT" |grep -q -i -e "GPT: not present"; then
@@ -1497,9 +1506,7 @@ create_swaps()
         done
       fi
     else
-      # MBR/DOS Partitions:
-      SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null)"
-
+      # MBR/DOS partition table:
       IFS=$EOL
       echo "$SFDISK_OUTPUT" |grep -i "id=82$" |while read LINE; do
         PART="$(echo "$LINE" |awk '{ print $1 }')"
@@ -1656,11 +1663,10 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
   do_exit 7
 fi
 
-if [ -f "gdisk.${IMAGE_SOURCE_NODEV}" ]; then
+# Check for GPT partitions in source
+if [ -z "$(find . -maxdepth 1 -type f -iname "sgdisk.*" -o -iname "gdisk.*")" ]; then
   check_command_error gdisk
   check_command_error sgdisk
-
-  GPT_ENABLE=1
 fi
 
 # Check target disks
@@ -1732,7 +1738,7 @@ if [ $NO_CUSTOM_SH -eq 0 ] && ls *.sh >/dev/null 2>&1; then
   echo "--------------------------------------------------------------------------------"
   unset IFS
   for script in *.sh; do
-    if [ -f "$script" ]; then
+    if [ -e "$script" ]; then
       # Source script:
       echo "* Executing custom script \"$script\""
       . ./"$script"
