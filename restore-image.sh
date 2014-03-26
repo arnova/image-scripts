@@ -122,15 +122,16 @@ get_partitions_with_size_type()
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
     local SIZE=`echo "$LINE" |awk '{ print $2 }'`
 
+    # Note that SIZE is in (1KiB) blocks already
     GB_SIZE=$(($SIZE / 1024 / 1024))
     if [ $GB_SIZE -ne 0 ]; then
       SIZE_HUMAN="${GB_SIZE}GiB"
     else
       MB_SIZE=$(($SIZE / 1024))
-      if [ $MB_SIZE ne 0 ]; then
+      if [ $MB_SIZE -ne 0 ]; then
         SIZE_HUMAN="${MB_SIZE}MiB"
       else
-        SIZE_HUMAN="${SIZE}B"
+        SIZE_HUMAN="${SIZE}KiB"
       fi
     fi
 
