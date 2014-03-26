@@ -930,12 +930,28 @@ get_used_disks()
 {
   local USED_DISKS=""
 
-  # FIXME: need to check images as well here!
-  # FIXME, we should exclude disks not in --dev, if specified and consider --clean
-  for FN in track0.*; do
+  # FIXME: we should exclude disks/items not in --dev, if specified and consider --clean
+  IFS=$EOL
+  for ITEM in `find . -maxdepth 1 -name "track0.*" -o -name "sgdisk.*" -o -name "sfdisk.*"`; do
     # Extract drive name from file
-    IMAGE_SOURCE_NODEV="$(basename "$FN" |sed s/'.*\.'//)"
-    USED_DISKS="${USED_DISKS}${IMAGE_SOURCE_NODEV} "
+    IMAGE_SOURCE_NODEV="$(basename "$ITEM" |sed s/'.*\.'//)"
+
+    # Skip duplicates
+    if ! echo "$USEDR_DISKS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV} " -e " ${IMAGE_SOURCE_NODEV} "; then
+      USED_DISKS="${USED_DISKS}${IMAGE_SOURCE_NODEV} "
+    fi
+  done
+
+  # Check image files as well
+  IFS=$EOL
+  for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
+    # Extract drive name from file
+    IMAGE_SOURCE_NODEV=`get_partition_disk "$(basename "$ITEM" |sed s/'\..*'//)"`
+
+    # Skip duplicates
+    if ! echo "$USED_DISKS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV} " -e " ${IMAGE_SOURCE_NODEV} "; then
+      USED_DISKS="${USED_DISKS}${IMAGE_SOURCE_NODEV} "
+    fi
   done
 
   echo "$USED_DISKS"
@@ -1109,7 +1125,7 @@ check_disks()
     if [ $CLEAN -eq 0 -a -n "$PARTITIONS_FOUND" ]; then
       if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
         echo "" >&2
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table (+ possible boot-loader), it will NOT be updated!\n\033[0m" >&2
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table (+possible bootloader), it will NOT be updated!\n\033[0m" >&2
         echo "To override this you must specify --clean or --pt --mbr..." >&2
         ENTER=1
       else
@@ -1183,9 +1199,9 @@ restore_disks()
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
+    TRACK0_CLEAN=0
     DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
     if [ -e "$DD_SOURCE" ]; then
-      TRACK0_CLEAN=0
       if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
         TRACK0_CLEAN=1
       fi
@@ -1214,9 +1230,10 @@ restore_disks()
         fi
         PARTPROBE=1
       fi
+    fi
 
     # Clear (GPT) partition data:
-    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN eq -1 ] && which sgdisk >/dev/null 2>&1; then
+    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ] && which sgdisk >/dev/null 2>&1; then
       # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
       sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
 
@@ -1415,23 +1432,23 @@ test_target_partitions()
     SOURCE_DISK_NODEV=$(get_partition_disk "$IMAGE_PARTITION_NODEV")
     TARGET_DISK=$(get_partition_disk "$TARGET_PARTITION")
 
-    if [ -e "sgdisk.${SOURCE_DISK_NODEV}" ]; then
+    if [ -e "gdisk.${SOURCE_DISK_NODEV}" ]; then
       GDISK_TARGET_PART="$(gdisk -l "$TARGET_DISK" |grep -E "^[[:blank:]]+$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
-      if [ -n "$SGDISK_TARGET_PART" ]; then
-        SGDISK_SOURCE_PART="$(grep -E "^[[:blank:]]+$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" "sgdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
+      if [ -n "$GDISK_TARGET_PART" ]; then
+        GDISK_SOURCE_PART="$(grep -E "^[[:blank:]]+$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" "gdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
 
-        echo "* Source GPT partition: $SGDISK_SOURCE_PART"
-        echo "* Target GPT partition: $SGDISK_TARGET_PART"
+        echo "* Source GPT partition: $GDISK_SOURCE_PART"
+        echo "* Target GPT partition: $GDISK_TARGET_PART"
 
         # Match partition with what we have stored in our partitions file
-        if [ -z "$SGDISK_SOURCE_PART" ]; then
+        if [ -z "$GDISK_SOURCE_PART" ]; then
           printf "\033[40m\033[1;31m\nWARNING: GPT partition /dev/$IMAGE_PARTITION_NODEV can not be found in partition source files!\n\033[0m" >&2
           echo ""
           MISMATCH=1
           continue;
         fi
 
-        if [ "$SGDISK_TARGET_PART" != "$SGDISK_SOURCE_PART" ]; then
+        if [ "$GDISK_TARGET_PART" != "$GDISK_SOURCE_PART" ]; then
           MISMATCH=1
         fi
       else
