@@ -1216,20 +1216,17 @@ restore_disks()
         echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
 
         if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
-  #        result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63 2>&1)"
+#          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63
           # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
-          result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV 2>&1 bs=512 count=2048)"
+          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=2048
           retval=$?
         else
           # FIXME: Need to detect the empty space before the first partition since GRUB2 may be longer than 32256 bytes!
-          result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 2>&1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62 2>&1)"
+          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62
           retval=$?
         fi
-        
+
         if [ $retval -ne 0 ]; then
-          if [ -n "$result" ]; then
-            echo "$result" >&2
-          fi
           printf "\033[40m\033[1;31mERROR: Track0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
           do_exit 5
         fi
