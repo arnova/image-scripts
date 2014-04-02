@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA21"
+MY_VERSION="3.10-BETA22"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: March 265, 2014
+# Last update: April 2, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1213,7 +1213,7 @@ restore_disks()
 
       # Check for MBR restore:
       if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
-        echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE"
+        echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE:"
 
         if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
 #          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63
@@ -1247,7 +1247,7 @@ restore_disks()
     if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 -o $PT_ADD -eq 1 ]; then
       SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
       if [ -e "$SGDISK_FILE" ]; then
-        echo "* Updating GPT partition-table on /dev/$TARGET_NODEV"
+        echo "* Updating GPT partition-table on /dev/$TARGET_NODEV:"
         sgdisk --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV
         retval=$?
 
@@ -1267,7 +1267,7 @@ restore_disks()
         fi
 
         if [ -n "$SFDISK_FILE" ]; then
-          echo "* Updating DOS partition-table on /dev/$TARGET_NODEV"
+          echo "* Updating DOS partition-table on /dev/$TARGET_NODEV:"
           result="$(sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE" 2>&1)"
           retval=$?
 
