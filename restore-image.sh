@@ -1204,6 +1204,15 @@ restore_disks()
     # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
+    # Clear all (GPT) partition data on --clean:
+    if [ $CLEAN -eq 1 ] && which sgdisk >/dev/null 2>&1; then
+      # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
+      sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
+
+      # Completely zap GPT, MBR and legacy partition data, if we're using GPT on one of the devices
+      sgdisk --zap-all /dev/$TARGET_NODEV >/dev/null 2>&1
+    fi
+
     TRACK0_CLEAN=0
     DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
     if [ -e "$DD_SOURCE" ]; then
@@ -1232,15 +1241,6 @@ restore_disks()
         fi
         PARTPROBE=1
       fi
-    fi
-
-    # Clear (GPT) partition data:
-    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ] && which sgdisk >/dev/null 2>&1; then
-      # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
-      sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
-
-      # Completely zap GPT, MBR and legacy partition data, if we're using GPT on one of the devices
-      sgdisk --zap-all /dev/$TARGET_NODEV >/dev/null 2>&1
     fi
 
     # Check for partition restore
