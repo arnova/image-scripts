@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA22"
+MY_VERSION="3.10-BETA23"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: April 2, 2014
@@ -102,6 +102,29 @@ get_partitions_with_size()
   else
     echo "$FIND_PARTS" # Show all
   fi
+}
+
+
+# Safe (fixed) version of sgdisk since it doesn't always return non-zero when an error occurs
+sgdisk_safe()
+{
+  local result=""
+  local IFS=' '
+  result="$(sgdisk $@ 2>&1)"
+  local retval=$?
+
+  if [ $retval -ne 0 ]; then
+    echo "$result" >&2
+    return $retval
+  fi
+
+  if ! echo "$result" |grep -i -q "operation has completed successfully"; then
+    echo "$result" >&2
+    return 8 # Seems to be the most appropriate return code for this
+  fi
+
+  echo "$result"
+  return 0
 }
 
 
@@ -1248,13 +1271,16 @@ restore_disks()
       SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
       if [ -e "$SGDISK_FILE" ]; then
         echo "* Updating GPT partition-table on /dev/$TARGET_NODEV:"
-        sgdisk --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV
+        result="$(sgdisk_safe --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV 2>&1)"
         retval=$?
 
         if [ $retval -ne 0 ]; then
+          echo "$result" >&2
           printf "\033[40m\033[1;31mGPT partition-table restore failed($retval). Quitting...\n\033[0m" >&2
           echo ""
           do_exit 5
+        else
+          echo "$result"
         fi
         PARTPROBE=1
       else
@@ -1278,11 +1304,12 @@ restore_disks()
             echo ""
             do_exit 5
           else
-            echo "$result" |sed '0,/^New situation:/d' |grep -i -e '^/dev/' -e '^Disk' -e 'Device.*Boot' -e 'Success'
+            echo "$result" |grep -i -e 'Success'
           fi
           PARTPROBE=1
         fi
       fi
+      list_device_partitions /dev/$TARGET_NODEV
     fi
 
     if [ $PARTPROBE -eq 1 ]; then
