@@ -1278,7 +1278,7 @@ restore_disks()
             echo ""
             do_exit 5
           else
-            echo "$result"
+            echo "$result" |sed '0,^ New situation:,di' |grep -i -e '^/dev/' -e '^Disk' -e 'Device' -e 'Success'
           fi
           PARTPROBE=1
         fi
