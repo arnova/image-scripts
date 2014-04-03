@@ -149,8 +149,6 @@ mkud_create_user_filesystem()
       else
         printf "\033[40m\033[1;31mWARNING: Mounting NTFS partition $USER_PART failed (disk in use?!)\n\033[0m" >&2
       fi
-
-
     else
       printf "\033[40m\033[1;31mERROR: Creating NTFS filesystem on $USER_PART failed!\033[0m\n" >&2
     fi
