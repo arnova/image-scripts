@@ -230,7 +230,7 @@ show_block_device_info()
 
   local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
   if [ -n "$SIZE" ]; then
-    printf -- " - $SIZE bytes"
+    printf -- "- $SIZE bytes"
     GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
     if [ $GB_SIZE -ne 0 ]; then
       printf " (${GB_SIZE} GiB)"
