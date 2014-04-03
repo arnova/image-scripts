@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA23"
+MY_VERSION="3.10-BETA24"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: April 2, 2014
+# Last update: April 4, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -202,40 +202,45 @@ get_disk_partitions()
 
 show_block_device_info()
 {
-  local BLK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local BLK_NODEV=`echo "$1" |sed -e s,'^/dev/',, -e s,'^/sys/class/block/',,`
+  local SYS_BLK="/sys/class/block/${BLK_NODEV}"
 
-  if ! echo "$BLK_NODEV" |grep -q '^/'; then
-    BLK_NODEV="/sys/class/block/${BLK_NODEV}"
-  fi
+  local NAME=""
 
-  local VENDOR="$(cat "${BLK_NODEV}/device/vendor" |sed s!' *$'!!g)"
+  local VENDOR="$(cat "${SYS_BLK}/device/vendor" 2>/dev/null |sed s!' *$'!!g)"
   if [ -n "$VENDOR" ]; then
-    printf "%s " "$VENDOR"
+    NAME="$VENDOR "
   fi
 
-  local MODEL="$(cat "${BLK_NODEV}/device/model" |sed s!' *$'!!g)"
+  local MODEL="$(cat "${SYS_BLK}/device/model"  2>/dev/null |sed s!' *$'!!g)"
   if [ -n "$MODEL" ]; then
-    printf "%s " "$MODEL"
+    NAME="${NAME}{$MODEL} "
   fi
 
-  local REV="$(cat "${BLK_NODEV}/device/rev" |sed s!' *$'!!g)"
+  local REV="$(cat "${SYS_BLK}/device/rev"  2>/dev/null |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
-    printf "%s " "$REV"
+    NAME="${NAME}{$REV} "
+  fi
+  
+  if [ -n "$NAME" ]; then
+    printf "$NAME"
+  else
+    printf "No info "
   fi
 
   local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
   if [ -n "$SIZE" ]; then
-    printf -- "- $SIZE bytes"
+    printf -- " - $SIZE bytes"
     GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
     if [ $GB_SIZE -ne 0 ]; then
-      printf -- " - ${GB_SIZE} GiB"
+      printf " (${GB_SIZE} GiB)"
     else
       MB_SIZE=$(($SIZE / 1024 / 1024))
       if [ $MB_SIZE -ne 0 ]; then
-        printf -- " - ${MB_SIZE} MiB"
+        printf " (${MB_SIZE} MiB)"
       else
         KB_SIZE=$(($SIZE / 1024))
-        printf -- " - ${KB_SIZE} KiB"
+        printf " (${KB_SIZE} KiB)"
       fi
     fi
   fi
