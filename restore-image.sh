@@ -97,32 +97,32 @@ human_size()
     TB_SIZE=(SIZE / 1024 / 1024 / 1024 / 1024)
     if (TB_SIZE > 1.0)
     {
-      printf("%.2f TiB\n", TB_SIZE)
+      printf("%.2fTiB\n", TB_SIZE)
     }
     else
     {
       GB_SIZE=(SIZE / 1024 / 1024 / 1024)
       if (GB_SIZE > 1.0)
       {
-        printf("%.2f GiB\n", GB_SIZE)
+        printf("%.2fGiB\n", GB_SIZE)
       }
       else
       {
         MB_SIZE=(SIZE / 1024 / 1024)
         if (MB_SIZE > 1.0)
         {
-          printf("%.2f MiB\n", MB_SIZE)
+          printf("%.2fMiB\n", MB_SIZE)
         }
         else
         {
           KB_SIZE=(SIZE / 1024)
           if (KB_SIZE > 1.0)
           {
-            printf("%.2f KiB\n", KB_SIZE)
+            printf("%.2fKiB\n", KB_SIZE)
           }
           else
           {
-            printf("%u B\n", SIZE)
+            printf("%uB\n", SIZE)
           }
         }
       }
@@ -189,7 +189,7 @@ get_partitions_with_size_type()
     if [ -z "$SIZE" ]; then
       SIZE=0
     fi
-    local SIZE_HUMAN="$(human_size $SIZE |tr ' ' '_')"
+    local SIZE_HUMAN="$(human_size $SIZE)"
 
     local BLKID_INFO="$(blkid -o full -s LABEL -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed s,'^/dev/.*: ',,)"
     if [ -z "$BLKID_INFO" ]; then
