@@ -170,7 +170,7 @@ get_partitions_with_size_type()
       fi
     fi
 
-    local BLKID_INFO="$(blkid -p -o full -s LABEL -s PTTYPE -s TYPE -s UUID "/dev/$PART_NODEV" 2>/dev/null |sed s,'^/dev/.*: ',,)"
+    local BLKID_INFO="$(blkid -o full -s LABEL -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed s,'^/dev/.*: ',,)"
     if [ -z "$BLKID_INFO" ]; then
       BLKID_INFO="TYPE=\"unknown\""
     fi
