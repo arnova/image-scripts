@@ -316,7 +316,7 @@ get_available_disks()
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
     DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
-    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" }; then
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" ]; then
       continue; # Ignore device
     fi
 
@@ -1334,7 +1334,6 @@ restore_disks()
     fi
 
     if [ $PARTPROBE -eq 1 ]; then
-      echo ""
       # Re-read partition table
       if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
         printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed! Use --force to override.\n\033[0m" >&2

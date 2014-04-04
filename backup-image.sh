@@ -758,8 +758,12 @@ select_partitions()
          break;
       fi
     else
-      # FIXME: Keeps looping here
-      echo "ERROR: No partitions to backup on $SELECT_DEVICES"
+      if [ -z "$SELECT_DEVICES" -o -z "$SELECT_PARTITIONS" ]; then
+        printf "\033[40m\033[1;31mERROR: No (suitable) partitions found to backup! Quitting...\n\033[0m" >&2
+        do_exit 5
+      fi
+
+      echo "ERROR: No (suitable) partitions found to backup on $SELECT_DEVICES" >&2
       echo ""
       SELECT_DEVICES=""
       USER_SELECT=1
