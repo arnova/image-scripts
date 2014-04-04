@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA22"
+MY_VERSION="3.10-BETA23"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: April 4, 2014
@@ -119,6 +119,9 @@ get_partitions_with_size_type()
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
 
     local SIZE="$(blockdev --getsize64 "/dev/$PART_NODEV" 2>/dev/null)"
+    if [ -z "$SIZE" ]; then
+      SIZE=0
+    fi
     local SIZE_HUMAN="${SIZE}B"
 
     local TB_SIZE=$(($SIZE / 1024 / 1024 / 1024 / 1024))
@@ -141,7 +144,11 @@ get_partitions_with_size_type()
       fi
     fi
 
-    echo "$(blkid -p -o full "/dev/$PART_NODEV") SIZE=$SIZE SIZEH=$SIZE_HUMAN"
+    local BLKID_INFO="$(blkid -p -o full -s LABEL -s PTTYPE -s TYPE -s UUID "/dev/$PART_NODEV" 2>/dev/null |sed s,'^/dev/.*: ',,)"
+    if [ -z "$BLKID_INFO" ]; then
+      BLKID_INFO="TYPE=\"unknown\""
+    fi
+    echo "$PART_NODEV: $BLKID_INFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
 }
 
@@ -587,6 +594,11 @@ select_disks()
   IFS=' '
   for PART in $BACKUP_PARTITIONS; do
     local HDD_NODEV="$(get_partition_disk "$PART")"
+    # Make sure it exists
+    if [ ! -b "/dev/$HDD_NODEV" ]; then
+      continue; # Ignore this one
+    fi
+
     if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
       BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
     fi
@@ -622,8 +634,18 @@ detect_partitions()
     SELECT_PARTITIONS=""
     IFS=$EOL
     for LINE in $FIND_PARTITIONS; do
+      local PART_NODEV=`echo "$LINE" |awk -F: '{ print $1 }'`
+
+      if echo "$LINE" |grep -q -e '^loop[0-9]' -e '^sr[0-9]' -e '^fd[0-9]' -e '^ram[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
+        continue;
+      fi
+
+      if echo "$LINE" |grep -q "SIZE=0 "; then
+        continue; # Ignore device
+      fi
+
       # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
-      if echo "$LINE" |grep -q -i -E -e 'TYPE=(swap|squashfs|unknown)' -e 'PTTYPE=dos'; then
+      if echo "$LINE" |grep -q -i -E -e 'TYPE=\"?(swap|squashfs|unknown)' -e 'PTTYPE='; then
         continue; # Ignore swap etc. partitions
       fi
 
@@ -632,8 +654,7 @@ detect_partitions()
 #        continue;
 #      fi
 
-      PART=`echo "$LINE" |awk -F: '{ print $1 }'`
-      SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART}"
+      SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART_NODEV}"
     done
 
     if [ -n "$SELECT_PARTITIONS" ]; then
@@ -738,6 +759,7 @@ select_partitions()
          break;
       fi
     else
+      # FIXME: Keeps looping here
       echo "ERROR: No partitions to backup on $SELECT_DEVICES"
       echo ""
       SELECT_DEVICES=""

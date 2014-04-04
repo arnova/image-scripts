@@ -145,6 +145,9 @@ get_partitions_with_size_type()
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
 
     local SIZE="$(blockdev --getsize64 "/dev/$PART_NODEV" 2>/dev/null)"
+    if [ -z "$SIZE" ]; then
+      SIZE=0
+    fi
     local SIZE_HUMAN="${SIZE}B"
 
     local TB_SIZE=$(($SIZE / 1024 / 1024 / 1024 / 1024))
@@ -167,7 +170,11 @@ get_partitions_with_size_type()
       fi
     fi
 
-    echo "$(blkid -p -o full "/dev/$PART_NODEV") SIZE=$SIZE SIZEH=$SIZE_HUMAN"
+    local BLKID_INFO="$(blkid -p -o full -s LABEL -s PTTYPE -s TYPE -s UUID "/dev/$PART_NODEV" 2>/dev/null |sed s,'^/dev/.*: ',,)"
+    if [ -z "$BLKID_INFO" ]; then
+      BLKID_INFO="TYPE=\"unknown\""
+    fi
+    echo "$PART_NODEV: $BLKID_INFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
 }
 
@@ -309,11 +316,16 @@ get_available_disks()
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
     DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
-    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" -o $(cat "$BLK_DEVICE/size") -eq 0 ]; then
+    if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" }; then
       continue; # Ignore device
     fi
 
-   DEV_FOUND="${DEV_FOUND}${DEVICE} "
+    local BLK_SIZE="$(cat "$BLK_DEVICE/size" 2>/dev/null)"
+    if [ -z "$BLK_SIZE" -o $BLK_SIZE -eq 0 ]; then
+      continue; # Ignore device
+    fi
+
+    DEV_FOUND="${DEV_FOUND}${DEVICE} "
   done
 
   echo "$DEV_FOUND"
