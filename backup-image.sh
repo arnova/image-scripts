@@ -609,8 +609,7 @@ select_disks()
 show_backup_disks_info()
 {
   IFS=' '
-  for HDD in $BACKUP_DISKS; do
-    HDD_NODEV="$(get_partition_disk "$HDD")"
+  for HDD_NODEV in $BACKUP_DISKS; do
     echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
     get_partitions_with_size_type /dev/$HDD_NODEV
     echo ""
@@ -645,7 +644,7 @@ detect_partitions()
       fi
 
       # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
-      if echo "$LINE" |grep -q -i -E -e 'TYPE=\"?(swap|squashfs|unknown)' -e 'PTTYPE='; then
+      if echo "$LINE" |grep -q -i -E -e 'TYPE=\"?(swap|squashfs)' -e 'PTTYPE='; then
         continue; # Ignore swap etc. partitions
       fi
 
