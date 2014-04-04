@@ -90,6 +90,47 @@ get_user_yn()
 }
 
 
+human_size()
+{
+  echo "$1" |awk '{
+    SIZE=$1
+    TB_SIZE=(SIZE / 1024 / 1024 / 1024 / 1024)
+    if (TB_SIZE > 1.0)
+    {
+      printf("%.2f TiB\n", TB_SIZE)
+    }
+    else
+    {
+      GB_SIZE=(SIZE / 1024 / 1024 / 1024)
+      if (GB_SIZE > 1.0)
+      {
+        printf("%.2f GiB\n", GB_SIZE)
+      }
+      else
+      {
+        MB_SIZE=(SIZE / 1024 / 1024)
+        if (MB_SIZE > 1.0)
+        {
+          printf("%.2f MiB\n", MB_SIZE)
+        }
+        else
+        {
+          KB_SIZE=(SIZE / 1024)
+          if (KB_SIZE > 1.0)
+          {
+            printf("%.2f KiB\n", KB_SIZE)
+          }
+          else
+          {
+            printf("%u B\n", SIZE)
+          }
+        }
+      }
+    }
+  }'
+}
+
+
 # $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
 # Note that size is represented in 1KiB blocks
 get_partitions_with_size()
@@ -148,27 +189,7 @@ get_partitions_with_size_type()
     if [ -z "$SIZE" ]; then
       SIZE=0
     fi
-    local SIZE_HUMAN="${SIZE}B"
-
-    local TB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024 / 1024 / 1024) + 0.5) }')
-    if [ $TB_SIZE -gt 0 ]; then
-      SIZE_HUMAN="${TB_SIZE}TiB"
-    else
-      local GB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024 / 1024) + 0.5) }')
-      if [ $GB_SIZE -gt 0 ]; then
-        SIZE_HUMAN="${GB_SIZE}GiB"
-      else
-        local MB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024) + 0.5) }')
-        if [ $MB_SIZE -gt 0 ]; then
-          SIZE_HUMAN="${MB_SIZE}MiB"
-        else
-          local KB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024) + 0.5) }')
-          if [ $KB_SIZE -gt 0 ]; then
-            SIZE_HUMAN="${SIZE}KiB"
-          fi
-        fi
-      fi
-    fi
+    local SIZE_HUMAN="$(human_size $SIZE |tr ' ' '_')"
 
     local BLKID_INFO="$(blkid -o full -s LABEL -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed s,'^/dev/.*: ',,)"
     if [ -z "$BLKID_INFO" ]; then
@@ -236,24 +257,7 @@ show_block_device_info()
 
   local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
   if [ -n "$SIZE" ]; then
-    printf -- "- $SIZE bytes"
-    local TB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024 / 1024 / 1024) + 0.5) }')
-    if [ $TB_SIZE -gt 0 ]; then
-      printf " (${TB_SIZE} TiB)"
-    else
-      local GB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024 / 1024) + 0.5) }')
-      if [ $GB_SIZE -gt 0 ]; then
-        printf " (${GB_SIZE} GiB)"
-      else
-        local MB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024) + 0.5) }')
-        if [ $MB_SIZE -gt 0 ]; then
-          printf " (${MB_SIZE} MiB)"
-        else
-          local KB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024) + 0.5) }')
-          printf " (${KB_SIZE} KiB)"
-        fi
-      fi
-    fi
+    printf -- "- $SIZE bytes $(human_size $SIZE)"
   fi
 
   echo ""
