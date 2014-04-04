@@ -257,7 +257,7 @@ show_block_device_info()
 
   local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
   if [ -n "$SIZE" ]; then
-    printf -- "- $SIZE bytes $(human_size $SIZE)"
+    printf -- "- $SIZE bytes - $(human_size $SIZE)"
   fi
 
   echo ""
