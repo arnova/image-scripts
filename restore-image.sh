@@ -145,19 +145,24 @@ get_partitions_with_size_type()
     local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
 
     local SIZE="$(blockdev --getsize64 "/dev/$PART_NODEV" 2>/dev/null)"
-    local GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
-    if [ $GB_SIZE -ne 0 ]; then
-      local SIZE_HUMAN="${GB_SIZE}GiB"
+    local SIZE_HUMAN="${SIZE}B"
+
+    local TB_SIZE=$(($SIZE / 1024 / 1024 / 1024 / 1024))
+    if [ $TB_SIZE -ne 0 ]; then
+      SIZE_HUMAN="${TB_SIZE}TiB"
     else
-      local MB_SIZE=$(($SIZE / 1024 / 1024))
-      if [ $MB_SIZE -ne 0 ]; then
-        SIZE_HUMAN="${MB_SIZE}MiB"
+      local GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
+      if [ $GB_SIZE -ne 0 ]; then
+        SIZE_HUMAN="${GB_SIZE}GiB"
       else
-        local KB_SIZE=$(($SIZE / 1024))
-        if [ $KB_SIZE -ne 0 ]; then
-          SIZE_HUMAN="${SIZE}KiB"
+        local MB_SIZE=$(($SIZE / 1024 / 1024))
+        if [ $MB_SIZE -ne 0 ]; then
+          SIZE_HUMAN="${MB_SIZE}MiB"
         else
-          SIZE_HUMAN="${SIZE}B"
+          local KB_SIZE=$(($SIZE / 1024))
+          if [ $KB_SIZE -ne 0 ]; then
+            SIZE_HUMAN="${SIZE}KiB"
+          fi
         fi
       fi
     fi
@@ -225,16 +230,21 @@ show_block_device_info()
   local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
   if [ -n "$SIZE" ]; then
     printf -- "- $SIZE bytes"
-    GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
-    if [ $GB_SIZE -ne 0 ]; then
-      printf " (${GB_SIZE} GiB)"
+    local TB_SIZE=$(($SIZE / 1024 / 1024 / 1024 / 1024))
+    if [ $TB_SIZE -ne 0 ]; then
+      printf " (${TB_SIZE} TiB)"
     else
-      MB_SIZE=$(($SIZE / 1024 / 1024))
-      if [ $MB_SIZE -ne 0 ]; then
-        printf " (${MB_SIZE} MiB)"
+      local GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
+      if [ $GB_SIZE -ne 0 ]; then
+        printf " (${GB_SIZE} GiB)"
       else
-        KB_SIZE=$(($SIZE / 1024))
-        printf " (${KB_SIZE} KiB)"
+        local MB_SIZE=$(($SIZE / 1024 / 1024))
+        if [ $MB_SIZE -ne 0 ]; then
+          printf " (${MB_SIZE} MiB)"
+        else
+          local KB_SIZE=$(($SIZE / 1024))
+          printf " (${KB_SIZE} KiB)"
+        fi
       fi
     fi
   fi
