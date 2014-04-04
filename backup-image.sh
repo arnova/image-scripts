@@ -136,13 +136,7 @@ get_partitions_with_size_type()
       fi
     fi
 
-    printf "$PART_NODEV: SIZE=$SIZE SIZEH=$SIZE_HUMAN"
-    IFS=$EOL
-    blkid -o export "/dev/$PART_NODEV" |grep -v '^DEVNAME=' |while read ITEM; do
-      printf " $ITEM"
-    done
-
-    echo "" # EOL
+    echo "$(blkid -p -o full "/dev/$PART_NODEV") SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
 }
 
@@ -375,7 +369,7 @@ partclone_detect()
   local PART="$1"
   local PARTCLONE_BIN=""
 
-  local TYPE=`blkid -s TYPE -o value "$PART"` # May try `file -s -b "$PART"` instead but blkid seems to work better
+  local TYPE=`blkid -p -s TYPE -o value "$PART"` # May try `file -s -b "$PART"` instead but blkid seems to work better
   case $TYPE in
     ntfs)                           PARTCLONE_BIN="partclone.ntfs"
                                     ;;

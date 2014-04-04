@@ -162,13 +162,7 @@ get_partitions_with_size_type()
       fi
     fi
 
-    printf "$PART_NODEV: SIZE=$SIZE SIZEH=$SIZE_HUMAN"
-    IFS=$EOL
-    blkid -o export "/dev/$PART_NODEV" |grep -v '^DEVNAME=' |while read ITEM; do
-      printf " $ITEM"
-    done
-
-    echo "" # EOL
+    echo "$(blkid -p -o full "/dev/$PART_NODEV") SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
 }
 
