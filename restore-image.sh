@@ -320,8 +320,8 @@ get_available_disks()
       continue; # Ignore device
     fi
 
-    local BLK_SIZE="$(cat "$BLK_DEVICE/size" 2>/dev/null)"
-    if [ -z "$BLK_SIZE" -o $BLK_SIZE -eq 0 ]; then
+    local SIZE="$(blockdev --getsize64 "$DEVICE" 2>/dev/null)"
+    if [ -z "$SIZE" -o $SIZE -eq 0 ]; then
       continue; # Ignore device
     fi
 
