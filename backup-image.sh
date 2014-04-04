@@ -124,20 +124,20 @@ get_partitions_with_size_type()
     fi
     local SIZE_HUMAN="${SIZE}B"
 
-    local TB_SIZE=$(($SIZE / 1024 / 1024 / 1024 / 1024))
-    if [ $TB_SIZE -ne 0 ]; then
+    local TB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024 / 1024 / 1024) + 0.5) }')
+    if [ $TB_SIZE -gt 0 ]; then
       SIZE_HUMAN="${TB_SIZE}TiB"
     else
-      local GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
-      if [ $GB_SIZE -ne 0 ]; then
+      local GB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024 / 1024) + 0.5) }')
+      if [ $GB_SIZE -gt 0 ]; then
         SIZE_HUMAN="${GB_SIZE}GiB"
       else
-        local MB_SIZE=$(($SIZE / 1024 / 1024))
-        if [ $MB_SIZE -ne 0 ]; then
+        local MB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024) + 0.5) }')
+        if [ $MB_SIZE -gt 0 ]; then
           SIZE_HUMAN="${MB_SIZE}MiB"
         else
-          local KB_SIZE=$(($SIZE / 1024))
-          if [ $KB_SIZE -ne 0 ]; then
+          local KB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024) + 0.5) }')
+          if [ $KB_SIZE -gt 0 ]; then
             SIZE_HUMAN="${SIZE}KiB"
           fi
         fi
@@ -211,19 +211,19 @@ show_block_device_info()
   local SIZE="$(blockdev --getsize64 "/dev/$BLK_NODEV" 2>/dev/null)"
   if [ -n "$SIZE" ]; then
     printf -- "- $SIZE bytes"
-    local TB_SIZE=$(($SIZE / 1024 / 1024 / 1024 / 1024))
-    if [ $TB_SIZE -ne 0 ]; then
+    local TB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024 / 1024 / 1024) + 0.5) }')
+    if [ $TB_SIZE -gt 0 ]; then
       printf " (${TB_SIZE} TiB)"
     else
-      local GB_SIZE=$(($SIZE / 1024 / 1024 / 1024))
-      if [ $GB_SIZE -ne 0 ]; then
+      local GB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024 / 1024) + 0.5) }')
+      if [ $GB_SIZE -gt 0 ]; then
         printf " (${GB_SIZE} GiB)"
       else
-        local MB_SIZE=$(($SIZE / 1024 / 1024))
-        if [ $MB_SIZE -ne 0 ]; then
+        local MB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024 / 1024) + 0.5) }')
+        if [ $MB_SIZE -gt 0 ]; then
           printf " (${MB_SIZE} MiB)"
         else
-          local KB_SIZE=$(($SIZE / 1024))
+          local KB_SIZE=$(echo $SIZE |awk '{ printf("%d\n", ($1 / 1024) + 0.5) }')
           printf " (${KB_SIZE} KiB)"
         fi
       fi
