@@ -3,7 +3,7 @@
 MY_VERSION="3.10-BETA24"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: April 4, 2014
+# Last update: April 8, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -241,14 +241,14 @@ show_block_device_info()
 
   local MODEL="$(cat "${SYS_BLK}/device/model"  2>/dev/null |sed s!' *$'!!g)"
   if [ -n "$MODEL" ]; then
-    NAME="${NAME}{$MODEL} "
+    NAME="${NAME}${MODEL} "
   fi
 
   local REV="$(cat "${SYS_BLK}/device/rev"  2>/dev/null |sed s!' *$'!!g)"
   if [ -n "$REV" ]; then
-    NAME="${NAME}{$REV} "
+    NAME="${NAME}${REV} "
   fi
-  
+
   if [ -n "$NAME" ]; then
     printf "$NAME"
   else
