@@ -245,7 +245,7 @@ show_block_device_info()
   fi
 
   local REV="$(cat "${SYS_BLK}/device/rev"  2>/dev/null |sed s!' *$'!!g)"
-  if [ -n "$REV" ]; then
+  if [ -n "$REV" -a "$REV" != "n/a" ]; then
     NAME="${NAME}${REV} "
   fi
 
