@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA23"
+MY_VERSION="3.10-BETA25"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: April 8, 2014
+# Last update: April 23, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l

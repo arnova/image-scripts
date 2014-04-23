@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA24"
+MY_VERSION="3.10-BETA25"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: April 8, 2014
+# Last update: April 23, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -325,7 +325,7 @@ get_available_disks()
     fi
 
     local SIZE="$(blockdev --getsize64 "$DEVICE" 2>/dev/null)"
-    if [ -z "$SIZE" -o $SIZE -eq 0 ]; then
+    if [ -z "$SIZE" -o "$SIZE" = "0" ]; then
       continue; # Ignore device
     fi
 
