@@ -1052,7 +1052,7 @@ check_disks()
     IMAGE_TARGET_NODEV=`source_to_target_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
 
     if [ "$IMAGE_TARGET_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
-      # Check whether device is available (eg. not mounted partitions and fallback to other default device if
+      # Check whether device is available (eg. not mounted partitions and fallback to other default device if so)
       IMAGE_TARGET_NODEV=`get_auto_target_device "$IMAGE_SOURCE_NODEV"`
 #    else
       # FIXME: Fail here when size is too small
@@ -1663,14 +1663,14 @@ load_config()
                                           ;;
                                       -*) echo "ERROR: Bad argument \"$arg\"" >&2
                                           show_help;
-                                          exit 0
+                                          exit 1;
                                           ;;
                                        *) if [ -z "$IMAGE_NAME" ]; then
                                             IMAGE_NAME="$arg"
                                           else
                                             echo "ERROR: Bad command syntax with argument \"$arg\"" >&2
                                             show_help;
-                                            exit 4
+                                            exit 1;
                                           fi
                                           ;;
     esac

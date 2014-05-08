@@ -945,14 +945,14 @@ load_config()
                                                  ;;
                                              -*) echo "ERROR: Bad argument \"$arg\"" >&2
                                                  show_help;
-                                                 exit 4
+                                                 exit 1;
                                                  ;;
                                               *) if [ -z "$IMAGE_NAME" ]; then
                                                    IMAGE_NAME="$arg"
                                                  else
                                                    echo "ERROR: Bad command syntax with argument \"$arg\"" >&2
                                                    show_help;
-                                                   exit 4
+                                                   exit 1;
                                                  fi
                                                  ;;
     esac
