@@ -392,19 +392,17 @@ partclone_detect()
 
   local TYPE=`blkid -s TYPE -o value "$PART"` # May try `file -s -b "$PART"` instead but blkid seems to work better
   case $TYPE in
-    ntfs)                           PARTCLONE_BIN="partclone.ntfs"
+    ntfs)                           check_command_error "partclone.ntfs" && PARTCLONE_BIN="partclone.ntfs -c"
                                     ;;
-    vfat|msdos|fat*)                PARTCLONE_BIN="partclone.fat"
+    vfat|msdos|fat*)                check_command_error "partclone.fat" && PARTCLONE_BIN="partclone.fat -c"
                                     ;;
-    ext2|ext3|ext4)                 PARTCLONE_BIN="partclone.extfs"
+    ext2|ext3|ext4)                 check_command_error "partclone.extfs" && PARTCLONE_BIN="partclone.extfs -c"
                                     ;;
-    btrfs)                          PARTCLONE_BIN="partclone.btrfs"
+    btrfs)                          check_command_error "partclone.btrfs" && PARTCLONE_BIN="partclone.btrfs -c"
                                     ;;
-    *)                              PARTCLONE_BIN="partclone.dd"
+    *)                              check_command_error "partclone.dd" && PARTCLONE_BIN="partclone.dd"
                                     ;;
   esac
-
-  check_command_error "$PARTCLONE_BIN"
 
   echo "$PARTCLONE_BIN"
   return 0
@@ -639,7 +637,7 @@ detect_partitions()
     for LINE in $FIND_PARTITIONS; do
       local PART_NODEV=`echo "$LINE" |awk -F: '{ print $1 }'`
 
-      if echo "$LINE" |grep -q -e '^loop[0-9]' -e '^sr[0-9]' -e '^fd[0-9]' -e '^ram[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
+      if echo "$LINE" |grep -q -e '^loop[0-9]' -e '^sr[0-9]' -e '^fd[0-9]' -e '^ram[0-9]' -e '^md[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
         continue;
       fi
 
@@ -798,7 +796,7 @@ backup_partitions()
             PARTCLONE=`partclone_detect "/dev/$PART"`
             if [ -n "$PARTCLONE" ]; then
               printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-              { $PARTCLONE -c -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+              { $PARTCLONE -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
               retval=$?
               if [ $retval -eq 0 ]; then
                 retval=`cat /tmp/.partclone.exitcode`
