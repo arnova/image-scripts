@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10-BETA25"
+MY_VERSION="3.10-BETA26"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: April 23, 2014
+# Last update: May 16, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -349,12 +349,12 @@ show_available_disks()
 }
 
 
-# Function which waits till the kernel ACTUALLY re-read the partition table
-partwait()
+# Function checks (and waits) till the kernel ACTUALLY re-read the partition table
+part_check()
 {
   local DEVICE="$1"
 
-  echo "Waiting for kernel to reread the partition on $DEVICE..."
+  printf "Waiting for up to date partion table from kernel for $DEVICE..."
 
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
   IFS=' '
@@ -363,25 +363,24 @@ partwait()
     TRY=$(($TRY - 1))
 
     # First make sure all partitions reported by the disk exist according to the kernel in /dev/
-    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',,)"
+    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
 
     # Second make sure all partitions reported by the kernel in /dev/ exist according to the disk
-    KERNEL_PARTITIONS="$(get_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',,)"
+    KERNEL_PARTITIONS="$(get_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
 
     # Compare the partition numbers
     if [ "$DISK_PARTITIONS" = "$KERNEL_PARTITIONS" ]; then
+      echo ""
       return 0
     fi
+
+    printf "."
 
     # Sleep 1 second:
     sleep 1
-
-    if [ $FAIL -eq 0 ]; then
-      return 0
-    fi
   done
 
-  printf "\033[40m\033[1;31mWaiting for the kernel to reread the partition FAILED!\n\033[0m" >&2
+  printf "\033[40m\033[1;31mFAILED!\n\033[0m" >&2
   return 1
 }
 
@@ -414,11 +413,6 @@ partprobe()
   if [ -n "$result" ]; then
     printf "\033[40m\033[1;31m${result}\n\033[0m" >&2
     return 1
-  fi
-
-  # Wait till the kernel reread the partition table
-  if ! partwait "$DEVICE"; then
-    return 2
   fi
 
   return 0
@@ -1322,8 +1316,8 @@ restore_disks()
           result="$(sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE" 2>&1)"
           retval=$?
 
-          # Can't check sfdisk's error code as it sometimes fails rereading the partition table (handled below with partprobe)
-          if [ $retval -ne 0 ] && ! echo "$result" |grep -i -q "^Successfully wrote"; then
+          # Can't just check sfdisk's return code as it is not reliable
+          if ! echo "$result" |grep -i -q "^Successfully wrote" || echo "$result" |grep -i -q -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max"; then
             echo "$result" >&2
             printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
             echo ""
@@ -1338,8 +1332,10 @@ restore_disks()
     fi
 
     if [ $PARTPROBE -eq 1 ]; then
-      # Re-read partition table
-      if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
+      # Wait for kernel to reread partition table
+      if partprobe "/dev/$TARGET_NODEV" && part_check "/dev/$TARGET_NODEV"; then
+        echo ""
+      elif [ $FORCE -ne 1 ]; then
         printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed! Use --force to override.\n\033[0m" >&2
         do_exit 5;
       fi
