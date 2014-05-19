@@ -3,7 +3,7 @@
 MY_VERSION="3.10-BETA26"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 16, 2014
+# Last update: May 19, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -910,7 +910,7 @@ update_source_to_target_device_remap()
 restore_partitions()
 {
   # Restore the actual image(s):
-  unset IFS
+  IFS=' '
   for ITEM in $IMAGE_FILES; do
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
     TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -1048,8 +1048,6 @@ check_disks()
     if [ "$IMAGE_TARGET_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
       # Check whether device is available (eg. not mounted partitions and fallback to other default device if so)
       IMAGE_TARGET_NODEV=`get_auto_target_device "$IMAGE_SOURCE_NODEV"`
-#    else
-      # FIXME: Fail here when size is too small
     fi
 
     if [ -z "$IMAGE_TARGET_NODEV" ]; then
@@ -1131,7 +1129,6 @@ check_disks()
 
           echo "* Target GPT partition table (/dev/$TARGET_NODEV):"
           echo "$GDISK_TARGET"
-          echo ""
 
           do_exit 5
         fi
@@ -1161,7 +1158,6 @@ check_disks()
           
           echo "* Target DOS partition table (/dev/$TARGET_NODEV):"
           echo "$SFDISK_TARGET"
-          echo ""
 
           do_exit 5
         fi
@@ -1233,6 +1229,9 @@ check_disks()
 
 restore_disks()
 {
+  local TRACK0_CLEAN
+  local PARTPROBE
+
   # Restore MBR/track0/partitions
   unset IFS
   for ITEM in $DEVICE_FILES; do
@@ -1256,12 +1255,12 @@ restore_disks()
     fi
 
     TRACK0_CLEAN=0
+    if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
+      TRACK0_CLEAN=1
+    fi
+
     DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
     if [ -e "$DD_SOURCE" ]; then
-      if [ -z "$PARTITIONS_FOUND" -o $CLEAN -eq 1 ] && [ $NO_TRACK0 -eq 0 ]; then
-        TRACK0_CLEAN=1
-      fi
-
       # Check for MBR restore:
       if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
         echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE:"
@@ -1286,7 +1285,7 @@ restore_disks()
     fi
 
     # Check for partition restore
-    if [ $PT_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 -o $PT_ADD -eq 1 ]; then
+    if [ $TRACK0_CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ]; then
       SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
       if [ -e "$SGDISK_FILE" ]; then
         echo "* Updating GPT partition-table on /dev/$TARGET_NODEV:"
@@ -1296,7 +1295,6 @@ restore_disks()
         if [ $retval -ne 0 ]; then
           echo "$result" >&2
           printf "\033[40m\033[1;31mGPT partition-table restore failed($retval). Quitting...\n\033[0m" >&2
-          echo ""
           do_exit 5
         else
           echo "$result"
@@ -1320,7 +1318,6 @@ restore_disks()
           if ! echo "$result" |grep -i -q "^Successfully wrote" || echo "$result" |grep -i -q -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max"; then
             echo "$result" >&2
             printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
-            echo ""
             do_exit 5
           else
             echo "$result" |grep -i -e 'Success'
@@ -1461,6 +1458,78 @@ show_target_devices()
 }
 
 
+compare_dos_partition()
+{
+  local SOURCE_PART="$(echo "$1" |sed -r -e 's!^/dev/[a-z]+!!' -e 's!^[0-9]+p!!' -e 's!start= *[0-9]+, *!!' -e 's!size= *!!' |tr 'A-Z' 'a-z')"
+  local TARGET_PART="$(echo "$2" |sed -r -e 's!^/dev/[a-z]+!!' -e 's!^[0-9]+p!!' -e 's!start= *[0-9]+, *!!' -e 's!size= *!!' |tr 'A-Z' 'a-z')"
+
+  local retval=0
+
+  local SOURCE_NUM="$(echo "$SOURCE_PART" |awk '{ print $1 }')"
+  local TARGET_NUM="$(echo "$TARGET_PART" |awk '{ print $1 }')"
+
+  # Check type / flags
+  local SOURCE_TYPE="$(echo "$SOURCE_PART" |sed -r 's![0-9: ,]+!!')"
+  local TARGET_TYPE="$(echo "$TARGET_PART" |sed -r 's![0-9: ,]+!!')"
+  if [ "$SOURCE_TYPE" != "$TARGET_TYPE" ]; then
+    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM has different type/flags than source partition $SOURCE_NUM!\n\033[0m" >&2
+    retval=1
+  fi
+
+  local SOURCE_SIZE="$(echo "$SOURCE_PART" |sed -r -e 's![0-9]+[ :]+!!' -e 's!,.*!!')"
+  local TARGET_SIZE="$(echo "$TARGET_PART" |sed -r -e 's![0-9]+[ :]+!!' -e 's!,.*!!')"
+
+  # Target is smaller?
+  if [ $SOURCE_SIZE -gt $TARGET_SIZE ]; then
+    printf "\033[40m\033[1;31mERROR: Target partition $TARGET_NUM is smaller than source partition $SOURCE_NUM!\n\033[0m" >&2
+    retval=1
+  fi
+
+  # Target is bigger?
+  if [ $SOURCE_SIZE -lt $TARGET_SIZE ]; then
+    echo "NOTE: Target partition $TARGET_NUM is bigger than source partition $SOURCE_NUM"
+  fi
+
+  return $retval
+}
+
+
+compare_gpt_partition()
+{
+  local SOURCE_PART="$1"
+  local TARGET_PART="$2"
+
+  local retval=0
+
+  local SOURCE_NUM="$(echo "$SOURCE_PART" |awk '{ print $1 }')"
+  local TARGET_NUM="$(echo "$TARGET_PART" |awk '{ print $1 }')"
+
+  # Check type / flags
+  local SOURCE_TYPE="$(echo "$SOURCE_PART" |awk '{ print substr($0, index($0,$6)) }')"
+  local TARGET_TYPE="$(echo "$TARGET_PART" |awk '{ print substr($0, index($0,$6)) }')"
+  if [ "$SOURCE_TYPE" != "$TARGET_TYPE" ]; then
+    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM has different type/flags than source partition $SOURCE_NUM!\n\033[0m" >&2
+    retval=1
+  fi
+
+  local SOURCE_SIZE="$(echo "$SOURCE_PART" |awk '{ print $3 - $2 }')"
+  local TARGET_SIZE="$(echo "$TARGET_PART" |awk '{ print $3 - $2 }')"
+
+  # Target is smaller?
+  if [ $SOURCE_SIZE -gt $TARGET_SIZE ]; then
+    printf "\033[40m\033[1;31mERROR: Target partition $TARGET_NUM is smaller than source partition $SOURCE_NUM!\n\033[0m" >&2
+    retval=1
+  fi
+
+  # Target is bigger?
+  if [ $SOURCE_SIZE -lt $TARGET_SIZE ]; then
+    echo "NOTE: Target partition $TARGET_NUM is bigger than source partition $SOURCE_NUM"
+  fi
+
+  return $retval
+}
+
+
 test_target_partitions()
 {
   if [ -z "$IMAGE_FILES" ]; then
@@ -1471,7 +1540,7 @@ test_target_partitions()
 
   # Test whether the target partition(s) exist and have the correct geometry:
   local MISMATCH=0
-  unset IFS
+  IFS=' '
   for ITEM in $IMAGE_FILES; do
     IMAGE_FILE=$(echo "$ITEM" |cut -f1 -d"$SEP" -s)
     TARGET_PARTITION=$(echo "$ITEM" |cut -f2 -d"$SEP" -s)
@@ -1497,7 +1566,7 @@ test_target_partitions()
           continue;
         fi
 
-        if [ "$GDISK_TARGET_PART" != "$GDISK_SOURCE_PART" ]; then
+        if ! compare_gpt_partition "$GDISK_SOURCE_PART" "$GDISK_TARGET_PART"; then
           MISMATCH=1
         fi
       else
@@ -1519,14 +1588,14 @@ test_target_partitions()
 
         # Match partition with what we have stored in our partitions file
         if [ -z "$SFDISK_SOURCE_PART" ]; then
-          printf "\033[40m\033[1;31m\nWARNING: DOS partition /dev/$IMAGE_PARTITION_NODEV can not be found in the partition source  files!\n\033[0m" >&2
+          printf "\033[40m\033[1;31m\nWARNING: DOS partition /dev/$IMAGE_PARTITION_NODEV can not be found in the partition source files!\n\033[0m" >&2
           echo ""
           MISMATCH=1
           continue;
         fi
 
         # Check geometry/type of partition
-        if [ "$(echo "$SFDISK_TARGET_PART" |sed -r -e s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)" != "$(echo "$SFDISK_SOURCE_PART" |sed -r -e s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)" ]; then
+        if ! compare_dos_partition "$SFDISK_SOURCE_PART" "$SFDISK_TARGET_PART"; then
           MISMATCH=1
         fi
       fi
