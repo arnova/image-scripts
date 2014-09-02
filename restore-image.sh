@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10"
+MY_VERSION="3.10a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: August 29, 2014
+# Last update: September 2, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -773,8 +773,13 @@ set_image_source_dir()
         read IMAGE_NAME
 
         if echo "$IMAGE_NAME" |grep -q "/$"; then
-          IMAGE_DIR="$IMAGE_DIR/${IMAGE_NAME%/}"
-          IMAGE_DEFAULT="."
+          NEW_IMAGE_DIR="$IMAGE_DIR/$(echo "$IMAGE_NAME" |sed -e s:'^\./*':: -e s:'/*$'::)"
+          if [ ! -d "$NEW_IMAGE_DIR" ]; then
+            printf "\033[40m\033[1;31mERROR: Unable to access directory $NEW_IMAGE_DIR!\n\033[0m" >&2
+          else
+            IMAGE_DIR="$NEW_IMAGE_DIR"
+            IMAGE_DEFAULT="."
+          fi
           continue;
         fi
 
@@ -788,7 +793,7 @@ set_image_source_dir()
           TEMP_IMAGE_DIR="$IMAGE_DIR/$IMAGE_NAME"
         fi
 
-        LOOKUP="$(find "$TEMP_IMAGE_DIR/" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz")"
+        LOOKUP="$(find "$TEMP_IMAGE_DIR/" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" 2>/dev/null)"
         if [ -z "$LOOKUP" ]; then
           printf "\033[40m\033[1;31m\nERROR: No valid image (directory) specified ($TEMP_IMAGE_DIR)!\n\n\033[0m" >&2
           continue;
