@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.10b"
+MY_VERSION="3.10c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: October 5, 2014
@@ -1174,6 +1174,7 @@ check_disks()
     fi
 
     local ENTER=0
+
     if [ $CLEAN -eq 0 -a -n "$PARTITIONS_FOUND" ]; then
       if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
         echo "" >&2
@@ -1195,6 +1196,18 @@ check_disks()
           ENTER=1
         fi
       fi
+    fi
+
+    if [ $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ] &&
+       [ ! -e "track0.${IMAGE_SOURCE_NODEV}" -a -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+      printf "\033[40m\033[1;31mWARNING: track0.${IMAGE_SOURCE_NODEV} does NOT exist! Won't be able to update MBR boot loader\n\033[0m" >&2
+      ENTER=1
+    fi
+
+    if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1-o $PT_ADD -eq 1 ] &&
+       [ ! -e "sfdisk.${IMAGE_SOURCE_NODEV}" -a ! -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
+      printf "\033[40m\033[1;31mWARNING: sgdisk/sfdisk.${IMAGE_SOURCE_NODEV} does NOT exist! Won't be able to update partition table!\n\033[0m" >&2
+      ENTER=1
     fi
 
     if [ $ENTER -eq 1 ]; then
@@ -1276,7 +1289,7 @@ restore_disks()
 
         if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
 #          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63
-          # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else GRUB2 may not work.
+          # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
           dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=2048
           retval=$?
         else
