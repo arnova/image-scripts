@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10a"
+MY_VERSION="3.10b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: September 2, 2014
+# Last update: October 5, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -773,12 +773,16 @@ set_image_source_dir()
         read IMAGE_NAME
 
         if echo "$IMAGE_NAME" |grep -q "/$"; then
-          NEW_IMAGE_DIR="$IMAGE_DIR/$(echo "$IMAGE_NAME" |sed -e s:'^\./*':: -e s:'/*$'::)"
-          if [ ! -d "$NEW_IMAGE_DIR" ]; then
-            printf "\033[40m\033[1;31mERROR: Unable to access directory $NEW_IMAGE_DIR!\n\033[0m" >&2
+          if [ "$IMAGE_NAME" = "../" ]; then
+            IMAGE_DIR="$(dirname "$IMAGE_DIR")" # Get rid of top directory
           else
-            IMAGE_DIR="$NEW_IMAGE_DIR"
-            IMAGE_DEFAULT="."
+            NEW_IMAGE_DIR="$IMAGE_DIR/$(echo "$IMAGE_NAME" |sed -e s:'^\./*':: -e s:'/*$'::)"
+            if [ ! -d "$NEW_IMAGE_DIR" ]; then
+              printf "\033[40m\033[1;31mERROR: Unable to access directory $NEW_IMAGE_DIR!\n\033[0m" >&2
+            else
+              IMAGE_DIR="$NEW_IMAGE_DIR"
+              IMAGE_DEFAULT="."
+            fi
           fi
           continue;
         fi
@@ -1272,7 +1276,7 @@ restore_disks()
 
         if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
 #          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63
-          # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
+          # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else GRUB2 may not work.
           dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=2048
           retval=$?
         else
