@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10c"
+MY_VERSION="3.10d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 5, 2014
+# Last update: October 9, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1015,7 +1015,7 @@ get_source_disks()
 }
 
 
-# Returns preferred target, unmounted disks first (without /dev/ prefix)
+# Returns best suitable target device, prefer unmounted disks (without /dev/ prefix)
 get_auto_target_device()
 {
   local SOURCE_NODEV="$1"
@@ -1031,12 +1031,12 @@ get_auto_target_device()
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
       # Checked for mounted partitions
-      if [ "$(cat /sys/block/$SOURCE_NODEV/removable 2>/dev/null)" = "0 " ] && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+      if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
         break;
       fi
-    #FIXME: Check disk-size
-    #FIXME: Skip check above when --clean is not specified?
+      #FIXME: Check disk-size ?
+      #FIXME: Skip check above when --clean is not specified?
     done
   fi
 
