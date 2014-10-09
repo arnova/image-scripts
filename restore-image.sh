@@ -1015,7 +1015,7 @@ get_source_disks()
 }
 
 
-# Returns preferred taget, unmounted disks first (without /dev/ prefix)
+# Returns preferred target, unmounted disks first (without /dev/ prefix)
 get_auto_target_device()
 {
   local SOURCE_NODEV="$1"
@@ -1204,7 +1204,7 @@ check_disks()
       ENTER=1
     fi
 
-    if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1-o $PT_ADD -eq 1 ] &&
+    if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ] &&
        [ ! -e "sfdisk.${IMAGE_SOURCE_NODEV}" -a ! -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
       printf "\033[40m\033[1;31mWARNING: sgdisk/sfdisk.${IMAGE_SOURCE_NODEV} does NOT exist! Won't be able to update partition table!\n\033[0m" >&2
       ENTER=1
