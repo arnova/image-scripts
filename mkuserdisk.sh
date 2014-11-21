@@ -1,5 +1,4 @@
-# Auto create d: drive (user disk). Note that this script only works for a
-# restore to a single disk!
+# Auto create d: ntfs drive (user disk).
 
 ####################
 # Global variables #
