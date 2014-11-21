@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10"
+MY_VERSION="3.10a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: August 29, 2014
+# Last update: November 21, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -709,13 +709,22 @@ select_partitions()
     unset IFS
     for PART_NODEV in $SELECT_PARTITIONS; do
       if grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /etc/mtab; then
-        # In case user specifically selected partition, hardfail:
-        if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
-          printf "\033[40m\033[1;31mERROR: Partition /dev/$PART_NODEV is mounted! Wrong device/partition specified? Quitting...\n\033[0m" >&2
-          do_exit 5
-        fi
+        if [ "$IMAGE_PROGRAM" = "fsa" ]; then
+          # FSArchiver can backup live (mounted) partitions, the others cannot
+          # so if user specified partition generate warning and proceed
+          if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
+            printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART_NODEV is mounted!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+            read dummy
+          fi
+        else
+          # In case user specifically selected partition, hardfail:
+          if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
+            printf "\033[40m\033[1;31mERROR: Partition /dev/$PART_NODEV is mounted! Wrong device/partition specified? Quitting...\n\033[0m" >&2
+            do_exit 5
+          fi
 
-        IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
+          IGNORE_PARTITIONS="${IGNORE_PARTITIONS}${IGNORE_PARTITIONS:+ }${PART_NODEV}"
+        fi
       elif grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /proc/swaps; then
         # In case user specifically selected partition, hardfail:
         if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
@@ -784,7 +793,7 @@ backup_partitions()
     case "$IMAGE_PROGRAM" in
       fsa)  TARGET_FILE="$PART.fsa"
             printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            fsarchiver -v savefs "$TARGET_FILE" "/dev/$PART"
+            fsarchiver -a -A -v savefs "$TARGET_FILE" "/dev/$PART"
             retval=$?
             ;;
       pi)   TARGET_FILE="$PART.img.gz"

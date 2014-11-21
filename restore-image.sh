@@ -1021,6 +1021,7 @@ get_auto_target_device()
   local SOURCE_NODEV="$1"
   local MIN_SIZE="$2"
 
+  #FIXME: Check disk-size with MIN_SIZE?
   if [ -z "$MIN_SIZE" ]; then
     MIN_SIZE=0
   fi
@@ -1035,7 +1036,6 @@ get_auto_target_device()
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
         break;
       fi
-      #FIXME: Check disk-size ?
       #FIXME: Skip check above when --clean is not specified?
     done
   fi
