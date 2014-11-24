@@ -431,6 +431,7 @@ sanity_check()
   check_command_error fdisk
   check_command_error dd
   check_command_error blkid
+  check_command_error lsblk
   check_command_error blockdev
 
   # FIXME: Only required when GPT partitions are found
@@ -643,7 +644,7 @@ detect_partitions()
     for LINE in $FIND_PARTITIONS; do
       local PART_NODEV=`echo "$LINE" |awk -F: '{ print $1 }'`
 
-      if echo "$LINE" |grep -q -e '^loop[0-9]' -e '^sr[0-9]' -e '^fd[0-9]' -e '^ram[0-9]' -e '^md[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
+      if echo "$LINE" |grep -q -e '^loop[0-9]' -e '^sr[0-9]' -e '^fd[0-9]' -e '^ram[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
         continue;
       fi
 
@@ -652,12 +653,12 @@ detect_partitions()
       fi
 
       # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
-      if echo "$LINE" |grep -q -i -E -e 'TYPE=\"?(swap|squashfs)' -e 'PTTYPE='; then
-        continue; # Ignore swap etc. partitions
+      if echo "$LINE" |grep -q -i -E -e 'TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member)' -e 'PTTYPE='; then
+        continue; # Ignore swap, lvm (dm), raid (md), etc. partitions
       fi
 
       # Extra strict regex for making sure it's really a filesystem
-#      if ! echo "$LINE" |grep -q -i ' TYPE=' && ! echo "$LINE" |grep -q -i -E -e ' LABEL=' -e '  ; then
+#      if ! echo "$LINE" |grep -q -i ' TYPE=' && ! echo "$LINE" |grep -q -i -E -e ' LABEL=' -e '; then
 #        continue;
 #      fi
 
@@ -690,7 +691,7 @@ select_partitions()
 
       unset IFS
       for DEVICE in $SELECT_DEVICES; do
-        if [ ! -e "/dev/$DEVICE" ]; then
+        if [ ! -b "/dev/$DEVICE" ]; then
           echo ""
           printf "\033[40m\033[1;31mERROR: Specified source block device /dev/$DEVICE does NOT exist! Quitting...\n\033[0m" >&2
           echo ""
