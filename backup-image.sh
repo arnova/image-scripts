@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.11"
+MY_VERSION="3.11a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: November 24, 2014
@@ -165,7 +165,7 @@ get_partitions_with_size_type()
     fi
     local SIZE_HUMAN="$(human_size $SIZE |tr ' ' '_')"
 
-    local BLKID_INFO="$(blkid -o full -s LABEL -s PTTYPE -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed s,'^/dev/.*: ',,)"
+    local BLKID_INFO="$(blkid -o full -s LABEL -s PTTYPE -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed -e s,'^/dev/.*: ',, -e s,' *$',,)"
     if [ -z "$BLKID_INFO" ]; then
       BLKID_INFO="TYPE=\"unknown\""
     fi
@@ -177,7 +177,12 @@ get_partitions_with_size_type()
 # Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
-  echo "$1" |sed -r s,'[p/]?[0-9]+$',,
+  local PARSE="$(echo "$1" |sed -r s,'[p/]?[0-9]+$',,)"
+
+  # Make sure we don't just return the partition
+  if [ "$PARSE" != "$1" ]; then
+    echo "$PARSE"
+  fi
 }
 
 
@@ -596,6 +601,7 @@ select_disks()
   IFS=' '
   for PART in $BACKUP_PARTITIONS; do
     local HDD_NODEV="$(get_partition_disk "$PART")"
+
     # Make sure it exists
     if [ ! -b "/dev/$HDD_NODEV" ]; then
       continue; # Ignore this one
@@ -1061,12 +1067,12 @@ if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
   fi
 fi
 
-if [ $NO_TRACK0 -ne 1 -a $ONLY_SH -eq 0 ]; then
-  if [ -z "$BACKUP_DISKS" ]; then
-    printf "\033[40m\033[1;31mWARNING: No disks to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
-    read dummy
-  fi
-fi
+#if [ $NO_TRACK0 -ne 1 -a $ONLY_SH -eq 0 ]; then
+#  if [ -z "$BACKUP_DISKS" ]; then
+#    printf "\033[40m\033[1;31mWARNING: No disks to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+#    read dummy
+#  fi
+#fi
 
 echo ""
 
@@ -1123,7 +1129,6 @@ fi
 
 # Check integrity of .gz-files:
 if [ -n "$BACKUP_IMAGES" ]; then
-  echo ""
   echo "* Verifying image(s) ($BACKUP_IMAGES) (CTRL-C to break)..."
   IFS=' '
   for BACKUP_IMAGE in $BACKUP_IMAGES; do

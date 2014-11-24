@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.11"
+MY_VERSION="3.11a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: November 24, 2014
@@ -191,7 +191,7 @@ get_partitions_with_size_type()
     fi
     local SIZE_HUMAN="$(human_size $SIZE |tr ' ' '_')"
 
-    local BLKID_INFO="$(blkid -o full -s LABEL -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed s,'^/dev/.*: ',,)"
+    local BLKID_INFO="$(blkid -o full -s LABEL -s PTTYPE -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed -e s,'^/dev/.*: ',, -e s,' *$',,)"
     if [ -z "$BLKID_INFO" ]; then
       BLKID_INFO="TYPE=\"unknown\""
     fi
@@ -582,6 +582,7 @@ sanity_check()
   check_command_error fdisk
   check_command_error dd
   check_command_error blkid
+  check_command_error lsblk
   check_command_error blockdev
 
   [ "$NO_NET" != "0" ] && check_command_error ifconfig
@@ -1083,15 +1084,20 @@ check_disks()
 
       echo ""
 
-      # Check if DMA is enabled for device
-      check_dma "/dev/$TARGET_NODEV"
+      local DEVICE_TYPE="$(lsblk -a -d -n -o TYPE /dev/$TARGET_NODEV)"
+      # Make sure it's a real disk
+      if [ "$DEVICE_TYPE" = "disk" ]; then
+        # Make sure kernel doesn't use old partition table
+        if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
+          echo ""
+          printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override.\n\n\033[0m" >&2
+          continue;
+        fi
+        
 
-      # Make sure kernel doesn't use old partition table
-      if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
-        echo ""
-        printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override.\n\n\033[0m" >&2
-        continue;
-      fi
+        # Check if DMA is enabled for device
+        check_dma "/dev/$TARGET_NODEV"
+       fi
 
       echo ""
 
