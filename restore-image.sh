@@ -203,7 +203,12 @@ get_partitions_with_size_type()
 # Figure out to which disk the specified partition ($1) belongs
 get_partition_disk()
 {
-  echo "$1" |sed -r s,'[p/]?[0-9]+$',,
+  local PARSE="$(echo "$1" |sed -r s,'[p/]?[0-9]+$',,)"
+
+  # Make sure we don't just return the partition
+  if [ "$PARSE" != "$1" ]; then
+    echo "$PARSE"
+  fi
 }
 
 
@@ -1459,7 +1464,7 @@ check_partitions()
     # Check whether we need to add this to our included devices list
     PART_DISK="$(get_partition_disk "$TARGET_PARTITION")"
     if [ -z "$PART_DISK" ]; then
-      echo "* WARNING: Unable to obtain device for target partition $TARGET_PARTITION" >&2
+      echo "* NOTE: No parent disk found for target partition $TARGET_PARTITION" >&2
     elif ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DISK " -e " $PART_DISK " -e " $PART_DISK$" -e "^$PART_DISK$"; then
       TARGET_DEVICES="${TARGET_DEVICES}${TARGET_DEVICES:+ }${PART_DISK} "
     fi
@@ -1581,6 +1586,11 @@ test_target_partitions()
     IMAGE_PARTITION_NODEV=$(echo "$IMAGE_FILE" |sed 's/\..*//')
     SOURCE_DISK_NODEV=$(get_partition_disk "$IMAGE_PARTITION_NODEV")
     TARGET_DISK=$(get_partition_disk "$TARGET_PARTITION")
+
+    # FIXME: What to do if one translates to a disk?
+    if [ -z "$SOURCE_DISK_NODEV" -o -z "$TARGET_DISK" ]; then
+      continue; # No partitions on this device
+    fi
 
     if [ -e "gdisk.${SOURCE_DISK_NODEV}" ]; then
       GDISK_TARGET_PART="$(gdisk -l "$TARGET_DISK" |grep -E "^[[:blank:]]+$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
