@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10a"
+MY_VERSION="3.11"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 21, 2014
+# Last update: November 24, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -790,18 +790,19 @@ backup_partitions()
   for PART in $BACKUP_PARTITIONS; do
     local retval=1
     local TARGET_FILE=""
+    local OUTPUT_PREFIX="$(echo "$PART" |sed s,'/','_',g)"
     case "$IMAGE_PROGRAM" in
-      fsa)  TARGET_FILE="$PART.fsa"
+      fsa)  TARGET_FILE="${OUTPUT_PREFIX}.fsa"
             printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
             fsarchiver -a -A -v savefs "$TARGET_FILE" "/dev/$PART"
             retval=$?
             ;;
-      pi)   TARGET_FILE="$PART.img.gz"
+      pi)   TARGET_FILE="${OUTPUT_PREFIX}.img.gz"
             printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
             partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
             retval=$?
             ;;
-      pc)   TARGET_FILE="$PART.pc.gz"
+      pc)   TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
             PARTCLONE=`partclone_detect "/dev/$PART"`
             if [ -n "$PARTCLONE" ]; then
               printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
@@ -812,7 +813,7 @@ backup_partitions()
               fi
             fi
             ;;
-      ddgz) TARGET_FILE="$PART.dd.gz"
+      ddgz) TARGET_FILE="${OUTPUT_PREFIX}.dd.gz"
             printf "****** Using dd (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
             { dd if="/dev/$PART" bs=4096; echo $? >/tmp/.dd.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
@@ -846,6 +847,9 @@ backup_disks()
     # Check if DMA is enabled for HDD
     check_dma /dev/$HDD_NODEV
 
+    # For output files replace / with _
+    OUTPUT_SUFFIX="$(echo "$HDD_NODEV" |sed s,'/','_',g)"
+
     SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
     if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
       # GPT partition table found
@@ -854,26 +858,26 @@ backup_disks()
         do_exit 9
       fi
 
-      echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.$HDD_NODEV..."
-      sgdisk --backup="sgdisk.${HDD_NODEV}" "/dev/${HDD_NODEV}"
+      echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
+      sgdisk --backup="sgdisk.${OUTPUT_SUFFIX}" "/dev/${HDD_NODEV}"
 
       # Dump gdisk -l info to file
-      gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${HDD_NODEV}"
+      gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${OUTPUT_SUFFIX}"
     elif [ -n "$SFDISK_OUTPUT" ]; then
       # DOS partition table found
-      echo "* Storing DOS partition table for /dev/$HDD_NODEV in sfdisk.$HDD_NODEV..."
-      echo "$SFDISK_OUTPUT" > "sfdisk.$HDD_NODEV"
+      echo "* Storing DOS partition table for /dev/$HDD_NODEV in sfdisk.${OUTPUT_SUFFIX}..."
+      echo "$SFDISK_OUTPUT" > "sfdisk.${OUTPUT_SUFFIX}"
 
       # Dump fdisk -l info to file
-      fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${HDD_NODEV}"
+      fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${OUTPUT_SUFFIX}"
 
-      echo "* Storing track0 for /dev/$HDD_NODEV in track0.$HDD_NODEV..."
+      echo "* Storing track0 for /dev/$HDD_NODEV in track0.${OUTPUT_SUFFIX}..."
       # Dump hdd info for all disks in the current system
-      result="$(dd if=/dev/$HDD_NODEV of="track0.$HDD_NODEV" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
+      result="$(dd if=/dev/$HDD_NODEV of="track0.${OUTPUT_SUFFIX}" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
       retval=$?
       if [ $retval -ne 0 ]; then
         echo "$result" >&2
-        printf "\033[40m\033[1;31mERROR: Track0(MBR) backup from /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
+        printf "\033[40m\033[1;31mERROR: Track0(MBR) backup of /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
         do_exit 8
       fi
     else
@@ -882,7 +886,7 @@ backup_disks()
     fi
 
     # Dump device partition layout in "fancified" format
-    get_partitions_with_size_type "$HDD_NODEV" >"partition_layout.${HDD_NODEV}"
+    get_partitions_with_size_type "$HDD_NODEV" >"partition_layout.${OUTPUT_SUFFIX}"
   done
 }
 

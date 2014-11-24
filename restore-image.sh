@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.10d"
+MY_VERSION="3.11"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 9, 2014
+# Last update: November 24, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -986,7 +986,7 @@ get_source_disks()
     IFS=$EOL
     for ITEM in `find . -maxdepth 1 -name "track0.*" -o -name "sgdisk.*" -o -name "sfdisk.*"`; do
       # Extract drive name from file
-      IMAGE_SOURCE_NODEV="$(basename "$ITEM" |sed s/'.*\.'//)"
+      IMAGE_SOURCE_NODEV="$(basename "$ITEM" |sed -e s,'.*\.',, -e s,'_','/',g)"
 
       # Skip duplicates
       if ! echo "$USED_DISKS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV} " -e " ${IMAGE_SOURCE_NODEV} "; then
@@ -999,7 +999,7 @@ get_source_disks()
   IFS=$EOL
   for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
     # Extract drive name from file
-    IMAGE_SOURCE_NODEV=`get_partition_disk "$(basename "$ITEM" |sed s/'\..*'//)"`
+    IMAGE_SOURCE_NODEV="$(get_partition_disk "$(basename "$ITEM" |sed -e s,'\..*',, -e s,'_','/',g)")"
 
     if [ -n "$PARTITIONS" ] && ! echo "$PARTITIONS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV}[ :]" -e " ${IMAGE_SOURCE_NODEV}[ :]"; then
       continue; # Not specified in --partitions, skip
@@ -1386,7 +1386,9 @@ check_image_files()
       fi
 
       IMAGE_FILE=`basename "$LOOKUP"`
-      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
+
+      # Construct device name:
+      SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
       TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
 
       # Add item to list
@@ -1397,7 +1399,9 @@ check_image_files()
     for ITEM in $(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort); do
       # FIXME: Can have multiple images here!
       IMAGE_FILE=`basename "$ITEM"`
-      SOURCE_NODEV=`echo "$IMAGE_FILE" |sed 's/\..*//'`
+
+      # Construct device name:
+      SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
       TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
 
       if echo "$IMAGE_FILES" |grep -q -e "${SEP}${TARGET_PARTITION}$" -e "${SEP}${TARGET_PARTITION} "; then
