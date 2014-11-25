@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11a"
+MY_VERSION="3.11b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 24, 2014
+# Last update: November 25, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -175,13 +175,30 @@ get_partitions_with_size_type()
 
 
 # Figure out to which disk the specified partition ($1) belongs
-get_partition_disk()
+get_partition_disks()
 {
-  local PARSE="$(echo "$1" |sed -r s,'[p/]?[0-9]+$',,)"
+  local DISK=""
+  local FOUND_DISKS=""
 
-  # Make sure we don't just return the partition
-  if [ "$PARSE" != "$1" ]; then
-    echo "$PARSE"
+  IFS=$EOL
+  for LINE in `lsblk -a -i -n -o NAME,TYPE`; do
+    if echo "$LINE" |grep -q "^[a-z]"; then
+      if echo "$LINE" |grep -q "[[:blank:]]disk$"; then
+        # Master disk:
+        DISK=`echo "$LINE" |awk '{ print $1 }'`
+      else
+        DISK=""
+      fi
+    elif echo "$LINE" |grep -q -e "-${1}[[:blank:]]"; then
+      # Found slave
+      if [ -n "$DISK" ]; then
+        FOUND_DISKS="${FOUND_DISKS}${DISK} "
+      fi
+    fi
+  done
+  
+  if [ -n "$FOUND_DISKS" ]; then
+    echo "$FOUND_DISKS"
   fi
 }
 
@@ -601,16 +618,21 @@ select_disks()
 
   IFS=' '
   for PART in $BACKUP_PARTITIONS; do
-    local HDD_NODEV="$(get_partition_disk "$PART")"
+    # Get disks this partition is on, maybe multiple disks (e.g. lvm/md)!
+    local DISKS_NODEV="$(get_partition_disks "$PART")"
+    
+    IFS=' '
+    for HDD_NODEV in $DISKS_NODEV; do
+      # Make sure it exists
+      if [ ! -b "/dev/$HDD_NODEV" ]; then
+        continue; # Ignore this one
+      fi
 
-    # Make sure it exists
-    if [ ! -b "/dev/$HDD_NODEV" ]; then
-      continue; # Ignore this one
-    fi
-
-    if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
-      BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
-    fi
+      # Only add, if it's not included already:
+      if ! echo "$BACKUP_DISKS" |grep -q -e "^${HDD_NODEV}$" -e "^${HDD_NODEV} " -e " ${HDD_NODEV}$" -e " ${HDD_NODEV} "; then
+        BACKUP_DISKS="${BACKUP_DISKS}${BACKUP_DISKS:+ }${HDD_NODEV}"
+      fi
+    done
   done
 }
 
@@ -620,7 +642,8 @@ show_backup_disks_info()
   IFS=' '
   for HDD_NODEV in $BACKUP_DISKS; do
     echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
-    get_partitions_with_size_type /dev/$HDD_NODEV
+    #get_partitions_with_size_type /dev/$HDD_NODEV
+    lsblk -a -n -o NAME,FSTYPE,LABEL,PARTLABEL,PARTUUID,UUID,SIZE,TYPE /dev/$HDD_NODEV
     echo ""
   done
 }
