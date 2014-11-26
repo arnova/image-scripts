@@ -47,7 +47,7 @@ do_exit()
   if [ "$AUTO_UNMOUNT" = "1" ] && [ -n "$MOUNT_DEVICE" ] && grep -q " $IMAGE_ROOT " /etc/mtab; then
     # Go to root else we can't umount
     cd /
-    
+
     # Umount our image repo
     umount -v "$IMAGE_ROOT"
   fi
@@ -196,7 +196,7 @@ get_partition_disks()
       fi
     fi
   done
-  
+
   if [ -n "$FOUND_DISKS" ]; then
     echo "$FOUND_DISKS"
   fi
@@ -461,7 +461,7 @@ sanity_check()
 
   [ "$IMAGE_PROGRAM" = "fsa" ] && check_command_error fsarchiver
   [ "$IMAGE_PROGRAM" = "pi" ] && check_command_error partimage
-  
+
   if [ "$IMAGE_PROGRAM" = "pc" -o "$IMAGE_PROGRAM" = "ddgz" ]; then
     GZIP="gzip"
   fi
@@ -494,7 +494,7 @@ mkdir_safe()
     printf "\033[40m\033[1;31m\nERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
     return 3
   fi
-  
+
   return 0
 }
 
@@ -504,7 +504,7 @@ set_image_target_dir()
   if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
     # Assume absolute path
     IMAGE_DIR="$IMAGE_NAME"
-    
+
     if ! mkdir_safe "$IMAGE_DIR"; then
       do_exit 7
     fi
@@ -534,7 +534,7 @@ set_image_target_dir()
           fi
 
           echo "* Using network username $USERNAME"
-          
+
           # Replace username in our mount arguments (it's a little dirty, I know ;-))
           MOUNT_ARGS="-t $MOUNT_TYPE -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
 
@@ -569,15 +569,15 @@ set_image_target_dir()
       while true; do
         printf "\nImage name (directory) to use: "
         read IMAGE_NAME
-        
+
         if [ -z "$IMAGE_NAME" ]; then
           echo ""
           printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
           continue;
         fi
-      
+
         IMAGE_DIR="$IMAGE_NAME"
-    
+
         if [ -n "$IMAGE_BACKUP_DIR" ]; then
           IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
         fi
@@ -589,13 +589,13 @@ set_image_target_dir()
         if ! mkdir_safe "$IMAGE_DIR"; then
           continue;
         fi
-    
+
         echo ""
         break; # All sane: break loop
       done
     else
       IMAGE_DIR="$IMAGE_NAME"
-    
+
       if [ -n "$IMAGE_BACKUP_DIR" ]; then
         IMAGE_DIR="${IMAGE_BACKUP_DIR}/${IMAGE_DIR}"
       fi
@@ -603,7 +603,7 @@ set_image_target_dir()
       if [ -n "$IMAGE_ROOT" ]; then
         IMAGE_DIR="$IMAGE_ROOT/$IMAGE_DIR"
       fi
-      
+
       if ! mkdir_safe "$IMAGE_DIR"; then
         do_exit 7;
       fi
@@ -620,7 +620,7 @@ select_disks()
   for PART in $BACKUP_PARTITIONS; do
     # Get disks this partition is on, maybe multiple disks (e.g. lvm/md)!
     local DISKS_NODEV="$(get_partition_disks "$PART")"
-    
+
     IFS=' '
     for HDD_NODEV in $DISKS_NODEV; do
       # Make sure it exists
@@ -643,7 +643,7 @@ show_backup_disks_info()
   for HDD_NODEV in $BACKUP_DISKS; do
     echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
     #get_partitions_with_size_type /dev/$HDD_NODEV
-    lsblk -a -n -o NAME,FSTYPE,LABEL,PARTLABEL,PARTUUID,UUID,SIZE,TYPE /dev/$HDD_NODEV
+    lsblk -a -n -o NAME,FSTYPE,LABEL,UUID,SIZE,TYPE /dev/$HDD_NODEV
     echo ""
   done
 }
@@ -693,7 +693,7 @@ detect_partitions()
       return 0
     fi
   fi
-  
+
   return 1 # Nothing found
 }
 
@@ -703,7 +703,7 @@ select_partitions()
   local SELECT_DEVICES="$DEVICES"
   local LAST_BACKUP_DISKS=""
   local USER_SELECT=0
- 
+
   # User select loop:
   while true; do
     # Check if target device exists
