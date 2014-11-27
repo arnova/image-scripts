@@ -428,7 +428,7 @@ partprobe()
 configure_network()
 {
   IFS=$EOL
-  for CUR_IF in $(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo' -e '^wlan'); do
+  for CUR_IF in $(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy0' -e '^bond0' -e '^lo'); do
     IF_INFO="$(ifconfig $CUR_IF)"
     MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
     IP_TEST=""
