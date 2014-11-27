@@ -1089,7 +1089,7 @@ check_disks()
 
       echo ""
 
-      local DEVICE_TYPE="$(lsblk -a -d -n -o TYPE /dev/$TARGET_NODEV)"
+      local DEVICE_TYPE="$(lsblk -d -n -o TYPE /dev/$TARGET_NODEV)"
       # Make sure it's a real disk
       if [ "$DEVICE_TYPE" = "disk" ]; then
         # Make sure kernel doesn't use old partition table

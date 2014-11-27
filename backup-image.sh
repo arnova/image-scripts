@@ -643,7 +643,13 @@ show_backup_disks_info()
   for HDD_NODEV in $BACKUP_DISKS; do
     echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
     #get_partitions_with_size_type /dev/$HDD_NODEV
-    lsblk -a -n -o NAME,FSTYPE,LABEL,UUID,SIZE,TYPE /dev/$HDD_NODEV
+    result="$(lsblk -n -o NAME,FSTYPE,LABEL,UUID,SIZE,TYPE /dev/$HDD_NODEV 2>&1)"
+    if [ $? -ne 0 ]; then
+      # Fallback for ancient versions of lsblk
+      lsblk -n /dev/$HDD_NODEV
+    else
+      echo "$result"
+    fi
     echo ""
   done
 }
