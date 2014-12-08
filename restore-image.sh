@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11a"
+MY_VERSION="3.11b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 24, 2014
+# Last update: December 8, 2014
 # (C) Copyright 2004-2014 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -218,7 +218,7 @@ get_disk_partitions()
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
   local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
-  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && which sgdisk >/dev/null 2>&1; then
+  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && check_command sgdisk; then
     local DEV_PREFIX="/dev/$DISK_NODEV"
     # FIXME: Not sure if this is correct:
     if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
@@ -275,7 +275,7 @@ list_device_partitions()
   local DEVICE="$1"
 
   FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
-  if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]' && which gdisk >/dev/null 2>&1; then
+  if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]' && check_command gdisk; then
     # GPT partition table found
     GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
     printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
@@ -449,13 +449,13 @@ configure_network()
       echo "* Network interface $CUR_IF is not active (yet)"
 
       if echo "$NETWORK" |grep -q -e 'dhcp'; then
-        if which dhcpcd >/dev/null 2>&1; then
+        if check_command dhcpcd; then
           echo "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
           # Run dhcpcd to get a dynamic IP
           if dhcpcd -L $CUR_IF; then
             continue
           fi
-        elif which dhclient >/dev/null 2>&1; then
+        elif check_command dhclient; then
           echo "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
           if dhclient -1 $CUR_IF; then
             continue
@@ -510,7 +510,7 @@ configure_network()
 # Check if DMA is enabled for HDD
 check_dma()
 {
-  if which hdparm >/dev/null 2>&1; then
+  if check_command hdparm; then
     # DMA disabled?
     if hdparm -d "$1" 2>/dev/null |grep -q 'using_dma.*0'; then
       # Enable DMA
@@ -529,7 +529,7 @@ check_command()
 
   IFS=' '
   for cmd in $*; do
-    if which "$cmd" >/dev/null 2>&1; then
+    if [ -n "$(which "$cmd" 2>/dev/null)" ]; then
       return 0
     fi
   done
@@ -1279,7 +1279,7 @@ restore_disks()
     PARTPROBE=0
 
     # Clear all (GPT) partition data on --clean:
-    if [ $CLEAN -eq 1 ] && which sgdisk >/dev/null 2>&1; then
+    if [ $CLEAN -eq 1 ] && check_command sgdisk; then
       # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
       sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
 
@@ -1667,7 +1667,7 @@ create_swaps()
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
     SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null)"
-    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && which sgdisk >/dev/null 2>&1; then
+    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && check_command sgdisk; then
       # GPT partition table:
       SGDISK_OUTPUT="$(sgdisk -p "$DEVICE" 2>/dev/null)"
 
@@ -1821,7 +1821,7 @@ if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET != 1 ]; then
   configure_network;
 
   # Try to sync time against the server used, if ntpdate is available
-  if which ntpdate >/dev/null 2>&1 && [ -n "$SERVER" ]; then
+  if [ -n "$SERVER" ] && check_command ntpdate; then
     ntpdate "$SERVER"
   fi
 fi
