@@ -96,7 +96,7 @@ y
   if ! echo "$GDISK_CMD" |gdisk $USER_DISK >/dev/null; then
     return 1
   fi
-  
+
   return 0
 }
 
@@ -166,7 +166,9 @@ mkud_select_disk()
   unset IFS
   for DISK in `cat /proc/partitions |grep -E '[sh]d[a-z]$' |awk '{ print $4 }' |sed s,'^/dev/',,`; do
     # Ignore disks with swap/mounted partitions
-    if ! grep -E -q "^/dev/${DISK}p?[0-9]+" /etc/mtab && ! grep -E -q "^/dev/${PART}p?[0-9]+" /proc/swaps; then
+    if grep -E -q "^/dev/${DISK}p?[0-9]+" /etc/mtab; then
+      echo "* NOTE: Ignoring mounted disk /dev/$DISK" >&2
+    elif ! grep -E -q "^/dev/${PART}p?[0-9]+" /proc/swaps; then
       FIND_DISKS="${FIND_DISKS}${FIND_DISKS:+ }$DISK"
     fi
   done
