@@ -26,27 +26,27 @@ mkud_create_user_dos_partition()
     echo "* Creating new (empty) DOS partition"
     # Empty partition table"
     FDISK_CMD="o
-               n
-               p
-               $PART_ID
+n
+p
+$PART_ID
 
 
-               t
-               7
-               w
-              "
+t
+7
+w
+"
   else
     echo "* Adding user partition to (existing) DOS partition"
     FDISK_CMD="n
-               p
-               $PART_ID
+p
+$PART_ID
 
 
-               t
-               $PART_ID
-               7
-               w
-              "
+t
+$PART_ID
+7
+w
+"
   fi
 
   # Create NTFS partition:
@@ -69,28 +69,30 @@ mkud_create_user_gpt_partition()
     echo "* Creating new (empty) GPT partition"
     # Empty partition table"
     GDISK_CMD="o
-               n
+y
+n
+$PART_ID
 
 
-               t
-               0700
-               w
-              "
+0700
+w
+y
+"
   else
     echo "* Adding user partition to (existing) GPT partition"
     GDISK_CMD="n
-               $PART_ID
+$PART_ID
 
 
-               t
-               $PART_ID
-               0700
-               w
-              "
+0700
+w
+y
+"
   fi
 
   # Create NTFS partition:
   echo "* Creating user NTFS GPT partition $USER_PART"
+
   if ! echo "$GDISK_CMD" |gdisk $USER_DISK >/dev/null; then
     return 1
   fi
@@ -120,8 +122,8 @@ mkud_create_user_filesystem()
 
     # If user partition is on the same device as the images, check that it does not exist already
     if [ ! -e $USER_PART -o $EMPTY_PARTITION_TABLE -eq 1 ]; then
-      # Detect GPT
-      if sfdisk -d $USER_DISK 2>/dev/null |grep -q -E -i '[[:blank:]]Id=ee'; then
+      # Detect GPT. Always use GPT on an empty disk since size may be > 2TB
+      if [ $EMPTY_PARTITION_TABLE -eq 1 ] || sfdisk -d $USER_DISK 2>/dev/null |grep -q -E -i '[[:blank:]]Id=ee'; then
         mkud_create_user_gpt_partition;
       else
         mkud_create_user_dos_partition;
