@@ -668,7 +668,9 @@ detect_partitions()
 
   # Does the device contain partitions?
   if [ -n "$FIND_PARTITIONS" ]; then
-    SELECT_PARTITIONS=""
+    local SELECT_PARTITIONS=""
+    local BLKID_LIST="$(blkid)"
+
     IFS=$EOL
     for LINE in $FIND_PARTITIONS; do
       local PART_NODEV=`echo "$LINE" |awk -F: '{ print $1 }'`
