@@ -681,6 +681,12 @@ detect_partitions()
         continue; # Ignore device
       fi
 
+
+      # Make sure it's a real partition
+      if ! echo "$BLKID_LIST" |grep -q "^/dev/${PART_NODEV}:"; then
+        continue;
+      fi
+
       # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
       if echo "$LINE" |grep -q -i -E -e "([[:blank:]]|^)TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member)" -e "([[:blank:]]|^)PTTYPE="; then
         continue; # Ignore swap, lvm (dm), raid (md), etc. partitions
@@ -1158,7 +1164,7 @@ else
 fi
 
 # Check integrity of .gz-files:
-if [ -n "$BACKUP_IMAGES" ]; then
+if [ -n "$BACKUP_IMAGES" ] && [ "$IMAGE_PROGRAM" = "ddgz" -o "$IMAGE_PROGRAM" = "pc" -o "$IMAGE_PROGRAM" = "pi" ]; then
   echo "* Verifying image(s) ($BACKUP_IMAGES) (CTRL-C to break)..."
   IFS=' '
   for BACKUP_IMAGE in $BACKUP_IMAGES; do
