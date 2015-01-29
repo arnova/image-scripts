@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.11c"
+MY_VERSION="3.11d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: December 8, 2014
-# (C) Copyright 2004-2014 by Arno van Amersfoort
+# Last update: January 29, 2014
+# (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -677,12 +677,12 @@ detect_partitions()
         continue;
       fi
 
-      if echo "$LINE" |grep -q "SIZE=0 "; then
+      if echo "$LINE" |grep -q -E "([[:blank:]]|^)SIZE=\"?0"; then
         continue; # Ignore device
       fi
 
       # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
-      if echo "$LINE" |grep -q -i -E -e 'TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member)' -e 'PTTYPE='; then
+      if echo "$LINE" |grep -q -i -E -e "([[:blank:]]|^)TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member)" -e "([[:blank:]]|^)PTTYPE="; then
         continue; # Ignore swap, lvm (dm), raid (md), etc. partitions
       fi
 
