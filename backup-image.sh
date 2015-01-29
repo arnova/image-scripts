@@ -830,7 +830,7 @@ backup_partitions()
     case "$IMAGE_PROGRAM" in
       fsa)  TARGET_FILE="${OUTPUT_PREFIX}.fsa"
             printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            fsarchiver -a -A -v savefs "$TARGET_FILE" "/dev/$PART"
+            fsarchiver -a -A -v --exclude="/.snapshots" savefs "$TARGET_FILE" "/dev/$PART"
             retval=$?
             ;;
       pi)   TARGET_FILE="${OUTPUT_PREFIX}.img.gz"
