@@ -1,0 +1,61 @@
+                       -= image backup/restore =-
+          Image Backup/Restore Scripts with (SMB) network support
+
+                      ~ In memory of my dear father ~
+
+(C) Copyright 2004-2015 by Arno van Amersfoort
+Homepage   : http://rocky.eld.leidenuniv.nl/
+Email      : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
+             (note: you must remove all spaces and substitute the @ and the .
+             at the proper locations!)
+-------------------------------------------------------------------------------
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+version 2 as published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+-------------------------------------------------------------------------------
+
+A MESSAGE FROM THE AUTHOR:
+--------------------------
+Almost *all* my work is distributed under the terms of the GNU GPL License,
+which means it's free (open-source) software. If you like my work or you want
+me to implement a certain feature, you are encouraged to donate money. You can
+(preferably) donate directly to me through my bank account (mail me for my IBAN
+number (International Bank Account Number). Or you can donate it to one of my
+favourite charity organisations:
+- foundations for cancer research (in The Netherlands: "KWF Kanker Bestrijding");
+- foundations for brain desease research (in The Netherlands: "De Hersenstichting");
+- foundations for the welfare of animals ("IFAW" or in the Netherlands: "De Dierenbescherming")
+
+Note that *ALL* donations I receive go to one of the above foundations.
+------------------------------------------------------------------------------
+
+Description
+-----------
+These scripts allow you to backup (and restore) your computer's filesystems
+using partclone (default), partimage, or fsarchiver. Furthermore it
+backups/restores bootloaders, partition tables, etc. This includes GPT and
+(U)EFI enabled systems. The script features native SMB filesystem support
+allowing you to directly backup/restore from an SMB network share.
+
+Requirements
+------------
+- partclone (or partimage or fsarchiver)
+- smbfs (if SMB network support is required)
+- (Default) system binaries like sfdisk/fdisk/dd
+- sgdisk/gdisk (when GPT support is required)
+- Bootable Linux (Rescue) CD. I personally recommend "SystemRescueCD" although
+  others should work as well.
+- (root) POSIX shell
+
+Usage
+-----
+Use "restore-image.sh --help" or "backup-image.sh" for info on usage.
