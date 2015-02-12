@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.11b"
+MY_VERSION="3.11c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: December 8, 2014
-# (C) Copyright 2004-2014 by Arno van Amersfoort
+# Last update: February 12, 2015
+# (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -772,7 +772,7 @@ set_image_source_dir()
         echo "* Showing contents of the image root directory ($IMAGE_DIR):"
         IFS=$EOL
         find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |sort |while read ITEM; do
-          echo "$(basename "$ITEM")"
+          echo "$(basename "$ITEM") ($(stat -c "%y" "$ITEM"))"
         done
 
         printf "\nImage (directory) to use ($IMAGE_DEFAULT): "
