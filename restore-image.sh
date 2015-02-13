@@ -772,7 +772,7 @@ set_image_source_dir()
         echo "* Showing contents of the image root directory ($IMAGE_DIR):"
         IFS=$EOL
         find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |sort |while read ITEM; do
-          echo "$(basename "$ITEM") ($(stat -c "%y" "$ITEM"))"
+          printf "$(stat -c "%y" "$ITEM" |sed s/'\..*'//)\t$(basename $ITEM)\n"
         done
 
         printf "\nImage (directory) to use ($IMAGE_DEFAULT): "
