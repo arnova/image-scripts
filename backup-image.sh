@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11d"
+MY_VERSION="3.11e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: January 29, 2014
+# Last update: March 2, 2014
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -64,17 +64,21 @@ ctrlc_handler()
 
 get_user_yn()
 {
-  printf "$1 "
+  if [ "$2" = "y" ]; then
+    printf "$1 (Y/n) "
+  else
+    printf "$1 (y/N) "
+  fi
 
   read answer_with_case
-  
-  answer=`echo "$answer_with_case" |tr A-Z a-z`
 
-  if [ "$answer" = "y" -o "$answer" = "yes" ]; then
+  ANSWER=`echo "$answer_with_case" |tr A-Z a-z`
+
+  if [ "$ANSWER" = "y" -o "$ANSWER" = "yes" ]; then
     return 0
   fi
 
-  if [ "$answer" = "n" -o "$answer" = "no" ]; then
+  if [ "$ANSWER" = "n" -o "$ANSWER" = "no" ]; then
     return 1
   fi
 
@@ -300,7 +304,8 @@ configure_network()
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        if ! get_user_yn "\n* Setup interface $CUR_IF statically (Y/N)?"; then
+        echo ""
+        if ! get_user_yn "* Setup interface $CUR_IF statically?"; then
           continue;
         fi
 
@@ -1083,7 +1088,7 @@ fi
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   echo ""
   find . -maxdepth 1 -type f -exec ls -l {} \;
-  if get_user_yn "Image target directory is NOT empty. PURGE directory before continueing (Y/N) (CTRL-C to abort)?"; then
+  if get_user_yn "Image target directory is NOT empty. PURGE directory before continueing (CTRL-C to abort)?"; then
     find . -maxdepth 1 -type f -exec rm -vf {} \;
   fi
   echo ""

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11c"
+MY_VERSION="3.11d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: February 12, 2015
+# Last update: March 2, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -67,17 +67,21 @@ ctrlc_handler()
 
 get_user_yn()
 {
-  printf "$1 "
+  if [ "$2" = "y" ]; then
+    printf "$1 (Y/n) "
+  else
+    printf "$1 (y/N) "
+  fi
 
   read answer_with_case
-  
-  answer=`echo "$answer_with_case" |tr A-Z a-z`
 
-  if [ "$answer" = "y" -o "$answer" = "yes" ]; then
+  ANSWER=`echo "$answer_with_case" |tr A-Z a-z`
+
+  if [ "$ANSWER" = "y" -o "$ANSWER" = "yes" ]; then
     return 0
   fi
 
-  if [ "$answer" = "n" -o "$answer" = "no" ]; then
+  if [ "$ANSWER" = "n" -o "$ANSWER" = "no" ]; then
     return 1
   fi
 
@@ -464,7 +468,8 @@ configure_network()
       fi
 
       if echo "$NETWORK" |grep -q -e 'static'; then
-        if ! get_user_yn "\n* Setup interface $CUR_IF statically (Y/N)?"; then
+        echo ""
+        if ! get_user_yn "* Setup interface $CUR_IF statically?"; then
           continue;
         fi
 
@@ -1648,7 +1653,7 @@ test_target_partitions()
 
   if [ $MISMATCH -ne 0 ]; then
     printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source!\n\033[0m" >&2
-    if ! get_user_yn "Continue anyway (Y/N)?"; then
+    if ! get_user_yn "Continue anyway?"; then
       echo "Aborted by user..."
       do_exit 5;
     fi
@@ -1884,7 +1889,7 @@ if [ -e "description.txt" ]; then
 fi
 
 echo "--------------------------------------------------------------------------------"
-if ! get_user_yn "Continue with restore (Y/N)?"; then
+if ! get_user_yn "Continue with restore?"; then
   echo "Aborted by user..."
   do_exit 1;
 fi
