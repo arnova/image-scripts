@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11e"
+MY_VERSION="3.11f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: March 2, 2014
+# Last update: March 17, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -793,7 +793,7 @@ select_partitions()
       # Only show info when not shown before
       if [ "$BACKUP_DISKS" != "$LAST_BACKUP_DISKS" ]; then
         if [ -n "$IGNORE_PARTITIONS" ]; then
-          echo "NOTE: Ignored (mounted/swap) partitions: $IGNORE_PARTITIONS"
+          echo "NOTE: Ignored (mounted/swap) partition(s): $IGNORE_PARTITIONS"
         fi
 
         show_backup_disks_info;
@@ -802,7 +802,7 @@ select_partitions()
       fi
 
       if [ $USER_SELECT -eq 1 ]; then
-        printf "* Select partitions to backup (default=$BACKUP_PARTITIONS): "
+        printf "* Select partition(s) to backup (default=$BACKUP_PARTITIONS): "
         read USER_DEVICES
 
         IGNORE_PARTITIONS="" # Don't confuse user by showing ignored partitions
@@ -910,6 +910,8 @@ backup_disks()
       echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
       sgdisk --backup="sgdisk.${OUTPUT_SUFFIX}" "/dev/${HDD_NODEV}"
 
+      echo ""
+
       # Dump gdisk -l info to file
       gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${OUTPUT_SUFFIX}"
     elif [ -n "$SFDISK_OUTPUT" ]; then
@@ -920,6 +922,8 @@ backup_disks()
       # Dump fdisk -l info to file
       fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${OUTPUT_SUFFIX}"
 
+      echo ""
+
       echo "* Storing track0 for /dev/$HDD_NODEV in track0.${OUTPUT_SUFFIX}..."
       # Dump hdd info for all disks in the current system
       result="$(dd if=/dev/$HDD_NODEV of="track0.${OUTPUT_SUFFIX}" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
@@ -929,6 +933,7 @@ backup_disks()
         printf "\033[40m\033[1;31mERROR: Track0(MBR) backup of /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
         do_exit 8
       fi
+      echo ""
     else
       printf "\033[40m\033[1;31mERROR: Unable to obtain GPT or DOS partition table for /dev/$HDD_NODEV! Quitting...\n\033[0m" >&2
       do_exit 9
@@ -1099,9 +1104,9 @@ select_partitions;
 
 if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
   if [ -n "$BACKUP_PARTITIONS" ]; then
-    echo "* Partitions to backup: $BACKUP_PARTITIONS"
+    echo "* Partition(s) to backup: $BACKUP_PARTITIONS"
   else
-    echo "* Partitions to backup: none"
+    echo "* Partition(s) to backup: none"
   fi
 
   if [ -z "$BACKUP_PARTITIONS" ]; then
@@ -1141,8 +1146,6 @@ fi
 if [ $NO_TRACK0 -ne 1 -a $ONLY_SH -eq 0 ]; then
   backup_disks;
 fi
-
-echo "--------------------------------------------------------------------------------"
 
 # Backup selected partitions to images
 if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then

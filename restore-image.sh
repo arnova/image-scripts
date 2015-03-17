@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11d"
+MY_VERSION="3.11e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: March 2, 2015
+# Last update: March 17, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1318,6 +1318,7 @@ restore_disks()
           printf "\033[40m\033[1;31mERROR: Track0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
           do_exit 5
         fi
+        echo ""
         PARTPROBE=1
       fi
     fi
@@ -1337,6 +1338,7 @@ restore_disks()
         else
           echo "$result"
         fi
+        echo ""
         PARTPROBE=1
       else
         SFDISK_FILE=""
@@ -1360,6 +1362,7 @@ restore_disks()
           else
             echo "$result" |grep -i -e 'Success'
           fi
+          echo ""
           PARTPROBE=1
         fi
       fi
@@ -1369,7 +1372,7 @@ restore_disks()
     if [ $PARTPROBE -eq 1 ]; then
       # Wait for kernel to reread partition table
       if partprobe "/dev/$TARGET_NODEV" && part_check "/dev/$TARGET_NODEV"; then
-        echo ""
+        : # No-op
       elif [ $FORCE -ne 1 ]; then
         printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed! Use --force to override.\n\033[0m" >&2
         do_exit 5;
@@ -1892,6 +1895,8 @@ echo "--------------------------------------------------------------------------
 if ! get_user_yn "Continue with restore?"; then
   echo "Aborted by user..."
   do_exit 1;
+else
+  echo ""
 fi
 
 # Restore MBR/partition tables
