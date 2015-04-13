@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11f"
+MY_VERSION="3.11g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: March 17, 2015
+# Last update: April 13, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -65,9 +65,9 @@ ctrlc_handler()
 get_user_yn()
 {
   if [ "$2" = "y" ]; then
-    printf "$1 (Y/n) "
+    printf "$1 (Y/n)? "
   else
-    printf "$1 (y/N) "
+    printf "$1 (y/N)? "
   fi
 
   read answer_with_case
@@ -305,7 +305,7 @@ configure_network()
 
       if echo "$NETWORK" |grep -q -e 'static'; then
         echo ""
-        if ! get_user_yn "* Setup interface $CUR_IF statically?"; then
+        if ! get_user_yn "* Setup interface $CUR_IF statically"; then
           continue;
         fi
 
@@ -1093,7 +1093,7 @@ fi
 if [ -n "$(find . -maxdepth 1 -type f)" ]; then
   echo ""
   find . -maxdepth 1 -type f -exec ls -l {} \;
-  if get_user_yn "Image target directory is NOT empty. PURGE directory before continueing (CTRL-C to abort)?"; then
+  if get_user_yn "Image target directory is NOT empty. PURGE directory before continueing (CTRL-C to abort)"; then
     find . -maxdepth 1 -type f -exec rm -vf {} \;
   fi
   echo ""

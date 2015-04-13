@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11e"
+MY_VERSION="3.11f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: March 17, 2015
+# Last update: April 13, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -68,9 +68,9 @@ ctrlc_handler()
 get_user_yn()
 {
   if [ "$2" = "y" ]; then
-    printf "$1 (Y/n) "
+    printf "$1 (Y/n)? "
   else
-    printf "$1 (y/N) "
+    printf "$1 (y/N)? "
   fi
 
   read answer_with_case
@@ -469,7 +469,7 @@ configure_network()
 
       if echo "$NETWORK" |grep -q -e 'static'; then
         echo ""
-        if ! get_user_yn "* Setup interface $CUR_IF statically?"; then
+        if ! get_user_yn "* Setup interface $CUR_IF statically"; then
           continue;
         fi
 
@@ -1656,7 +1656,7 @@ test_target_partitions()
 
   if [ $MISMATCH -ne 0 ]; then
     printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source!\n\033[0m" >&2
-    if ! get_user_yn "Continue anyway?"; then
+    if ! get_user_yn "Continue anyway"; then
       echo "Aborted by user..."
       do_exit 5;
     fi
@@ -1892,7 +1892,7 @@ if [ -e "description.txt" ]; then
 fi
 
 echo "--------------------------------------------------------------------------------"
-if ! get_user_yn "Continue with restore?"; then
+if ! get_user_yn "Continue with restore"; then
   echo "Aborted by user..."
   do_exit 1;
 else
