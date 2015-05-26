@@ -783,9 +783,9 @@ set_image_source_dir()
         printf "\nImage (directory) to use ($IMAGE_DEFAULT): "
         read IMAGE_NAME
 
-        NEW_IMAGE_DIR="$IMAGE_DIR"
+        TEMP_IMAGE_DIR="$IMAGE_DIR"
         while echo "$IMAGE_NAME" |grep -q '^../'; do
-          NEW_IMAGE_DIR="$(dirname "$NEW_IMAGE_DIR")" # Get rid of top directory
+          TEMP_IMAGE_DIR="$(dirname "$TEMP_IMAGE_DIR")" # Get rid of top directory
           IMAGE_NAME="$(echo "$IMAGE_NAME" |sed s:'^../'::)"
         done
 
@@ -796,19 +796,18 @@ set_image_source_dir()
         if echo "$IMAGE_NAME" |grep -q "/$"; then
           # Sub-folder handling (trailing /)
 
-          NEW_IMAGE_DIR="$NEW_IMAGE_DIR/$(echo "$IMAGE_NAME" |sed s:'/*$'::)"
+          TEMP_IMAGE_DIR="$TEMP_IMAGE_DIR/$(echo "$IMAGE_NAME" |sed s:'/*$'::)"
           DIR_SELECT=1
         fi
 
-        if [ ! -d "$NEW_IMAGE_DIR" ]; then
-          printf "\033[40m\033[1;31mERROR: Unable to access directory $NEW_IMAGE_DIR!\n\033[0m" >&2
+        if [ ! -d "$TEMP_IMAGE_DIR" ]; then
+          printf "\033[40m\033[1;31mERROR: Unable to access directory $TEMP_IMAGE_DIR!\n\033[0m" >&2
           continue; # Let user re-select
-        else
-          IMAGE_DIR="$NEW_IMAGE_DIR"
-          IMAGE_DEFAULT="."
         fi
 
         if [ $DIR_SELECT -eq 1 ]; then
+          IMAGE_DIR="$TEMP_IMAGE_DIR"
+          IMAGE_DEFAULT="."
           continue;
         fi
 
@@ -816,10 +815,8 @@ set_image_source_dir()
            IMAGE_NAME="$IMAGE_DEFAULT"
         fi
 
-        if [ -z "$IMAGE_NAME" -o "$IMAGE_NAME" = "." ]; then
-          TEMP_IMAGE_DIR="$IMAGE_DIR"
-        else
-          TEMP_IMAGE_DIR="$IMAGE_DIR/$IMAGE_NAME"
+        if [ -n "$IMAGE_NAME" -a "$IMAGE_NAME" != "." ]; then
+          TEMP_IMAGE_DIR="$TEMP_IMAGE_DIR/$IMAGE_NAME"
         fi
 
         LOOKUP="$(find "$TEMP_IMAGE_DIR/" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" 2>/dev/null)"
@@ -830,9 +827,10 @@ set_image_source_dir()
 
         # Try to cd to the image directory
         if ! chdir_safe "$TEMP_IMAGE_DIR"; then
+          printf "\033[40m\033[1;31mERROR: Failed to change directory to $TEMP_IMAGE_DIR!\n\033[0m" >&2
           continue;
         fi
-        
+
         IMAGE_DIR="$TEMP_IMAGE_DIR"
         break; # All done: break
       done
