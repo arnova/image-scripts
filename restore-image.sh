@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11f"
+MY_VERSION="3.11g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: April 13, 2015
+# Last update: May 27, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -783,18 +783,32 @@ set_image_source_dir()
         printf "\nImage (directory) to use ($IMAGE_DEFAULT): "
         read IMAGE_NAME
 
+        NEW_IMAGE_DIR="$IMAGE_DIR"
+        while echo "$IMAGE_NAME" |grep -q '^../'; do
+          NEW_IMAGE_DIR="$(dirname "$NEW_IMAGE_DIR")" # Get rid of top directory
+          IMAGE_NAME="$(echo "$IMAGE_NAME" |sed s:'^../'::)"
+        done
+
+        # Get rid of ./ prefix
+        IMAGE_NAME="$(echo "$IMAGE_NAME" |sed s:'^\./'::)"
+
+        DIR_SELECT=0
         if echo "$IMAGE_NAME" |grep -q "/$"; then
-          if [ "$IMAGE_NAME" = "../" ]; then
-            IMAGE_DIR="$(dirname "$IMAGE_DIR")" # Get rid of top directory
-          else
-            NEW_IMAGE_DIR="$IMAGE_DIR/$(echo "$IMAGE_NAME" |sed -e s:'^\./*':: -e s:'/*$'::)"
-            if [ ! -d "$NEW_IMAGE_DIR" ]; then
-              printf "\033[40m\033[1;31mERROR: Unable to access directory $NEW_IMAGE_DIR!\n\033[0m" >&2
-            else
-              IMAGE_DIR="$NEW_IMAGE_DIR"
-              IMAGE_DEFAULT="."
-            fi
-          fi
+          # Sub-folder handling (trailing /)
+
+          NEW_IMAGE_DIR="$NEW_IMAGE_DIR/$(echo "$IMAGE_NAME" |sed s:'/*$'::)"
+          DIR_SELECT=1
+        fi
+
+        if [ ! -d "$NEW_IMAGE_DIR" ]; then
+          printf "\033[40m\033[1;31mERROR: Unable to access directory $NEW_IMAGE_DIR!\n\033[0m" >&2
+          continue; # Let user re-select
+        else
+          IMAGE_DIR="$NEW_IMAGE_DIR"
+          IMAGE_DEFAULT="."
+        fi
+
+        if [ $DIR_SELECT -eq 1 ]; then
           continue;
         fi
 
