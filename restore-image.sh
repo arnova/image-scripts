@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11g"
+MY_VERSION="3.11h"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 27, 2015
+# Last update: July 3, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1123,7 +1123,7 @@ check_disks()
 
       echo ""
 
-      if [ "$IMAGE_TARGET_NODEV" != "$TARGET_NODEV" ]; then
+      if [ "$IMAGE_SOURCE_NODEV" != "$TARGET_NODEV" ]; then
         update_source_to_target_device_remap "$IMAGE_SOURCE_NODEV" "/dev/$TARGET_NODEV"
       fi
       break;
