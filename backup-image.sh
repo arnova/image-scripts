@@ -98,32 +98,32 @@ human_size()
     TB_SIZE=(SIZE / 1024 / 1024 / 1024 / 1024)
     if (TB_SIZE > 1.0)
     {
-      printf("%.2f TiB\n", TB_SIZE)
+      printf("%.2fT\n", TB_SIZE)
     }
     else
     {
       GB_SIZE=(SIZE / 1024 / 1024 / 1024)
       if (GB_SIZE > 1.0)
       {
-        printf("%.2f GiB\n", GB_SIZE)
+        printf("%.2fG\n", GB_SIZE)
       }
       else
       {
         MB_SIZE=(SIZE / 1024 / 1024)
         if (MB_SIZE > 1.0)
         {
-          printf("%.2f MiB\n", MB_SIZE)
+          printf("%.2fM\n", MB_SIZE)
         }
         else
         {
           KB_SIZE=(SIZE / 1024)
           if (KB_SIZE > 1.0)
           {
-            printf("%.2f KiB\n", KB_SIZE)
+            printf("%.2fK\n", KB_SIZE)
           }
           else
           {
-            printf("%u B\n", SIZE)
+            printf("%u\n", SIZE)
           }
         }
       }
@@ -175,6 +175,59 @@ get_partitions_with_size_type()
     fi
     echo "$PART_NODEV: $BLKID_INFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
+}
+
+# $1 = disk device to get layout from, if not specified all devices are output
+get_device_layout()
+{
+  local DISK_DEV=""
+
+  if [ -n "$1" ]; then
+    if echo "$1" |grep -q '^/dev/'; then
+      DISK_DEV="$1"
+    else
+      DISK_DEV="/dev/$1"
+    fi
+  fi
+
+  # Handle fallback for older versions of lsblk
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,PARTUUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+  if [ $? -ne 0 ]; then
+    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+    if [ $? -ne 0 ]; then
+      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL "$DISK_DEV" 2>/dev/null)"
+      if [ $? -ne 0 ]; then
+        echo "WARNING: Unable to obtain lsblk info for \"$DISK_DEV\"" >&2
+      fi
+    fi
+  fi
+
+  if [ -z "$result" ]; then
+    return 1
+  fi
+
+  IFS=$EOL
+  FIRST=1
+  echo "$result" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |sed s,'^[^a-z]*',, |awk '{ print $1 }'`
+
+    printf "$LINE\t"
+
+    if [ $FIRST -eq 1 ]; then
+      FIRST=0
+      printf "SIZEH\n"
+    else
+      SIZE_HUMAN="$(human_size $(echo "$LINE" |awk '{ print $NF }') |tr ' ' '_')"
+
+      if [ -z "$SIZE_HUMAN" ]; then
+        printf "0\n"
+      else
+        printf "$SIZE_HUMAN\n"
+      fi
+    fi
+  done
+
+  return 0
 }
 
 
@@ -286,17 +339,17 @@ configure_network()
     fi
 
     if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
-      echo "* Network interface $CUR_IF is not active (yet)"
+      echo "* $CUR_IF ($MAC_ADDR): Not active (yet):"
 
       if echo "$NETWORK" |grep -q -e 'dhcp'; then
         if check_command dhcpcd; then
-          echo "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
+          echo "  Trying DHCP IP (with dhcpcd)..."
           # Run dhcpcd to get a dynamic IP
           if dhcpcd -L $CUR_IF; then
             continue
           fi
         elif check_command dhclient; then
-          echo "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
+          echo "  Trying DHCP IP (with dhclient)..."
           if dhclient -1 $CUR_IF; then
             continue
           fi
@@ -309,9 +362,7 @@ configure_network()
           continue;
         fi
 
-        echo ""
-        echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
-        printf "IP address ($IPADDRESS)?: "
+        printf "  IP address ($IPADDRESS)? : "
         read USER_IPADDRESS
         if [ -z "$USER_IPADDRESS" ]; then
           USER_IPADDRESS="$IPADDRESS"
@@ -321,13 +372,13 @@ configure_network()
           fi
         fi
 
-        printf "Netmask ($NETMASK)?: "
+        printf "  Netmask ($NETMASK)? : "
         read USER_NETMASK
         if [ -z "$USER_NETMASK" ]; then
           USER_NETMASK="$NETMASK"
         fi
 
-        printf "Gateway ($GATEWAY)?: "
+        printf "  Gateway ($GATEWAY)? : "
         read USER_GATEWAY
         if [ -z "$USER_GATEWAY" ]; then
           USER_GATEWAY="$GATEWAY"
@@ -339,10 +390,12 @@ configure_network()
         if [ -n "$USER_GATEWAY" ]; then
           route add default gw $USER_GATEWAY
         fi
+        echo ""
       fi
     else
-      echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
+      echo "* $CUR_IF ($MAC_ADDR): Using already configured IP: "
       echo "  $IP_TEST"
+      echo ""
     fi
   done
 }
@@ -647,14 +700,7 @@ show_backup_disks_info()
   IFS=' '
   for HDD_NODEV in $BACKUP_DISKS; do
     echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
-    #get_partitions_with_size_type /dev/$HDD_NODEV
-    result="$(lsblk -n -o NAME,FSTYPE,LABEL,UUID,SIZE,TYPE /dev/$HDD_NODEV 2>&1)"
-    if [ $? -ne 0 ]; then
-      # Fallback for ancient versions of lsblk
-      lsblk -n /dev/$HDD_NODEV
-    else
-      echo "$result"
-    fi
+    get_device_layout $HDD_NODEV
     echo ""
   done
 }
@@ -940,7 +986,7 @@ backup_disks()
     fi
 
     # Dump device partition layout in "fancified" format
-    get_partitions_with_size_type "$HDD_NODEV" >"partition_layout.${OUTPUT_SUFFIX}"
+    get_device_layout "$HDD_NODEV" >"device_layout.${OUTPUT_SUFFIX}"
   done
 }
 

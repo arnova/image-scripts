@@ -101,32 +101,32 @@ human_size()
     TB_SIZE=(SIZE / 1024 / 1024 / 1024 / 1024)
     if (TB_SIZE > 1.0)
     {
-      printf("%.2f TiB\n", TB_SIZE)
+      printf("%.2fT\n", TB_SIZE)
     }
     else
     {
       GB_SIZE=(SIZE / 1024 / 1024 / 1024)
       if (GB_SIZE > 1.0)
       {
-        printf("%.2f GiB\n", GB_SIZE)
+        printf("%.2fG\n", GB_SIZE)
       }
       else
       {
         MB_SIZE=(SIZE / 1024 / 1024)
         if (MB_SIZE > 1.0)
         {
-          printf("%.2f MiB\n", MB_SIZE)
+          printf("%.2fM\n", MB_SIZE)
         }
         else
         {
           KB_SIZE=(SIZE / 1024)
           if (KB_SIZE > 1.0)
           {
-            printf("%.2f KiB\n", KB_SIZE)
+            printf("%.2fK\n", KB_SIZE)
           }
           else
           {
-            printf("%u B\n", SIZE)
+            printf("%u\n", SIZE)
           }
         }
       }
@@ -180,27 +180,57 @@ get_partitions()
 }
 
 
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions_with_size_type()
+# $1 = disk device to get layout from, if not specified all devices are output
+get_device_layout()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local DISK_DEV=""
+
+  if [ -n "$1" ]; then
+    if echo "$1" |grep -q '^/dev/'; then
+      DISK_DEV="$1"
+    else
+      DISK_DEV="/dev/$1"
+    fi
+  fi
+
+  # Handle fallback for older versions of lsblk
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,PARTUUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+  if [ $? -ne 0 ]; then
+    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+    if [ $? -ne 0 ]; then
+      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL "$DISK_DEV" 2>/dev/null)"
+      if [ $? -ne 0 ]; then
+        echo "WARNING: Unable to obtain lsblk info for \"$DISK_DEV\"" >&2
+      fi
+    fi
+  fi
+
+  if [ -z "$result" ]; then
+    return 1
+  fi
 
   IFS=$EOL
-  get_partitions "$DISK_NODEV" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+  FIRST=1
+  echo "$result" |while read LINE; do
+    local PART_NODEV=`echo "$LINE" |sed s,'^[^a-z]*',, |awk '{ print $1 }'`
 
-    local SIZE="$(blockdev --getsize64 "/dev/$PART_NODEV" 2>/dev/null)"
-    if [ -z "$SIZE" ]; then
-      SIZE=0
-    fi
-    local SIZE_HUMAN="$(human_size $SIZE |tr ' ' '_')"
+    printf "$LINE\t"
 
-    local BLKID_INFO="$(blkid -o full -s LABEL -s PTTYPE -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed -e s,'^/dev/.*: ',, -e s,' *$',,)"
-    if [ -z "$BLKID_INFO" ]; then
-      BLKID_INFO="TYPE=\"unknown\""
+    if [ $FIRST -eq 1 ]; then
+      FIRST=0
+      printf "SIZEH\n"
+    else
+      SIZE_HUMAN="$(human_size $(echo "$LINE" |awk '{ print $NF }') |tr ' ' '_')"
+
+      if [ -z "$SIZE_HUMAN" ]; then
+        printf "0\n"
+      else
+        printf "$SIZE_HUMAN\n"
+      fi
     fi
-    echo "$PART_NODEV: $BLKID_INFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
+
+  return 0
 }
 
 
@@ -450,17 +480,17 @@ configure_network()
     fi
 
     if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
-      echo "* Network interface $CUR_IF is not active (yet)"
+      echo "* $CUR_IF ($MAC_ADDR): Not active (yet):"
 
       if echo "$NETWORK" |grep -q -e 'dhcp'; then
         if check_command dhcpcd; then
-          echo "* Trying DHCP IP (with dhcpcd) for interface $CUR_IF ($MAC_ADDR)..."
+          echo "  Trying DHCP IP (with dhcpcd)..."
           # Run dhcpcd to get a dynamic IP
           if dhcpcd -L $CUR_IF; then
             continue
           fi
         elif check_command dhclient; then
-          echo "* Trying DHCP IP (with dhclient) for interface $CUR_IF ($MAC_ADDR)..."
+          echo "  Trying DHCP IP (with dhclient)..."
           if dhclient -1 $CUR_IF; then
             continue
           fi
@@ -473,9 +503,7 @@ configure_network()
           continue;
         fi
 
-        echo ""
-        echo "* Static configuration for interface $CUR_IF ($MAC_ADDR)"
-        printf "IP address ($IPADDRESS)?: "
+        printf "  IP address ($IPADDRESS)? : "
         read USER_IPADDRESS
         if [ -z "$USER_IPADDRESS" ]; then
           USER_IPADDRESS="$IPADDRESS"
@@ -485,13 +513,13 @@ configure_network()
           fi
         fi
 
-        printf "Netmask ($NETMASK)?: "
+        printf "  Netmask ($NETMASK)? : "
         read USER_NETMASK
         if [ -z "$USER_NETMASK" ]; then
           USER_NETMASK="$NETMASK"
         fi
 
-        printf "Gateway ($GATEWAY)?: "
+        printf "  Gateway ($GATEWAY)? : "
         read USER_GATEWAY
         if [ -z "$USER_GATEWAY" ]; then
           USER_GATEWAY="$GATEWAY"
@@ -503,10 +531,12 @@ configure_network()
         if [ -n "$USER_GATEWAY" ]; then
           route add default gw $USER_GATEWAY
         fi
+        echo ""
       fi
     else
-      echo "* Using already configured IP for interface $CUR_IF ($MAC_ADDR): "
+      echo "* $CUR_IF ($MAC_ADDR): Using already configured IP: "
       echo "  $IP_TEST"
+      echo ""
     fi
   done
 }
@@ -1087,7 +1117,7 @@ check_disks()
       do_exit 5
     fi
 
-    echo "* Auto preselecting target device /dev/$IMAGE_TARGET_NODEV for image source $IMAGE_SOURCE_NODEV"
+    echo "* Auto preselecting target device /dev/$IMAGE_TARGET_NODEV for image source \"$IMAGE_SOURCE_NODEV\""
 
     while true; do
       user_target_dev_select "$IMAGE_TARGET_NODEV"
@@ -1104,8 +1134,6 @@ check_disks()
         continue;
       fi
 
-      echo ""
-
       local DEVICE_TYPE="$(lsblk -d -n -o TYPE /dev/$TARGET_NODEV)"
       # Make sure it's a real disk
       if [ "$DEVICE_TYPE" = "disk" ]; then
@@ -1119,7 +1147,7 @@ check_disks()
 
         # Check if DMA is enabled for device
         check_dma "/dev/$TARGET_NODEV"
-       fi
+      fi
 
       echo ""
 
@@ -1134,15 +1162,26 @@ check_disks()
 
     if [ -n "$PARTITIONS_FOUND" ]; then
       echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions:"
-      get_partitions_with_size_type /dev/$TARGET_NODEV
+      get_device_layout "$TARGET_NODEV" |sed s,'^','  ',
+      echo ""
     fi
+
+    echo "* Image source device \"${IMAGE_SOURCE_NODEV}\""
+    if [ -f "device_layout.${IMAGE_SOURCE_NODEV}" ]; then
+      cat "device_layout.${IMAGE_SOURCE_NODEV}" |sed s,'^','  ',
+    elif [ -f "partition_layout.${IMAGE_SOURCE_NODEV}" ]; then
+      # legacy fallback:
+      cat "partition_layout.${IMAGE_SOURCE_NODEV}" |sed s,'^','  ',
+    fi
+
+    echo ""
 
     if [ $PT_ADD -eq 1 ]; then
       if [ -e "gdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # GPT:
         GDISK_TARGET="$(gdisk -l "/dev/${TARGET_NODEV}" |grep -E '^[[:blank:]]+[0-9]')"
         if [ -z "$GDISK_TARGET" ]; then
-          printf "\033[40m\033[1;31m\nERROR: Unable to get GPT partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Unable to get GPT partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
 
@@ -1173,7 +1212,7 @@ check_disks()
         # DOS/MBR:
         SFDISK_TARGET="$(sfdisk -d "/dev/${TARGET_NODEV}" |grep -i '^/dev/.*Id=' |grep -i -v 'Id= 0$' |sed s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)"
         if [ -z "$SFDISK_TARGET" ]; then
-          printf "\033[40m\033[1;31m\nERROR: Unable to get DOS partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Unable to get DOS partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
 
@@ -1205,20 +1244,17 @@ check_disks()
 
     if [ $CLEAN -eq 0 -a -n "$PARTITIONS_FOUND" ]; then
       if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
-        echo "" >&2
         printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table (+possible bootloader), it will NOT be updated!\n\033[0m" >&2
         echo "To override this you must specify --clean or --pt --mbr..." >&2
         ENTER=1
       else
         if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 ]; then
-          echo "" >&2
           printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, it will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --pt..." >&2
           ENTER=1
         fi
 
         if [ $MBR_WRITE -eq 0 -a -e "track0.${IMAGE_SOURCE_NODEV}" ]; then
-          echo "" >&2
           printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --mbr..." >&2
           ENTER=1
@@ -1952,7 +1988,7 @@ echo "--------------------------------------------------------------------------
 IFS=' '
 for DEVICE in $TARGET_DEVICES; do
   echo "* $DEVICE: $(show_block_device_info "$DEVICE")"
-  get_partitions_with_size_type "$DEVICE"
+  get_device_layout "$DEVICE"
   echo ""
 done
 
