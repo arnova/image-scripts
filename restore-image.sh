@@ -1166,12 +1166,16 @@ check_disks()
       echo ""
     fi
 
-    echo "* Image source device \"${IMAGE_SOURCE_NODEV}\""
+    printf "* Image source device \"${IMAGE_SOURCE_NODEV}\""
     if [ -f "device_layout.${IMAGE_SOURCE_NODEV}" ]; then
+      echo ":"
       cat "device_layout.${IMAGE_SOURCE_NODEV}" |sed s,'^','  ',
     elif [ -f "partition_layout.${IMAGE_SOURCE_NODEV}" ]; then
       # legacy fallback:
+      echo ":"
       cat "partition_layout.${IMAGE_SOURCE_NODEV}" |sed s,'^','  ',
+    else
+      echo ""
     fi
 
     echo ""
@@ -1742,7 +1746,7 @@ test_target_partitions()
 # Create swap partitions on all target devices
 create_swaps()
 {
-  local SWAP_COUNT=0
+  local SWAP_COUNT=1
 
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
@@ -1756,7 +1760,7 @@ create_swaps()
         echo "$SGDISK_OUTPUT" |grep -E -i "[[:blank:]]8200[[:blank:]]" |while read LINE; do
           NUM="$(echo "$LINE" |awk '{ print $1 }')"
           PART="$(add_partition_number "$DEVICE" "$NUM")"
-          if ! mkswap -L "SWAP${SWAP_COUNT}" "$PART"; then
+          if ! mkswap -L "swap${SWAP_COUNT}" "$PART"; then
             printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
           fi
           SWAP_COUNT=$(($SWAP_COUNT + 1))
@@ -1767,7 +1771,7 @@ create_swaps()
       IFS=$EOL
       echo "$SFDISK_OUTPUT" |grep -i "id=82$" |while read LINE; do
         PART="$(echo "$LINE" |awk '{ print $1 }')"
-        if ! mkswap -L "SWAP${SWAP_COUNT}" "$PART"; then
+        if ! mkswap -L "swap${SWAP_COUNT}" "$PART"; then
           printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
         fi
         SWAP_COUNT=$(($SWAP_COUNT + 1))
