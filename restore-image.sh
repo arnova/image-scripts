@@ -1268,39 +1268,40 @@ check_disks()
       ENTER=1
     fi
 
-    if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ] &&
-       [ ! -e "sfdisk.${IMAGE_SOURCE_NODEV}" -a ! -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
-      printf "\033[40m\033[1;31mWARNING: sgdisk/sfdisk.${IMAGE_SOURCE_NODEV} does NOT exist! Won't be able to update partition table!\n\033[0m" >&2
-      ENTER=1
+    if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ]; then
+      if [ ! -e "sfdisk.${IMAGE_SOURCE_NODEV}" -a ! -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        printf "\033[40m\033[1;31mWARNING: sgdisk/sfdisk.${IMAGE_SOURCE_NODEV} does NOT exist! Won't be able to update partition table!\n\033[0m" >&2
+        ENTER=1
+      fi
+
+      if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        # Simulate DOS partition table restore
+        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk -n 2>&1 >/dev/null)"
+
+        # For now only check for max size errors
+        if [ $? -ne 0 ] && echo "$result" |grep -q -e 'exceeds max allowable size'; then
+          echo "$result" >&2
+          printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+      fi
+
+      if [ -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        # Simulate GPT partition table restore
+        result="$(sgdisk --pretend --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" 2>&1 >/dev/null)"
+
+        if [ $? -ne 0 ]; then
+          echo "$result" >&2
+          printf "\033[40m\033[1;31m\nERROR: Invalid GPT partition table (disk too small?)! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+      fi
     fi
 
     if [ $ENTER -eq 1 ]; then
       echo "" >&2
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
       read dummy
-    fi
-
-    # Simulate DOS partition table restore
-    if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-      result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk -n 2>&1 >/dev/null)"
-
-      # For now only check for max size errors
-      if [ $? -ne 0 ] && echo "$result" |grep -q -e 'exceeds max allowable size'; then
-        echo "$result" >&2
-        printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-    fi
-
-    # Simulate GPT partition table restore
-    if [ -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
-      result="$(sgdisk --pretend --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" 2>&1 >/dev/null)"
-
-      if [ $? -ne 0 ]; then
-        echo "$result" >&2
-        printf "\033[40m\033[1;31m\nERROR: Invalid GPT partition table (disk too small?)! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
     fi
 
     DEVICE_FILES="${DEVICE_FILES}${DEVICE_FILES:+ }${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV}"
