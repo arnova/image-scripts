@@ -211,7 +211,7 @@ get_device_layout()
   echo "$result" |while read LINE; do
     local PART_NODEV=`echo "$LINE" |sed s,'^[^a-z]*',, |awk '{ print $1 }'`
 
-    printf "$LINE\t"
+    printf "$LINE  "
 
     if [ $FIRST -eq 1 ]; then
       FIRST=0
