@@ -301,7 +301,7 @@ show_block_device_info()
   if [ -n "$REV" -a "$REV" != "n/a" ]; then
     NAME="${NAME}${REV} "
   fi
-  
+
   if [ -n "$NAME" ]; then
     printf "$NAME"
   else
@@ -427,7 +427,7 @@ check_command()
       return 0
     fi
   done
-  
+
   return 1
 }
 

@@ -33,7 +33,7 @@ FAILED=""
 
 # Reset global, used by other functions later on:
 TARGET_DEVICES=""
-  
+
 # Global used later on when restoring partition-tables etc.
 DEVICE_FILES=""
 
@@ -50,7 +50,7 @@ do_exit()
   if [ "$AUTO_UNMOUNT" = "1" ] && [ -n "$MOUNT_DEVICE" ] && grep -q " $IMAGE_ROOT " /etc/mtab; then
     # Go to root else we can't umount
     cd /
-    
+
     # Umount our image repo
     umount -v "$IMAGE_ROOT"
   fi
@@ -355,7 +355,7 @@ add_partition_number()
 get_available_disks()
 {
   local DEV_FOUND=""
-  
+
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
     DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
@@ -568,7 +568,7 @@ check_command()
       return 0
     fi
   done
-  
+
   return 1
 }
 
@@ -674,7 +674,7 @@ sanity_check()
   for ITEM in $PARTITIONS; do
     SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
-    
+
     if [ -n "$TARGET_PARTITION_MAP" ]; then
       if ! echo "$TARGET_PARTITION_MAP" |grep -q '^/dev/'; then
         echo ""
@@ -699,7 +699,7 @@ chdir_safe()
   local IMAGE_DIR="$1"
 
   if [ ! -d "$IMAGE_DIR" ]; then
-    printf "\033[40m\033[1;31m\nERROR: Image source directory ($IMAGE_DIR) does NOT exist!\n\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nERROR: Image source directory ($IMAGE_DIR) does NOT exist!\n\033[0m" >&2
     return 2
   fi
 
@@ -708,7 +708,7 @@ chdir_safe()
     printf "\033[40m\033[1;31m\nERROR: Unable to cd to image directory $IMAGE_DIR!\n\033[0m" >&2
     return 3
   fi
-  
+
   return 0
 }
 
@@ -718,7 +718,7 @@ set_image_source_dir()
   if echo "$IMAGE_NAME" |grep -q '^[\./]' || [ $NO_MOUNT -eq 1 ]; then
     # Assume absolute path
     IMAGE_DIR="$IMAGE_NAME"
-    
+
     if ! chdir_safe "$IMAGE_DIR"; then
       do_exit 7
     fi
@@ -748,7 +748,7 @@ set_image_source_dir()
           fi
 
           echo "* Using network username $USERNAME"
-          
+
           # Replace username in our mount arguments (it's a little dirty, I know ;-))
           MOUNT_ARGS="-t $MOUNT_TYPE -o $(echo "$MOUNT_OPTIONS" |sed "s/$DEFAULT_USERNAME$/$USERNAME/")"
 
@@ -786,7 +786,7 @@ set_image_source_dir()
       else
         IMAGE_DIR="$IMAGE_NAME"
       fi
-      
+
       if ! chdir_safe "$IMAGE_DIR"; then
         do_exit 7
       fi
@@ -959,7 +959,7 @@ update_source_to_target_device_remap()
     # Remove entries for specified device
     if [ "$SOURCE_DEVICE_NODEV" != "$IMAGE_SOURCE_NODEV" ]; then
     FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
-    
+
     DEVICES_TEMP="${DEVICES_TEMP}${DEVICES_TEMP:+,}${ITEM}"
     fi
   done
@@ -1143,7 +1143,7 @@ check_disks()
           printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override.\n\n\033[0m" >&2
           continue;
         fi
-        
+
 
         # Check if DMA is enabled for device
         check_dma "/dev/$TARGET_NODEV"
@@ -1231,11 +1231,11 @@ check_disks()
 
         if [ $MISMATCH -eq 1 ]; then
           printf "\033[40m\033[1;31mERROR: Target DOS partition(s) mismatches with source. Unable to update DOS partition table (--add)! Quitting...\n\033[0m" >&2
-          
+
           echo "* Source DOS partition table (/dev/$IMAGE_SOURCE_NODEV):"
           cat "sfdisk.${IMAGE_SOURCE_NODEV}"
           echo ""
-          
+
           echo "* Target DOS partition table (/dev/$TARGET_NODEV):"
           echo "$SFDISK_TARGET"
 
@@ -1518,7 +1518,7 @@ check_image_files()
   IFS=' '
   for ITEM in $IMAGE_FILES; do
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP"`
-    
+
     case $(image_type_detect "$IMAGE_FILE") in
       fsarchiver) check_command_error fsarchiver
                   ;;
@@ -1881,7 +1881,7 @@ load_config()
   elif [ "$IMAGE_PROGRAM" = "partclone" ]; then
     IMAGE_PROGRAM="pc"
   fi
-  
+
   # Set no_image to true if requested via --part=none
   if [ "$PARTITIONS" = "none" ]; then
     NO_IMAGE=1
