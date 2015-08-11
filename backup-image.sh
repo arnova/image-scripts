@@ -411,7 +411,7 @@ check_dma()
       hdparm -d1 "$1" >/dev/null
     fi
   else
-    printf "\033[40m\033[1;31mWARNING: hdparm binary does not exist so not checking/enabling DMA!\033[0m\n" >&2
+    printf "\033[40m\033[1;31mWARNING: hdparm binary does not exist so not checking/enabling DMA!\n\033[0m" >&2
   fi
 }
 
@@ -438,8 +438,8 @@ check_command_error()
   local IFS=' '
 
   if ! check_command "$@"; then
-    printf "\033[40m\033[1;31mERROR  : Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
-    printf "\033[40m\033[1;31m         Please investigate. Quitting...\033[0m\n" >&2
+    printf "\033[40m\033[1;31mERROR  : Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m         Please investigate. Quitting...\n\033[0m" >&2
     echo ""
     exit 2
   fi
@@ -455,8 +455,8 @@ check_command_warning()
   retval=$?
 
   if [ $retval -ne 0 ]; then
-    printf "\033[40m\033[1;31mWARNING: Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
-    printf "\033[40m\033[1;31m         Please investigate. This *may* be a problem!\033[0m\n" >&2
+    printf "\033[40m\033[1;31mWARNING: Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m         Please investigate. This *may* be a problem!\n\033[0m" >&2
     echo ""
   fi
 
@@ -493,7 +493,7 @@ sanity_check()
 {
   # root check
   if [ "$(id -u)" != "0" ]; then
-    printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
+    printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\n\033[0m" >&2
     exit 1
   fi
 

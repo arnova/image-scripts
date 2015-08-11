@@ -1950,7 +1950,7 @@ show_target_devices;
 
 if [ $ONLY_SH -eq 0 ]; then
   if [ $CLEAN -eq 1 ]; then
-    echo "* WARNING: MBR/track0 & partition-table will ALWAYS be (over)written (--clean)!" >&2
+    printf "\033[40m\033[1;31m* WARNING: MBR/track0 & partition-table will ALWAYS be (over)written (--clean)!\n\033[0m" >&2
   else
     if [ $PT_WRITE -eq 1 ]; then
       echo "* WARNING: Partition-table will ALWAYS be (over)written (--pt)!" >&2
