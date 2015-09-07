@@ -109,7 +109,12 @@ mkud_create_user_filesystem()
   local PARTITIONS_FOUND="$(get_partitions /dev/$USER_DISK_NODEV)"
 
   if [ $USER_DISK_ON_OTHER_DEVICE -eq 1 ]; then
-    echo "* NOTE: User partition $USER_PART will be created on a seperate disk"
+    if [ -n "$PARTITIONS_FOUND" ]
+      echo "* WARNING: There are already partitions on the seperate disk. Skipping user partition creation!"
+      return 0
+    else
+      echo "* NOTE: User partition $USER_PART will be created on a seperate disk"
+    fi
   fi
 
   # TODO: Skip the block below if our target disk already *exactly* matches?!
@@ -161,7 +166,7 @@ mkud_create_user_filesystem()
 
 mkud_select_disk()
 {
-  # Check which partitions to backup, we ignore mounted ones
+  # Check which partitions we can restore on, we ignore mounted ones
   local FIND_DISKS=""
   unset IFS
   for DISK in `cat /proc/partitions |grep -E '[sh]d[a-z]$' |awk '{ print $4 }' |sed s,'^/dev/',,`; do
