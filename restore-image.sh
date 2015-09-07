@@ -3,7 +3,7 @@
 MY_VERSION="3.11i"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: July 16, 2015
+# Last update: September 7, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -552,7 +552,7 @@ check_dma()
       hdparm -d1 "$1" >/dev/null
     fi
   else
-    printf "\033[40m\033[1;31mWARNING: hdparm binary does not exist so not checking/enabling DMA!\033[0m\n" >&2
+    printf "\033[40m\033[1;31mWARNING: hdparm binary does not exist so not checking/enabling DMA!\n\033[0m" >&2
   fi
 }
 
@@ -579,8 +579,8 @@ check_command_error()
   local IFS=' '
 
   if ! check_command "$@"; then
-    printf "\033[40m\033[1;31mERROR  : Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
-    printf "\033[40m\033[1;31m         Please investigate. Quitting...\033[0m\n" >&2
+    printf "\033[40m\033[1;31mERROR  : Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m         Please investigate. Quitting...\n\033[0m" >&2
     echo ""
     exit 2
   fi
@@ -596,8 +596,8 @@ check_command_warning()
   retval=$?
 
   if [ $retval -ne 0 ]; then
-    printf "\033[40m\033[1;31mWARNING: Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\033[0m\n" >&2
-    printf "\033[40m\033[1;31m         Please investigate. This *may* be a problem!\033[0m\n" >&2
+    printf "\033[40m\033[1;31mWARNING: Command(s) \"$(echo "$@" |tr ' ' '|')\" is/are not available!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m         Please investigate. This *may* be a problem!\n\033[0m" >&2
     echo ""
   fi
 
@@ -609,7 +609,7 @@ sanity_check()
 {
   # root check
   if [ "$(id -u)" != "0" ]; then
-    printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\033[0m\n" >&2
+    printf "\033[40m\033[1;31mERROR: Root check FAILED (you MUST be root to use this script)! Quitting...\n\033[0m" >&2
     exit 1
   fi
 
@@ -1602,13 +1602,13 @@ compare_dos_partition()
 
   # Target is smaller?
   if [ $SOURCE_SIZE -gt $TARGET_SIZE ]; then
-    printf "\033[40m\033[1;31mERROR: Target partition $TARGET_NUM is smaller than source partition $SOURCE_NUM!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nERROR: Target partition $TARGET_NUM is smaller than source partition $SOURCE_NUM!\n\033[0m" >&2
     retval=1
   fi
 
   # Target is bigger?
   if [ $SOURCE_SIZE -lt $TARGET_SIZE ]; then
-    echo "NOTE: Target partition $TARGET_NUM is bigger than source partition $SOURCE_NUM"
+    printf "\033[40m\033[1;31m\nWARNING: Target partition $TARGET_NUM is bigger than source partition $SOURCE_NUM!\n\033[0m" >&2
   fi
 
   return $retval
