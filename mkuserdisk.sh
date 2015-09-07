@@ -109,9 +109,9 @@ mkud_create_user_filesystem()
   local PARTITIONS_FOUND="$(get_partitions /dev/$USER_DISK_NODEV)"
 
   if [ $USER_DISK_ON_OTHER_DEVICE -eq 1 ]; then
-    if [ -n "$PARTITIONS_FOUND" ]
-      echo "* WARNING: There are already partitions on the seperate disk. Skipping user partition creation!"
-      return 0
+    if [ -n "$PARTITIONS_FOUND" ]; then
+      printf "\033[40m\033[1;31m* WARNING: There are already partitions on the seperate disk. Skipping user partition creation!\n\033[0m" >&2
+      return
     else
       echo "* NOTE: User partition $USER_PART will be created on a seperate disk"
     fi
