@@ -169,7 +169,7 @@ get_partitions_with_size_type()
     fi
     local SIZE_HUMAN="$(human_size $SIZE |tr ' ' '_')"
 
-    local BLKID_INFO="$(blkid -o full -s LABEL -s PTTYPE -s TYPE -s UUID -s PARTUUID "/dev/$PART_NODEV" 2>/dev/null |sed -e s,'^/dev/.*: ',, -e s,' *$',,)"
+    local BLKID_INFO="$(blkid -o full -s LABEL -s PTTYPE -s TYPE -s UUID "/dev/$PART_NODEV" 2>/dev/null |sed -e s,'^/dev/.*: ',, -e s,' *$',,)"
     if [ -z "$BLKID_INFO" ]; then
       BLKID_INFO="TYPE=\"unknown\""
     fi
@@ -191,7 +191,7 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,PARTUUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
   if [ $? -ne 0 ]; then
     result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
     if [ $? -ne 0 ]; then

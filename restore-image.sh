@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11i"
+MY_VERSION="3.11j"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: September 7, 2015
+# Last update: October 2, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -194,7 +194,7 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,PARTUUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
   if [ $? -ne 0 ]; then
     result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
     if [ $? -ne 0 ]; then
@@ -1461,53 +1461,63 @@ restore_disks()
 check_image_files()
 {
   IMAGE_FILES=""
-  if [ -n "$PARTITIONS" ]; then
-    IFS=','
-    for ITEM in $PARTITIONS; do
-      PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+  while [ -z "$IMAGE_FILES"; do
+    if [ -n "$PARTITIONS" ]; then
+      IFS=','
+      for ITEM in $PARTITIONS; do
+        PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
 
+        IFS=$EOL
+        LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
+
+        if [ -z "$LOOKUP" ]; then
+          printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+
+        if [ $(echo "$LOOKUP" |wc -l) -gt 1 ]; then
+          echo "$LOOKUP"
+          printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+
+        IMAGE_FILE=`basename "$LOOKUP"`
+
+        # Construct device name:
+        SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
+        TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
+
+        # Add item to list
+        IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
+      done
+    else
       IFS=$EOL
-      LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
+      for ITEM in $(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort); do
+        # FIXME: Can have multiple images here!
+        IMAGE_FILE=`basename "$ITEM"`
 
-      if [ -z "$LOOKUP" ]; then
-        printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
-        do_exit 5
+        # Construct device name:
+        SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
+        TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
+        PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${SOURCE_NODEV}"
+
+        if echo "$IMAGE_FILES" |grep -q -e "${SEP}${TARGET_PARTITION}$" -e "${SEP}${TARGET_PARTITION} "; then
+          printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $TARGET_PARTITION! Quitting...\n\033[0m" >&2
+          do_exit 5
+        fi
+
+        # Add item to list
+        IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
+      done
+
+      printf "* Select source partition(s) to restore (default=$PARTITIONS): "
+      read USER_PARTITIONS
+      if [ -n "$USER_PARTITIONS" ]; then
+        PARTITIONS="$USER_PARTITIONS"
+        IMAGE_FILES="" # Redetermine which image files to include
       fi
-
-      if [ $(echo "$LOOKUP" |wc -l) -gt 1 ]; then
-        echo "$LOOKUP"
-        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      IMAGE_FILE=`basename "$LOOKUP"`
-
-      # Construct device name:
-      SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
-      TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
-
-      # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
-    done
-  else
-    IFS=$EOL
-    for ITEM in $(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort); do
-      # FIXME: Can have multiple images here!
-      IMAGE_FILE=`basename "$ITEM"`
-
-      # Construct device name:
-      SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
-      TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
-
-      if echo "$IMAGE_FILES" |grep -q -e "${SEP}${TARGET_PARTITION}$" -e "${SEP}${TARGET_PARTITION} "; then
-        printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $TARGET_PARTITION! Quitting...\n\033[0m" >&2
-        do_exit 5
-      fi
-
-      # Add item to list
-      IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
-    done
-  fi
+    fi
+  done
 
   if [ -z "$IMAGE_FILES" ]; then
     printf "\033[40m\033[1;31m\nERROR: No (matching) image files found to restore! Quitting...\n\033[0m" >&2
