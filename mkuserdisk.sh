@@ -110,11 +110,13 @@ mkud_create_user_filesystem()
 
   if [ $USER_DISK_ON_OTHER_DEVICE -eq 1 ]; then
     if [ -n "$PARTITIONS_FOUND" ]; then
-      printf "\033[40m\033[1;31m* WARNING: There are already partitions on the seperate disk. Skipping user partition creation!\n\033[0m" >&2
-      return
-    else
-      echo "* NOTE: User partition $USER_PART will be created on a seperate disk"
+      printf "\033[40m\033[1;31m* WARNING: There are already partitions on the seperate disk!\n\033[0m" >&2
+      if ! get_user_yn "* Wipe (repartition + format) and continue"; then
+        return
+      fi
     fi
+
+    echo "* NOTE: User partition $USER_PART will be created on a seperate disk"
   fi
 
   # TODO: Skip the block below if our target disk already *exactly* matches?!
