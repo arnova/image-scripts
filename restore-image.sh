@@ -1461,7 +1461,7 @@ restore_disks()
 check_image_files()
 {
   IMAGE_FILES=""
-  while [ -z "$IMAGE_FILES"; do
+  while [ -z "$IMAGE_FILES" ]; do
     if [ -n "$PARTITIONS" ]; then
       IFS=','
       for ITEM in $PARTITIONS; do
