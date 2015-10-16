@@ -3,7 +3,7 @@
 MY_VERSION="3.11j"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 2, 2015
+# Last update: October 16, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -972,7 +972,7 @@ update_source_to_target_device_remap()
 restore_partitions()
 {
   # Restore the actual image(s):
-  IFS=' '
+  IFS=' ,'
   for ITEM in $IMAGE_FILES; do
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
     TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -1463,7 +1463,7 @@ check_image_files()
   IMAGE_FILES=""
   while [ -z "$IMAGE_FILES" ]; do
     if [ -n "$PARTITIONS" ]; then
-      IFS=','
+      IFS=' ,'
       for ITEM in $PARTITIONS; do
         PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
 
@@ -1525,7 +1525,7 @@ check_image_files()
   fi
 
   # Make sure the proper binaries are available
-  IFS=' '
+  IFS=' ,'
   for ITEM in $IMAGE_FILES; do
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP"`
 
@@ -1548,7 +1548,7 @@ check_image_files()
 
 check_partitions()
 {
-  IFS=' '
+  IFS=' ,'
   for ITEM in $IMAGE_FILES; do
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
     TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
@@ -1671,7 +1671,7 @@ test_target_partitions()
 
   # Test whether the target partition(s) exist and have the correct geometry:
   local MISMATCH=0
-  IFS=' '
+  IFS=' ,'
   for ITEM in $IMAGE_FILES; do
     IMAGE_FILE=$(echo "$ITEM" |cut -f1 -d"$SEP" -s)
     TARGET_PARTITION=$(echo "$ITEM" |cut -f2 -d"$SEP" -s)
@@ -1936,7 +1936,7 @@ if ! pwd |grep -q "$IMAGE_DIR$"; then
 fi
 
 # Check for GPT partitions in source
-if [ -z "$(find . -maxdepth 1 -type f -iname "sgdisk.*" -o -iname "gdisk.*")" ]; then
+if [ -n "$(find . -maxdepth 1 -type f -iname "sgdisk.*" -o -iname "gdisk.*")" ]; then
   check_command_error gdisk
   check_command_error sgdisk
 fi
