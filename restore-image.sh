@@ -3,7 +3,7 @@
 MY_VERSION="3.11j"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 16, 2015
+# Last update: November 4, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -462,7 +462,7 @@ partprobe()
 configure_network()
 {
   IFS=$EOL
-  for CUR_IF in $(ifconfig -s -a 2>/dev/null |grep -i -v '^iface' |awk '{ print $1 }' |grep -v -e '^dummy' -e '^bond' -e '^lo'); do
+  for CUR_IF in $(ifconfig -a 2>/dev/null |grep '^[a-z]' |sed -r s/'([[:blank:]]|:).*'// |grep -v -e '^dummy' -e '^bond' -e '^lo'); do
     IF_INFO="$(ifconfig $CUR_IF)"
     MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
     IP_TEST=""
