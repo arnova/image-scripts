@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11g"
+MY_VERSION="3.11h"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 4, 2015
+# Last update: November 24, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -898,10 +898,13 @@ backup_partitions()
             retval=$?
             ;;
       pc)   TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
-            PARTCLONE=`partclone_detect "/dev/$PART"`
-            if [ -n "$PARTCLONE" ]; then
-              printf "****** Using $PARTCLONE (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-              { $PARTCLONE -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            PARTCLONE_CMD=`partclone_detect "/dev/$PART"`
+            if [ -n "$PARTCLONE_CMD" ]; then
+              if [ $RESCUE -eq 1 ]; then
+                PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
+              fi
+              printf "****** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+              { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
               retval=$?
               if [ $retval -eq 0 ]; then
                 retval=`cat /tmp/.partclone.exitcode`
@@ -909,8 +912,12 @@ backup_partitions()
             fi
             ;;
       ddgz) TARGET_FILE="${OUTPUT_PREFIX}.dd.gz"
-            printf "****** Using dd (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
-            { dd if="/dev/$PART" bs=4096; echo $? >/tmp/.dd.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+            DD_CMD="dd if=/dev/$PART bs=4096"
+            if [ $RESCUE -eq 1 ]; then
+              DD_CMD="$DD_CMD noerror"
+            fi
+            printf "****** Using $DD_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            { $DD_CMD; echo $? >/tmp/.dd.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
             if [ $retval -eq 0 ]; then
               retval=`cat /tmp/.dd.exitcode`
@@ -1011,6 +1018,7 @@ show_help()
   echo "--noimage                   - Don't create any partition images, only do partition-table/MBR operations" >&2
   echo "--noccustomsh|--nosh        - Don't execute any custom shell script(s)" >&2
   echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
+  echo "--rescue|-r                 - Rescue mode (ignore e.g. read errors) (only for partclone or dd + gz)" >&2
 }
 
 
@@ -1029,6 +1037,7 @@ load_config()
   NO_CUSTOM_SH=0
   NO_IMAGE=0
   ONLY_SH=0
+  RESCUE=0
 
   # Check arguments
   unset IFS
@@ -1041,6 +1050,7 @@ load_config()
                                      --notrack0) NO_TRACK0=1;;
                                --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
                                       --conf|-c) CONF="$ARGVAL";;
+                                    --rescue|-r) RESCUE=1;;
                                           --fsa) IMAGE_PROGRAM="fsa";;
                                          --ddgz) IMAGE_PROGRAM="ddgz";;
                                            --pi) IMAGE_PROGRAM="pi";;
