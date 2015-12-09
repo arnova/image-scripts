@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11h"
+MY_VERSION="3.11i"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 24, 2015
+# Last update: December 9, 2015
 # (C) Copyright 2004-2015 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -698,7 +698,7 @@ select_disks()
 show_backup_disks_info()
 {
   IFS=' '
-  for HDD_NODEV in $BACKUP_DISKS; do
+  for HDD_NODEV in $*; do
     echo "* Found candidate disk for backup /dev/$HDD_NODEV: $(show_block_device_info $HDD_NODEV)"
     get_device_layout $HDD_NODEV
     echo ""
@@ -836,15 +836,24 @@ select_partitions()
     if [ -n "$BACKUP_PARTITIONS" ]; then
       select_disks; # Determine which disks the partitions are on
 
+      # Check whether we already displayed this disk
+      NEW_FOUND=0
+      IFS=' ,'
+      for DISK in $BACKUP_DISKS; do
+        if ! echo "$LAST_BACKUP_DISKS" |grep -E -q "(^| )$DISK( |$)"; then
+          LAST_BACKUP_DISKS="${LAST_BACKUP_DISKS}${LAST_BACKUP_DISKS:+ }${DISK}"
+          NEW_FOUND=1
+        fi
+      done
+
       # Only show info when not shown before
-      if [ "$BACKUP_DISKS" != "$LAST_BACKUP_DISKS" ]; then
+      if [ $NEW_FOUND -eq 1 ]; then
         if [ -n "$IGNORE_PARTITIONS" ]; then
           echo "NOTE: Ignored (mounted/swap) partition(s): $IGNORE_PARTITIONS"
         fi
 
-        show_backup_disks_info;
-
-        LAST_BACKUP_DISKS="$BACKUP_DISKS"
+        echo ""
+        show_backup_disks_info $BACKUP_DISKS;
       fi
 
       if [ $USER_SELECT -eq 1 ]; then
