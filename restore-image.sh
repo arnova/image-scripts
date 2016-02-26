@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.11j"
+MY_VERSION="3.11k"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 4, 2015
-# (C) Copyright 2004-2015 by Arno van Amersfoort
+# Last update: February 26, 2016
+# (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -1433,6 +1433,18 @@ restore_disks()
           # Can't just check sfdisk's return code as it is not reliable
           if ! echo "$result" |grep -i -q "^Successfully wrote" || echo "$result" |grep -i -q -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max"; then
             echo "$result" >&2
+            echo "" >&2
+
+            # Explicitly show known common errors
+            parse="$(echo "$result" |grep -i -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max")"
+            if [ -n "$parse" ]; then
+              printf "\033[40m\033[1;31m${parse}\n\033[0m" >&2
+            fi
+
+            if [ $retval -eq 0 ]; then
+              retval=1 # Don't show 0, which may confuse user
+            fi
+
             printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
             do_exit 5
           else
