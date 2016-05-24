@@ -446,7 +446,7 @@ partprobe()
     sleep 1
 
     # If blockdev returned success, we're done
-    if [ $retval -eq 0 ]; then
+    if [ $retval -eq 0 -a -z "$result" ]; then
       break;
     fi
   done
