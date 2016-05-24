@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11k"
+MY_VERSION="3.12"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: February 26, 2016
+# Last update: May 24, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -438,13 +438,15 @@ partprobe()
   while [ $TRY -gt 0 ]; do
     TRY=$(($TRY - 1))
 
-    # Somehow using partprobe here doesn't always work properly, using sfdisk -R instead for now
-    result="$(sfdisk -R "$DEVICE" 2>&1)"
+    # Somehow using the partprobe binary itself doesn't always work properly, so use blockdev instead
+    result="$(blockdev --rereadpt "$DEVICE" 2>&1)"
+    retval=$?
 
     # Wait a sec for things to settle
     sleep 1
 
-    if [ -z "$result" ]; then
+    # If blockdev returned success, we're done
+    if [ $retval -eq 0 ]; then
       break;
     fi
   done
