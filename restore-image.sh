@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.13"
+MY_VERSION="3.13a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: June 27, 2016
@@ -433,7 +433,7 @@ parse_sfdisk_output()
     fi
 
     #SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "partitions.${SOURCE_DISK_NODEV}" |sed -E -e s,'[[:blank:]]+',' ',g -e s,'^ +',,)"
-    echo "$LINE" |sed -r -e s!'^ *'!! -e s!'/dev/[a-z]+'!! -e s!'^[0-9]+p'!! -e s!'[[:blank:]]+'!' '!g -e s!'type='!'Id='!
+    echo "$LINE" |sed -r -e s!'^ *'!! -e s!'/dev/[a-z]+'!! -e s!'^[0-9]+p'!! -e s!'=[[:blank:]]+'!'='!g -e s!'type='!'Id='! -e s!' ?: ?'!', '!
     #echo "$LINE" |sed -r -e s!'^ */dev/'!! -e s!'[[:blank:]]+'!' '!g
   done
 }
