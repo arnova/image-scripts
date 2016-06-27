@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.12"
+MY_VERSION="3.13"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 24, 2016
+# Last update: June 27, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -421,6 +421,34 @@ part_check()
 
   printf "\033[40m\033[1;31mFAILED!\n\033[0m" >&2
   return 1
+}
+
+
+parse_sfdisk_output()
+{
+  IFS=$EOL
+  while read LINE; do
+    if ! echo "$LINE" |grep -i -q ': start=.*size=' || echo "$LINE" |grep -E -i -q '(Id|type)= ?0$'; then
+      continue;
+    fi
+
+    #SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "partitions.${SOURCE_DISK_NODEV}" |sed -E -e s,'[[:blank:]]+',' ',g -e s,'^ +',,)"
+    echo "$LINE" |sed -r -e s!'^ *'!! -e s!'/dev/[a-z]+'!! -e s!'^[0-9]+p'!! -e s!'[[:blank:]]+'!' '!g -e s!'type='!'Id='!
+    #echo "$LINE" |sed -r -e s!'^ */dev/'!! -e s!'[[:blank:]]+'!' '!g
+  done
+}
+
+
+parse_gdisk_output()
+{
+  IFS=$EOL
+  while read LINE; do
+    if ! "/dev/${TARGET_NODEV}" |grep -q -E '^[[:blank:]]+[0-9]'; then
+      continue;
+    fi
+
+    echo "$LINE" |awk '{ print $1 " "  $2 " " $3 " " $4 " " $5 " " $6 }'
+  done
 }
 
 
@@ -1185,7 +1213,7 @@ check_disks()
     if [ $PT_ADD -eq 1 ]; then
       if [ -e "gdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # GPT:
-        GDISK_TARGET="$(gdisk -l "/dev/${TARGET_NODEV}" |grep -E '^[[:blank:]]+[0-9]')"
+        GDISK_TARGET="$(gdisk -l "/dev/${TARGET_NODEV}" |parse_gdisk_output)"
         if [ -z "$GDISK_TARGET" ]; then
           printf "\033[40m\033[1;31mERROR: Unable to get GPT partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
@@ -1193,9 +1221,9 @@ check_disks()
 
         local MISMATCH=0
         IFS=$EOL
-        for PART in $GDISK_TARGET; do
+        for PART_ENTRY in $GDISK_TARGET; do
           # Check entry on source
-          if ! grep -q -x "$PART" "gdisk.${IMAGE_SOURCE_NODEV}"; then
+          if ! cat "gdisk.${IMAGE_SOURCE_NODEV}" |parse_gdisk_output |grep -q -x "${PART_ENTRY}"; then
             MISMATCH=1
             break;
           fi
@@ -1216,7 +1244,7 @@ check_disks()
         fi
       elif [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # DOS/MBR:
-        SFDISK_TARGET="$(sfdisk -d "/dev/${TARGET_NODEV}" |grep -i '^/dev/.*Id=' |grep -i -v 'Id= 0$' |sed s,'^/dev/[a-z]+',, -e s,'^[0-9]+p',,)"
+        SFDISK_TARGET="$(sfdisk -d "/dev/${TARGET_NODEV}" |parse_sfdisk_output)"
         if [ -z "$SFDISK_TARGET" ]; then
           printf "\033[40m\033[1;31mERROR: Unable to get DOS partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
@@ -1224,8 +1252,8 @@ check_disks()
 
         MISMATCH=0
         IFS=$EOL
-        for PART in $SFDISK_TARGET; do
-          if ! grep -q "[a-z]${PART}$" "sfdisk.${IMAGE_SOURCE_NODEV}"; then
+        for PART_ENTRY in $SFDISK_TARGET; do
+          if ! cat "sfdisk.${IMAGE_SOURCE_NODEV}" |parse_sfdisk_output |grep -q -x "${PART_ENTRY}"; then
             MISMATCH=1
             break;
           fi
@@ -1433,15 +1461,13 @@ restore_disks()
           retval=$?
 
           # Can't just check sfdisk's return code as it is not reliable
-          if ! echo "$result" |grep -i -q "^Successfully wrote" || echo "$result" |grep -i -q -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max"; then
+          parse="$(echo "$result" |grep -i -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max")"
+          if [ -n "$parse" ]; then
             echo "$result" >&2
             echo "" >&2
 
             # Explicitly show known common errors
-            parse="$(echo "$result" |grep -i -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max")"
-            if [ -n "$parse" ]; then
-              printf "\033[40m\033[1;31m${parse}\n\033[0m" >&2
-            fi
+            printf "\033[40m\033[1;31m${parse}\n\033[0m" >&2
 
             if [ $retval -eq 0 ]; then
               retval=1 # Don't show 0, which may confuse user
@@ -1626,13 +1652,13 @@ compare_dos_partition()
 
   # Target is smaller?
   if [ $SOURCE_SIZE -gt $TARGET_SIZE ]; then
-    printf "\033[40m\033[1;31m\nERROR: Target partition $TARGET_NUM is smaller than source partition $SOURCE_NUM!\n\033[0m" >&2
+    printf "\033[40m\033[1;31mERROR: Target partition $TARGET_NUM is smaller than source partition $SOURCE_NUM!\n\033[0m" >&2
     retval=1
   fi
 
   # Target is bigger?
   if [ $SOURCE_SIZE -lt $TARGET_SIZE ]; then
-    printf "\033[40m\033[1;31m\nWARNING: Target partition $TARGET_NUM is bigger than source partition $SOURCE_NUM!\n\033[0m" >&2
+    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM is bigger than source partition $SOURCE_NUM!\n\033[0m" >&2
   fi
 
   return $retval
@@ -1701,9 +1727,9 @@ test_target_partitions()
     fi
 
     if [ -e "gdisk.${SOURCE_DISK_NODEV}" ]; then
-      GDISK_TARGET_PART="$(gdisk -l "$TARGET_DISK" |grep -E "^[[:blank:]]+$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
+      GDISK_TARGET_PART="$(gdisk -l "$TARGET_DISK" |parse_gdisk_output |grep -E "^$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
       if [ -n "$GDISK_TARGET_PART" ]; then
-        GDISK_SOURCE_PART="$(grep -E "^[[:blank:]]+$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" "gdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
+        GDISK_SOURCE_PART="$(cat "gdisk.${SOURCE_DISK_NODEV}" 2>/dev/null |parse_gdisk_output |grep -E "^$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" )"
 
         echo "* Source GPT partition: $GDISK_SOURCE_PART"
         echo "* Target GPT partition: $GDISK_TARGET_PART"
@@ -1724,13 +1750,17 @@ test_target_partitions()
         do_exit 5
       fi
     else
-      SFDISK_TARGET_PART="$(sfdisk -d "$TARGET_DISK" 2>/dev/null |grep -E "^${TARGET_PARTITION}[[:blank:]]")"
+      SFDISK_TARGET_PART="$(sfdisk -d "$TARGET_DISK" 2>/dev/null |parse_sfdisk_output |grep -E "^$(get_partition_number ${TARGET_PARTITION})[ ,]")"
       if [ -n "$SFDISK_TARGET_PART" ]; then
         # DOS partition found
-        SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "sfdisk.${SOURCE_DISK_NODEV}" 2>/dev/null)"
-        # If empty, try old (legacy) file
-        if [ -z "$SFDISK_SOURCE_PART" -a -e "partitions.${SOURCE_DISK_NODEV}" ] && grep -q '^# partition table of' "partitions.${SOURCE_DISK_NODEV}"; then
-          SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "partitions.${SOURCE_DISK_NODEV}" 2>/dev/null)"
+        SFDISK_SOURCE_PART=""
+        if [ -f "sfdisk.${SOURCE_DISK_NODEV}" ]; then
+          SFDISK_SOURCE_PART="$(cat "sfdisk.${SOURCE_DISK_NODEV}" |parse_sfdisk_output |grep -E "^$(get_partition_number ${IMAGE_PARTITION_NODEV})[ ,]")"
+        elif [ -f "partitions.${SOURCE_DISK_NODEV}" ]; then
+          # If empty, try old (legacy) file
+          if grep -q '^# partition table of' "partitions.${SOURCE_DISK_NODEV}"; then
+            SFDISK_SOURCE_PART="$(cat "partitions.${SOURCE_DISK_NODEV}" |parse_sfdisk_output |grep -E "^$(get_partition_number ${IMAGE_PARTITION_NODEV})[[:blank:]]")"
+          fi
         fi
 
         echo "* Source DOS partition: $SFDISK_SOURCE_PART"
