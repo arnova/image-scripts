@@ -2002,6 +2002,13 @@ fi
 # Show info about target devices to be used
 show_target_devices;
 
+if [ -e "description.txt" ]; then
+  echo "--------------------------------------------------------------------------------"
+  cat "description.txt"
+fi
+
+echo "--------------------------------------------------------------------------------"
+
 if [ $ONLY_SH -eq 0 ]; then
   if [ $CLEAN -eq 1 ]; then
     printf "\033[40m\033[1;31m* WARNING: MBR/track0 & partition-table will ALWAYS be (over)written (--clean)!\n\033[0m" >&2
@@ -2016,12 +2023,8 @@ if [ $ONLY_SH -eq 0 ]; then
   fi
 fi
 
-if [ -e "description.txt" ]; then
-  echo "--------------------------------------------------------------------------------"
-  cat "description.txt"
-fi
+echo ""
 
-echo "--------------------------------------------------------------------------------"
 if ! get_user_yn "Continue with restore"; then
   echo "Aborted by user..."
   do_exit 1;
