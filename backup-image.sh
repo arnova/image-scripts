@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.11i"
+MY_VERSION="3.11j"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: December 9, 2015
-# (C) Copyright 2004-2015 by Arno van Amersfoort
+# Last update: July 7, 2016
+# (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -1247,7 +1247,7 @@ if [ -n "$BACKUP_IMAGES" ] && [ "$IMAGE_PROGRAM" = "ddgz" -o "$IMAGE_PROGRAM" = 
       continue; # Can only verify .gz
     fi
     # Note that pigz seems to hang on broken archives, therefor use gzip
-    gzip -tv "$BACKUP_IMAGE"
+    gzip -tv "$BACKUP_IMAGE"*
   done
 fi
 

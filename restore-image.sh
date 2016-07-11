@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.13a"
+MY_VERSION="3.14"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: June 27, 2016
+# Last update: July 11, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1391,11 +1391,11 @@ restore_disks()
 
     # Clear all (GPT) partition data on --clean:
     if [ $CLEAN -eq 1 ] && check_command sgdisk; then
-      # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
-      sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
-
       # Completely zap GPT, MBR and legacy partition data, if we're using GPT on one of the devices
       sgdisk --zap-all /dev/$TARGET_NODEV >/dev/null 2>&1
+
+      # Clear GPT entries before zapping them else sgdisk --load-backup (below) may complain
+#      sgdisk --clear /dev/$TARGET_NODEV >/dev/null 2>&1
     fi
 
     TRACK0_CLEAN=0
@@ -1475,10 +1475,20 @@ restore_disks()
 
             printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
             do_exit 5
-          else
-            echo "$result" |grep -i -e 'Success'
           fi
+
+          echo "$result" |grep -i -e 'Success'
           echo ""
+
+          # Make sure we restore the PARTUUID else e.g. Windows 10 fails to boot
+          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=1 seek=440 skip=440 count=6
+          #&& dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62
+          retval=$?
+          if [ $retval -ne 0 ]; then
+            printf "\033[40m\033[1;31mERROR: DOS partition UUIDTrack0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
+            do_exit 5
+          fi
+
           PARTPROBE=1
         fi
       fi
