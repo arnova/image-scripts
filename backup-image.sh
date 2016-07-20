@@ -528,6 +528,11 @@ sanity_check()
     # This is a dummy test for partclone, the actual binary test is in the wrapper
     check_command_error partclone.restore 
   fi
+
+  if [ "$RESCUE" = "1" ] && [ "$IMAGE_PROGRAM" = "fsa" -o "$IMAGE_PROGRAM" = "pi" ]; then
+    printf "\033[40m\033[1;31mERROR: --rescue is not supported with fsarcher(--fsa) or partimage(--pi)! Quitting...\n\033[0m" >&2
+    exit 2
+  fi
 }
 
 
