@@ -1310,7 +1310,7 @@ check_disks()
 
       if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # Simulate DOS partition table restore
-        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk -n 2>&1 >/dev/null)"
+        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk -n >/dev/null 2>&1)"
 
         # For now only check for max size errors
         if [ $? -ne 0 ] && echo "$result" |grep -q -e 'exceeds max allowable size'; then
@@ -1322,7 +1322,7 @@ check_disks()
 
       if [ -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # Simulate GPT partition table restore
-        result="$(sgdisk --pretend --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" 2>&1 >/dev/null)"
+        result="$(sgdisk --pretend --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" >/dev/null 2>&1)"
 
         if [ $? -ne 0 ]; then
           echo "$result" >&2
