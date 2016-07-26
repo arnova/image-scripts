@@ -992,10 +992,10 @@ backup_disks()
           do_exit 8
         fi
         echo ""
+      else
+        printf "\033[40m\033[1;31mERROR: Unable to detect any GPT or DOS partitions on /dev/$HDD_NODEV! Quitting...\n\033[0m" >&2
+        do_exit 9
       fi
-    else
-      printf "\033[40m\033[1;31mERROR: Unable to obtain GPT or DOS partition table for /dev/$HDD_NODEV! Quitting...\n\033[0m" >&2
-      do_exit 9
     fi
 
     # Dump device partition layout in "fancified" format
