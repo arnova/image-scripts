@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.14"
+MY_VERSION="3.15"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: July 11, 2016
+# Last update: July 26, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1403,21 +1403,41 @@ restore_disks()
       TRACK0_CLEAN=1
     fi
 
+    # Assume when sgdisk file exists, GPT is used
+    SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
+    GPT_FOUND=0
+    if [ -f "$SGDISK_FILE" ]; then
+      GPT_FOUND=1
+    fi
+
     DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
     if [ -e "$DD_SOURCE" ]; then
       # Check for MBR restore:
       if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
-        echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE:"
+        if [ $GPT_FOUND -eq 1 ]; then
+          echo "* Updating GPT protective MBR on /dev/$TARGET_NODEV from $DD_SOURCE:"
 
-        if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
-#          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=63
-          # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
-          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=2048
-          retval=$?
+          if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
+            # Complete MBR including legacy DOS partition table
+            dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=1
+            retval=$?
+          else
+            # Complete MBR but excluding legacy DOS partition table
+            dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1
+            retval=$?
+          fi
         else
-          # FIXME: Need to detect the empty space before the first partition since GRUB2 may be longer than 32256 bytes!
-          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62
-          retval=$?
+          echo "* Updating track0(MBR) on /dev/$TARGET_NODEV from $DD_SOURCE:"
+
+          if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
+            # For clean or empty disks always try to use a full 1MiB of DD_SOURCE else Grub2 may not work.
+            dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 count=2048
+            retval=$?
+          else
+            # FIXME: Need to detect the empty space before the first partition since GRUB2 may be longer than 32256 bytes!
+            dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=446 count=1 && dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=512 seek=1 skip=1 count=62
+            retval=$?
+          fi
         fi
 
         if [ $retval -ne 0 ]; then
@@ -1431,8 +1451,7 @@ restore_disks()
 
     # Check for partition restore
     if [ $TRACK0_CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ]; then
-      SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
-      if [ -e "$SGDISK_FILE" ]; then
+      if [ $GPT_FOUND -eq 1 ]; then
         echo "* Updating GPT partition-table on /dev/$TARGET_NODEV:"
         result="$(sgdisk_safe --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV 2>&1)"
         retval=$?
