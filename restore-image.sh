@@ -251,18 +251,13 @@ get_disk_partitions()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
-  local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
-  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && check_command sgdisk; then
-    local DEV_PREFIX="/dev/$DISK_NODEV"
-    # FIXME: Not sure if this is correct:
-    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
-      DEV_PREFIX="${DEV_PREFIX}p"
-    fi
-
-    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
-  else
-    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
+  local DEV_PREFIX="/dev/$DISK_NODEV"
+  # FIXME: Not sure if this is correct:
+  if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
+    DEV_PREFIX="${DEV_PREFIX}p"
   fi
+
+  sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
 }
 
 
@@ -308,18 +303,9 @@ list_device_partitions()
 {
   local DEVICE="$1"
 
-  FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
-  if echo "$FDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]ee[[:blank:]]' && check_command gdisk; then
-    # GPT partition table found
-    GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
-    printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
-  else
-    # MBR/DOS Partitions:
-    IFS=$EOL
-    if echo "$FDISK_OUTPUT" |grep -E -i -v '^/dev/.*[[:blank:]]ee[[:blank:]]' |grep -q -E -i '^/dev/'; then
-      printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
-    fi
-  fi
+  # GPT partition table found
+  printf "* Partition table:\n\n"
+  gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number' -e '^Partition table' -e '^  '
 }
 
 
@@ -650,6 +636,8 @@ sanity_check()
   check_command_error mkswap
   check_command_error sfdisk
   check_command_error fdisk
+  check_command_error sgdisk
+  check_command_error gdisk
   check_command_error dd
   check_command_error blkid
   check_command_error lsblk
@@ -1390,7 +1378,7 @@ restore_disks()
     PARTPROBE=0
 
     # Clear all (GPT) partition data on --clean:
-    if [ $CLEAN -eq 1 ] && check_command sgdisk; then
+    if [ $CLEAN -eq 1 ]; then
       # Completely zap GPT, MBR and legacy partition data, if we're using GPT on one of the devices
       sgdisk --zap-all /dev/$TARGET_NODEV >/dev/null 2>&1
 
@@ -1832,33 +1820,15 @@ create_swaps()
 
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
-    SFDISK_OUTPUT="$(sfdisk -d "$DEVICE" 2>/dev/null)"
-    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && check_command sgdisk; then
-      # GPT partition table:
-      SGDISK_OUTPUT="$(sgdisk -p "$DEVICE" 2>/dev/null)"
-
-      if ! echo "$SGDISK_OUTPUT" |grep -q -i -e "GPT: not present"; then
-        IFS=$EOL
-        echo "$SGDISK_OUTPUT" |grep -E -i "[[:blank:]]8200[[:blank:]]" |while read LINE; do
-          NUM="$(echo "$LINE" |awk '{ print $1 }')"
-          PART="$(add_partition_number "$DEVICE" "$NUM")"
-          if ! mkswap -L "swap${SWAP_COUNT}" "$PART"; then
-            printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
-          fi
-          SWAP_COUNT=$(($SWAP_COUNT + 1))
-        done
+    IFS=$EOL
+    sgdisk -p "$DEVICE" 2>/dev/null |grep -E -i "[[:blank:]]8200[[:blank:]]" |while read LINE; do
+      NUM="$(echo "$LINE" |awk '{ print $1 }')"
+      PART="$(add_partition_number "$DEVICE" "$NUM")"
+      if ! mkswap -L "swap${SWAP_COUNT}" "$PART"; then
+        printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi
-    else
-      # MBR/DOS partition table:
-      IFS=$EOL
-      echo "$SFDISK_OUTPUT" |grep -i "id=82$" |while read LINE; do
-        PART="$(echo "$LINE" |awk '{ print $1 }')"
-        if ! mkswap -L "swap${SWAP_COUNT}" "$PART"; then
-          printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
-        fi
-        SWAP_COUNT=$(($SWAP_COUNT + 1))
-      done
-    fi
+      SWAP_COUNT=$(($SWAP_COUNT + 1))
+    done
   done
 }
 

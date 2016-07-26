@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.11j"
+MY_VERSION="3.12"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: July 7, 2016
+# Last update: July 26, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -264,19 +264,13 @@ get_partition_disks()
 get_disk_partitions()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
-  if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee' && check_command sgdisk; then
-    local DEV_PREFIX="/dev/$DISK_NODEV"
-    # FIXME: Not sure if this is correct:
-    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
-      DEV_PREFIX="${DEV_PREFIX}p"
-    fi
-
-    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
-  else
-    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= 0' |awk '{ print $1 }'
+  local DEV_PREFIX="/dev/$DISK_NODEV"
+  # FIXME: Not sure if this is correct:
+  if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
+    DEV_PREFIX="${DEV_PREFIX}p"
   fi
+
+  sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
 }
 
 
@@ -504,6 +498,8 @@ sanity_check()
   check_command_error gzip
   check_command_error sfdisk
   check_command_error fdisk
+  check_command_error sgdisk
+  check_command_error gdisk
   check_command_error dd
   check_command_error blkid
   check_command_error lsblk
@@ -966,14 +962,7 @@ backup_disks()
     # For output files replace / with _
     OUTPUT_SUFFIX="$(echo "$HDD_NODEV" |sed s,'/','_',g)"
 
-    SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
-    if echo "$SFDISK_OUTPUT" |grep -q -E -i '^/dev/.*[[:blank:]]Id=ee'; then
-      # GPT partition table found
-      if ! check_command gdisk || ! check_command sgdisk; then
-        printf "\033[40m\033[1;31mERROR: Unable to save GPT partition as gdisk/sgdisk binaries were not found! Quitting...\n\033[0m" >&2
-        do_exit 9
-      fi
-
+    if ! gdisk -l "/dev/$HDD_NODEV" |grep -q 'GPT: not present'; then
       echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
       sgdisk --backup="sgdisk.${OUTPUT_SUFFIX}" "/dev/${HDD_NODEV}"
 
@@ -981,26 +970,29 @@ backup_disks()
 
       # Dump gdisk -l info to file
       gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${OUTPUT_SUFFIX}"
-    elif [ -n "$SFDISK_OUTPUT" ]; then
-      # DOS partition table found
-      echo "* Storing DOS partition table for /dev/$HDD_NODEV in sfdisk.${OUTPUT_SUFFIX}..."
-      echo "$SFDISK_OUTPUT" > "sfdisk.${OUTPUT_SUFFIX}"
+    else
+      SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
+      if [ -n "$SFDISK_OUTPUT" ]; then
+        # DOS partition table found
+        echo "* Storing DOS partition table for /dev/$HDD_NODEV in sfdisk.${OUTPUT_SUFFIX}..."
+        echo "$SFDISK_OUTPUT" > "sfdisk.${OUTPUT_SUFFIX}"
 
-      # Dump fdisk -l info to file
-      fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${OUTPUT_SUFFIX}"
+        # Dump fdisk -l info to file
+        fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${OUTPUT_SUFFIX}"
 
-      echo ""
+        echo ""
 
-      echo "* Storing track0 for /dev/$HDD_NODEV in track0.${OUTPUT_SUFFIX}..."
-      # Dump hdd info for all disks in the current system
-      result="$(dd if=/dev/$HDD_NODEV of="track0.${OUTPUT_SUFFIX}" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
-      retval=$?
-      if [ $retval -ne 0 ]; then
-        echo "$result" >&2
-        printf "\033[40m\033[1;31mERROR: Track0(MBR) backup of /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
-        do_exit 8
+        echo "* Storing track0 for /dev/$HDD_NODEV in track0.${OUTPUT_SUFFIX}..."
+        # Dump hdd info for all disks in the current system
+        result="$(dd if=/dev/$HDD_NODEV of="track0.${OUTPUT_SUFFIX}" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
+        retval=$?
+        if [ $retval -ne 0 ]; then
+          echo "$result" >&2
+          printf "\033[40m\033[1;31mERROR: Track0(MBR) backup of /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
+          do_exit 8
+        fi
+        echo ""
       fi
-      echo ""
     else
       printf "\033[40m\033[1;31mERROR: Unable to obtain GPT or DOS partition table for /dev/$HDD_NODEV! Quitting...\n\033[0m" >&2
       do_exit 9
