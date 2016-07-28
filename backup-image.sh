@@ -260,7 +260,7 @@ get_partition_disks()
 }
 
 
-# Get partitions directly from disk using sfdisk/gdisk
+# Get partitions directly from disk using sgdisk
 get_disk_partitions()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
@@ -271,6 +271,17 @@ get_disk_partitions()
   fi
 
   sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
+}
+
+
+# Function to detect whether a device has a GPT partition table
+gpt_detect()
+{
+  if gdisk -l "$1" |grep -q 'GPT: not present'; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 
@@ -957,12 +968,12 @@ backup_disks()
   IFS=' '
   for HDD_NODEV in $BACKUP_DISKS; do
     # Check if DMA is enabled for HDD
-    check_dma /dev/$HDD_NODEV
+    check_dma "/dev/$HDD_NODEV"
 
     # For output files replace / with _
     OUTPUT_SUFFIX="$(echo "$HDD_NODEV" |sed s,'/','_',g)"
 
-    if ! gdisk -l "/dev/$HDD_NODEV" |grep -q 'GPT: not present'; then
+    if gpt_detect "/dev/$HDD_NODEV"; then
       echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
       sgdisk --backup="sgdisk.${OUTPUT_SUFFIX}" "/dev/${HDD_NODEV}"
 

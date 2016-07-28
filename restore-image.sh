@@ -246,7 +246,7 @@ get_partition_disk()
 }
 
 
-# Get partitions directly from disk using sfdisk/gdisk
+# Get partitions directly from disk using sgdisk
 get_disk_partitions()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
