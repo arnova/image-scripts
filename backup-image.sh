@@ -278,9 +278,9 @@ get_disk_partitions()
 gpt_detect()
 {
   if gdisk -l "$1" |grep -q 'GPT: not present'; then
-    return 0
+    return 1 # GPT not found
   else
-    return 1
+    return 0 # GPT found
   fi
 }
 
@@ -722,6 +722,8 @@ detect_partitions()
 {
   local DEVICE="$1"
   local FIND_PARTITIONS=""
+  local SELECT_PARTITIONS=""
+  local BLKID_LIST=""
 
   if [ -n "$DEVICE" ]; then  
     FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE)"
@@ -731,8 +733,8 @@ detect_partitions()
 
   # Does the device contain partitions?
   if [ -n "$FIND_PARTITIONS" ]; then
-    local SELECT_PARTITIONS=""
-    local BLKID_LIST="$(blkid)"
+    SELECT_PARTITIONS=""
+    BLKID_LIST="$(blkid)"
 
     IFS=$EOL
     for LINE in $FIND_PARTITIONS; do
@@ -780,12 +782,13 @@ select_partitions()
   local SELECT_DEVICES="$DEVICES"
   local LAST_BACKUP_DISKS=""
   local USER_SELECT=0
+  local SELECT_PARTITIONS=""
 
   # User select loop:
   while true; do
     # Check if target device exists
     if [ -n "$SELECT_DEVICES" ]; then
-      local SELECT_PARTITIONS=""
+      SELECT_PARTITIONS=""
       BACKUP_PARTITIONS=""
       IGNORE_PARTITIONS=""
 
