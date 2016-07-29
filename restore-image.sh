@@ -304,8 +304,8 @@ list_device_partitions()
   local DEVICE="$1"
 
   # GPT partition table found
-  printf "* Partition table:\n\n"
-  gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number' -e '^Partition table' -e '^  '
+  printf "* Partition table:\n"
+  gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number' -e '^  '
 }
 
 
