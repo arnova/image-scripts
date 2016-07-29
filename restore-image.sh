@@ -1485,16 +1485,16 @@ restore_disks()
           fi
 
           echo "$result" |grep -i -e 'Success'
-          echo ""
 
           # Make sure we restore the PARTUUID else e.g. Windows 10 fails to boot
-          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=1 seek=440 skip=440 count=6
+          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=1 seek=440 skip=440 count=6 >/dev/null
           retval=$?
           if [ $retval -ne 0 ]; then
-            printf "\033[40m\033[1;31mERROR: DOS partition UUIDTrack0(MBR) update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
+            printf "\033[40m\033[1;31mERROR: DOS partition UUID update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
             do_exit 5
           fi
 
+          echo ""
           PARTPROBE=1
         fi
       fi
