@@ -912,12 +912,12 @@ backup_partitions()
     local OUTPUT_PREFIX="$(echo "$PART" |sed s,'/','_',g)"
     case "$IMAGE_PROGRAM" in
       fsa)  TARGET_FILE="${OUTPUT_PREFIX}.fsa"
-            printf "****** Using fsarchiver to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            printf "** Using fsarchiver to backup /dev/$PART to $TARGET_FILE **\n\n"
             fsarchiver -a -A -v --exclude="/.snapshots" savefs "$TARGET_FILE" "/dev/$PART"
             retval=$?
             ;;
       pi)   TARGET_FILE="${OUTPUT_PREFIX}.img.gz"
-            printf "****** Using partimage to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            printf "** Using partimage to backup /dev/$PART to $TARGET_FILE **\n\n"
             partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
             retval=$?
             ;;
@@ -927,7 +927,7 @@ backup_partitions()
               if [ $RESCUE -eq 1 ]; then
                 PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
               fi
-              printf "****** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+              printf "** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE **\n\n"
               { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
               retval=$?
               if [ $retval -eq 0 ]; then
@@ -940,7 +940,7 @@ backup_partitions()
             if [ $RESCUE -eq 1 ]; then
               DD_CMD="$DD_CMD noerror"
             fi
-            printf "****** Using $DD_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE ******\n\n"
+            printf "** Using $DD_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE **\n\n"
             { $DD_CMD; echo $? >/tmp/.dd.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
             retval=$?
             if [ $retval -eq 0 ]; then
@@ -957,7 +957,7 @@ backup_partitions()
     else
       SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
       BACKUP_IMAGES="${BACKUP_IMAGES}${BACKUP_IMAGES:+ }${TARGET_FILE}"
-      echo "****** Backuped /dev/$PART to $TARGET_FILE ******"
+      echo "** Backuped /dev/$PART to $TARGET_FILE **"
     fi
     echo ""
   done

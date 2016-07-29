@@ -1024,7 +1024,7 @@ restore_partitions()
       read dummy
     else
       SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
-      echo "****** $IMAGE_FILE restored to $TARGET_PARTITION ******"
+      echo "** $IMAGE_FILE restored to $TARGET_PARTITION **"
     fi
     echo ""
   done
