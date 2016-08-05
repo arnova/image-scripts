@@ -15,6 +15,23 @@ EXTRA_DISKS_NODEV=""
 # Functions #
 #############
 
+# Function to detect whether a device has a GPT partition table
+gpt_detect()
+{
+  if sfdisk -d "$1" 2>/dev/null |grep -q -E -i -e '[[:blank:]]Id=ee' -e '^Partition Table: gpt' -e '^label: gpt'; then
+    return 0 # GPT found
+  else
+    return 1 # GPT not found
+  fi
+
+#  if gdisk -l "$1" |grep -q 'GPT: not present'; then
+#    return 1 # GPT not found
+#  else
+#    return 0 # GPT found
+#  fi
+}
+
+
 # Arguments: $1 = DISK, $2 = Partition ID, $3 = Start with empty partition table(1)
 mkud_create_user_dos_partition()
 {
@@ -124,7 +141,7 @@ mkud_create_user_filesystem()
     # If user partition is on the same device as the images, check that it does not exist already
     if [ ! -e $TARGET_PART -o $REPARTITION_DISK -eq 1 ]; then
       # Detect GPT. Always use GPT on an empty disk since size may be > 2TB
-      if [ $REPARTITION_DISK -eq 1 ] || sfdisk -d $TARGET_DISK 2>/dev/null |grep -q -E -i '[[:blank:]]Id=ee'; then
+      if [ $REPARTITION_DISK -eq 1 ] || gpt_detect $TARGET_DISK; then
         mkud_create_user_gpt_partition $TARGET_DISK $TARGET_PART_ID $REPARTITION_DISK
       else
         mkud_create_user_dos_partition $TARGET_DISK $TARGET_PART_ID $REPARTITION_DISK
@@ -239,4 +256,3 @@ else
     fi
   done
 fi
-
