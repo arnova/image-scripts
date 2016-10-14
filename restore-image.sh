@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.15"
+MY_VERSION="3.16"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: July 26, 2016
+# Last update: October 14, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -170,6 +170,43 @@ sgdisk_safe()
 
   echo "$result"
   return 0
+}
+
+
+# Safe (fixed) version of sfdisk since it doesn't always return non-zero when an error occurs
+sfdisk_safe()
+{
+  local IFS=' '
+
+  local result="$(sfdisk $@ 2>&1)"
+  local retval=$?
+
+  # Can't just check sfdisk's return code as it is not reliable
+  local parse_false="$(echo "$result" |grep -i -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max")"
+  local parse_true="$(echo "$result" |grep -i -e "^New situation:")"
+  if [ -n "$parse_false" -o -z "$parse_true" ]; then
+    echo "$result" >&2
+
+    # Explicitly show known common errors
+#    if [ -n "$parse_false" ]; then
+#      printf "\033[40m\033[1;31m${parse_false}\n\033[0m" >&2
+#    fi
+
+    if [ $retval -eq 0 ]; then
+      retval=8 # Don't show 0, which may confuse user. 8 seems to be the most appropriate return code for this
+    fi
+
+    return $retval
+  fi
+
+  echo "$result"
+  return 0
+}
+
+
+sfdisk_legacy_format()
+{
+  grep -v -e "^label:" -e "^label-id:" -e "^device:" |sed s!'type='!'Id='!
 }
 
 
@@ -379,7 +416,7 @@ part_check()
 {
   local DEVICE="$1"
 
-  printf "Waiting for up to date partion table from kernel for $DEVICE..."
+  printf "Waiting for up to date partition table from kernel for $DEVICE..."
 
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
   IFS=' '
@@ -1298,10 +1335,10 @@ check_disks()
 
       if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # Simulate DOS partition table restore
-        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk -n >/dev/null 2>&1)"
+        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_legacy_format |sfdisk_safe --force -n "/dev/${TARGET_NODEV}" 2>&1)"
 
         # For now only check for max size errors
-        if [ $? -ne 0 ] && echo "$result" |grep -q -e 'exceeds max allowable size'; then
+        if [ $? -ne 0 ]; then
           echo "$result" >&2
           printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting...\n\033[0m" >&2
           do_exit 5
@@ -1310,7 +1347,7 @@ check_disks()
 
       if [ -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # Simulate GPT partition table restore
-        result="$(sgdisk --pretend --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" >/dev/null 2>&1)"
+        result="$(sgdisk --pretend --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" "/dev/${TARGET_NODEV}" >/dev/null 2>&1)"
 
         if [ $? -ne 0 ]; then
           echo "$result" >&2
@@ -1464,32 +1501,27 @@ restore_disks()
 
         if [ -n "$SFDISK_FILE" ]; then
           echo "* Updating DOS partition-table on /dev/$TARGET_NODEV:"
-          result="$(sfdisk --force --no-reread /dev/$TARGET_NODEV < "$SFDISK_FILE" 2>&1)"
+          result="$(cat "$SFDISK_FILE" |sfdisk_legacy_format |sfdisk_safe --force --no-reread /dev/$TARGET_NODEV 2>&1)"
           retval=$?
 
-          # Can't just check sfdisk's return code as it is not reliable
-          parse="$(echo "$result" |grep -i -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max")"
-          if [ -n "$parse" ]; then
+          # Make sure partition was properly written
+          if [ $retval -ne 0 ] || ! echo "$result" |grep -i -e "^Successfully wrote" -e "^The partition table has been altered"; then
             echo "$result" >&2
             echo "" >&2
-
-            # Explicitly show known common errors
-            printf "\033[40m\033[1;31m${parse}\n\033[0m" >&2
-
-            if [ $retval -eq 0 ]; then
-              retval=1 # Don't show 0, which may confuse user
-            fi
 
             printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
             do_exit 5
           fi
 
-          echo "$result" |grep -i -e 'Success'
+          echo "$result" #|grep -i -e 'Success'
 
           # Make sure we restore the PARTUUID else e.g. Windows 10 fails to boot
-          dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=1 seek=440 skip=440 count=6 >/dev/null
+          echo ""
+          echo "* Updating DOS partition UUID on /dev/$TARGET_NODEV"
+          result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=1 seek=440 skip=440 count=6 2>&1`
           retval=$?
           if [ $retval -ne 0 ]; then
+            echo "$result" >&2
             printf "\033[40m\033[1;31mERROR: DOS partition UUID update from $DD_SOURCE to /dev/$TARGET_NODEV failed($retval). Quitting...\n\033[0m" >&2
             do_exit 5
           fi
