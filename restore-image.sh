@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.16"
+MY_VERSION="3.17"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 14, 2016
+# Last update: November 1, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -135,21 +135,6 @@ human_size()
 }
 
 
-# $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
-# Note that size is represented in 1KiB blocks
-get_partitions_with_size()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-  local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
-
-  if [ -n "$DISK_NODEV" ]; then
-    echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}p?[0-9]+"
-  else
-    echo "$FIND_PARTS" # Show all
-  fi
-}
-
-
 # Safe (fixed) version of sgdisk since it doesn't always return non-zero when an error occurs
 sgdisk_safe()
 {
@@ -210,10 +195,105 @@ sfdisk_legacy_format()
 }
 
 
+# Function to detect whether a device has a GPT partition table
+gpt_detect()
+{
+  if sfdisk -d "$1" |grep -q -E -i -e '^/dev/.*[[:blank:]]Id=ee' -e '^label: gpt'; then
+    return 0 # GPT found
+  else
+    return 1 # GPT not found
+  fi
+}
+
+
+# Add partition number to device and return to stdout
+# $1 = device
+# $2 = number
+add_partition_number()
+{
+  if [ -b "${1}${2}" ]; then
+    echo "${1}${2}"
+  elif [ -b "${1}p${2}" ]; then
+    echo "${1}p${2}"
+  else
+    # Fallback logic:
+    # FIXME: Not sure if this is correct:
+    if echo "$1" |grep -q '[0-9]$'; then
+      echo "${1}p${2}"
+    else
+      echo "${1}${2}"
+    fi
+  fi
+}
+
+
+# $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
+# Note that size is represented in 1KiB blocks
+get_partitions_with_size()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
+
+  if [ -n "$DISK_NODEV" ]; then
+    echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}p?[0-9]+"
+  else
+    echo "$FIND_PARTS" # Show all
+  fi
+}
+
+
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions()
 {
   get_partitions_with_size "$1" |awk '{ print $1 }'
+}
+
+
+# $1 = disk device to get partitions from, if not specified all available partitions are listed
+get_disk_partitions_with_type()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  if gpt_detect "/dev/$DISK_NODEV" && check_command gdisk; then
+    # GPT partition table found
+    IFS=$EOL
+    for LINE in $(gdisk -l "/dev/$DISK_NODEV" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]'); do
+      NUM="$(echo "$LINE" |awk '{ print $1 }')"
+      PART="$(add_partition_number "$DISK_NODEV" "$NUM")"
+      TYPE="$(echo "$LINE" |awk '{ print $6 }')"
+
+      echo "$PART $TYPE"
+    done
+  else
+    # MBR/DOS Partitions:
+    IFS=$EOL
+    for LINE in $(sfdisk -l "/dev/$DISK_NODEV" 2>/dev/null); do
+      PART="$(echo "$LINE" |awk '{ print $1 }' |sed -e s,'^/dev/',,)"
+      TYPE="$(echo "$LINE" |sed -r -e s,'[/a-z0-9]+[^0-9]+',, |awk '{ print $5 }')"
+
+      echo "$PART $TYPE"
+    done
+  fi
+}
+
+
+# Get partitions directly from disk using sfdisk/sgdisk
+get_disk_partitions()
+{
+  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+
+  if gpt_detect "/dev/$DISK_NODEV" && check_command sgdisk; then
+    local DEV_PREFIX="/dev/$DISK_NODEV"
+    # FIXME: Not sure if this is correct:
+    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
+      DEV_PREFIX="${DEV_PREFIX}p"
+    fi
+
+    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
+  else
+    local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
+    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= ?0' |awk '{ print $1 }'
+  fi
 }
 
 
@@ -283,18 +363,20 @@ get_partition_disk()
 }
 
 
-# Get partitions directly from disk using sgdisk
-get_disk_partitions()
+# Show block device partitions, automatically showing either DOS or GPT partition table
+list_device_partitions()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local DEVICE="$1"
 
-  local DEV_PREFIX="/dev/$DISK_NODEV"
-  # FIXME: Not sure if this is correct:
-  if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
-    DEV_PREFIX="${DEV_PREFIX}p"
+  if gpt_detect "$DEVICE" && check_command gdisk; then
+    # GPT partition table found
+    local GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
+    printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
+  else
+    # MBR/DOS Partitions:
+    local FDISK_OUTPUT="$(fdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^/dev/' -e 'Device[[:blank:]]+Boot')"
+    printf "* DOS partition table:\n${FDISK_OUTPUT}\n\n"
   fi
-
-  sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
 }
 
 
@@ -335,42 +417,10 @@ show_block_device_info()
 }
 
 
-# Show block device partitions, automatically showing either DOS or GPT partition table
-list_device_partitions()
-{
-  local DEVICE="$1"
-
-  # GPT partition table found
-  printf "* Partition table:\n"
-  gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number' -e '^  '
-}
-
-
 # Get partition number from argument and return to stdout
 get_partition_number()
 {
   echo "$1" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',,
-}
-
-
-# Add partition number to device and return to stdout
-# $1 = device
-# $2 = number
-add_partition_number()
-{
-  if [ -b "${1}${2}" ]; then
-    echo "${1}${2}"
-  elif [ -b "${1}p${2}" ]; then
-    echo "${1}p${2}"
-  else
-    # Fallback logic:
-    # FIXME: Not sure if this is correct:
-    if echo "$1" |grep -q '[0-9]$'; then
-      echo "${1}p${2}"
-    else
-      echo "${1}${2}"
-    fi
-  fi
 }
 
 
@@ -673,8 +723,6 @@ sanity_check()
   check_command_error mkswap
   check_command_error sfdisk
   check_command_error fdisk
-  check_command_error sgdisk
-  check_command_error gdisk
   check_command_error dd
   check_command_error blkid
   check_command_error lsblk
@@ -1333,11 +1381,10 @@ check_disks()
         ENTER=1
       fi
 
-      if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+      # Note if disk currently contains GPT partitions, we can't simulate restore
+      if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ] && ! gpt_detect "/dev/${TARGET_NODEV}"; then
         # Simulate DOS partition table restore
         result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_legacy_format |sfdisk_safe --force -n "/dev/${TARGET_NODEV}" 2>&1)"
-
-        # For now only check for max size errors
         if [ $? -ne 0 ]; then
           echo "$result" >&2
           printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting...\n\033[0m" >&2
@@ -1415,7 +1462,7 @@ restore_disks()
     PARTPROBE=0
 
     # Clear all (GPT) partition data on --clean:
-    if [ $CLEAN -eq 1 ]; then
+    if [ $CLEAN -eq 1 ] && check_command sgdisk; then
       # Completely zap GPT, MBR and legacy partition data, if we're using GPT on one of the devices
       sgdisk --zap-all /dev/$TARGET_NODEV >/dev/null 2>&1
 
@@ -1853,9 +1900,9 @@ create_swaps()
   IFS=' '
   for DEVICE in $TARGET_DEVICES; do
     IFS=$EOL
-    sgdisk -p "$DEVICE" 2>/dev/null |grep -E -i "[[:blank:]]8200[[:blank:]]" |while read LINE; do
-      NUM="$(echo "$LINE" |awk '{ print $1 }')"
-      PART="$(add_partition_number "$DEVICE" "$NUM")"
+    get_disk_partitions_with_type "$DEVICE" 2>/dev/null |grep -E -i "[[:blank:]]820?0?$" |while read LINE; do
+      PART="/dev/$(echo "$LINE" |awk '{ print $1 }')"
+      printf "* Creating swapspace on $PART: "
       if ! mkswap -L "swap${SWAP_COUNT}" "$PART"; then
         printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi

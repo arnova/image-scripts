@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.12"
+MY_VERSION="3.17"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: July 26, 2016
+# Last update: November 1, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -132,6 +132,17 @@ human_size()
 }
 
 
+# Function to detect whether a device has a GPT partition table
+gpt_detect()
+{
+  if sfdisk -d "$1" |grep -q -E -i -e '^/dev/.*[[:blank:]]Id=ee' -e '^label: gpt'; then
+    return 0 # GPT found
+  else
+    return 1 # GPT not found
+  fi
+}
+
+
 # $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
 # Note that size is represented in 1KiB blocks
 get_partitions_with_size()
@@ -176,6 +187,7 @@ get_partitions_with_size_type()
     echo "$PART_NODEV: $BLKID_INFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
   done
 }
+
 
 # $1 = disk device to get layout from, if not specified all devices are output
 get_device_layout()
@@ -256,31 +268,6 @@ get_partition_disks()
 
   if [ -n "$FOUND_DISKS" ]; then
     echo "$FOUND_DISKS"
-  fi
-}
-
-
-# Get partitions directly from disk using sgdisk
-get_disk_partitions()
-{
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-  local DEV_PREFIX="/dev/$DISK_NODEV"
-  # FIXME: Not sure if this is correct:
-  if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
-    DEV_PREFIX="${DEV_PREFIX}p"
-  fi
-
-  sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
-}
-
-
-# Function to detect whether a device has a GPT partition table
-gpt_detect()
-{
-  if gdisk -l "$1" |grep -q 'GPT: not present'; then
-    return 1 # GPT not found
-  else
-    return 0 # GPT found
   fi
 }
 
@@ -509,8 +496,6 @@ sanity_check()
   check_command_error gzip
   check_command_error sfdisk
   check_command_error fdisk
-  check_command_error sgdisk
-  check_command_error gdisk
   check_command_error dd
   check_command_error blkid
   check_command_error lsblk
@@ -977,6 +962,12 @@ backup_disks()
     OUTPUT_SUFFIX="$(echo "$HDD_NODEV" |sed s,'/','_',g)"
 
     if gpt_detect "/dev/$HDD_NODEV"; then
+      # GPT partition table found, check for binaries
+      if ! check_command gdisk || ! check_command sgdisk; then
+        printf "\033[40m\033[1;31mERROR: Unable to save GPT partition as gdisk/sgdisk binaries were not found! Quitting...\n\033[0m" >&2
+        do_exit 9
+      fi
+
       echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
       sgdisk --backup="sgdisk.${OUTPUT_SUFFIX}" "/dev/${HDD_NODEV}"
 
