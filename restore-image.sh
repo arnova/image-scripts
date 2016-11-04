@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.17"
+MY_VERSION="3.17a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 1, 2016
+# Last update: November 4, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -36,6 +36,9 @@ TARGET_DEVICES=""
 
 # Global used later on when restoring partition-tables etc.
 DEVICE_FILES=""
+
+# Variable to indicate whether old or new sfdisk is used
+OLD_SFDISK=0
 
 SEP=':'
 EOL='
@@ -189,9 +192,22 @@ sfdisk_safe()
 }
 
 
-sfdisk_legacy_format()
+# This function is to handle old vs. new versions of sfdisk. It assumes that any data passed to it is always using DOS partitions (not GPT!)
+sfdisk_safe_with_legacy_fallback()
 {
-  grep -v -e "^label:" -e "^label-id:" -e "^device:" |sed s!'type='!'Id='!
+  local retval=0
+
+  if [ $OLD_SFDISK -eq 1 ]; then
+    # Filter out stuff that old sfdisk doesn't understand
+    grep -v -e "^label:" -e "^label-id:" -e "^device:" |sed s!'type='!'Id='! |sfdisk_safe $@
+    retval=$?
+  else
+    # Force DOS partition table
+    sfdisk_safe --label dos $@
+    retval=$?
+  fi
+
+  return $retval
 }
 
 
@@ -267,11 +283,12 @@ get_disk_partitions_with_type()
   else
     # MBR/DOS Partitions:
     IFS=$EOL
-    for LINE in $(sfdisk -l "/dev/$DISK_NODEV" 2>/dev/null); do
+    for LINE in $(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/'); do
       PART="$(echo "$LINE" |awk '{ print $1 }' |sed -e s,'^/dev/',,)"
-      TYPE="$(echo "$LINE" |sed -r -e s,'[/a-z0-9]+[^0-9]+',, |awk '{ print $5 }')"
-
-      echo "$PART $TYPE"
+      TYPE="$(echo "$LINE" |awk -F',' '{ print $3 }' |sed -r s,'.*= ?',,)"
+      if [ $TYPE -ne 0 ]; then
+        echo "$PART $TYPE"
+      fi
     done
   fi
 }
@@ -480,6 +497,12 @@ part_check()
   done
 
   printf "\033[40m\033[1;31mFAILED!\n\033[0m" >&2
+  echo "* Disk partitions:" >&2
+  echo "$DISK_PARTITIONS" >&2
+  echo "" >&2
+  echo "* Kernel partitions:" >&2
+  echo "$KERNEL_PARTITIONS" >&2
+  echo "" >&2
   return 1
 }
 
@@ -1368,10 +1391,9 @@ check_disks()
         ENTER=1
       fi
 
-      # Note if disk currently contains GPT partitions, we can't simulate restore
-      if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ] && ! gpt_detect "/dev/${TARGET_NODEV}"; then
+      if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # Simulate DOS partition table restore
-        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_legacy_format |sfdisk_safe --force -n "/dev/${TARGET_NODEV}" 2>&1)"
+        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_safe_with_legacy_fallback --force -n "/dev/${TARGET_NODEV}" 2>&1)"
         if [ $? -ne 0 ]; then
           echo "$result" >&2
           printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting...\n\033[0m" >&2
@@ -1535,7 +1557,7 @@ restore_disks()
 
         if [ -n "$SFDISK_FILE" ]; then
           echo "* Updating DOS partition-table on /dev/$TARGET_NODEV:"
-          result="$(cat "$SFDISK_FILE" |sfdisk_legacy_format |sfdisk_safe --force --no-reread /dev/$TARGET_NODEV 2>&1)"
+          result="$(cat "$SFDISK_FILE" |sfdisk_safe_with_legacy_fallback --force --no-reread /dev/$TARGET_NODEV 2>&1)"
           retval=$?
 
           # Make sure partition was properly written
@@ -2047,6 +2069,11 @@ fi
 if [ -n "$(find . -maxdepth 1 -type f -iname "sgdisk.*" -o -iname "gdisk.*")" ]; then
   check_command_error gdisk
   check_command_error sgdisk
+fi
+
+# Check whether old or new sfdisk is used
+if ! sfdisk --label dos -v >/dev/null 2>&1; then
+  OLD_SFDISK=1
 fi
 
 # Check target disks
