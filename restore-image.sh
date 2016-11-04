@@ -280,20 +280,7 @@ get_disk_partitions_with_type()
 # Get partitions directly from disk using sfdisk/sgdisk
 get_disk_partitions()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
-
-  if gpt_detect "/dev/$DISK_NODEV" && check_command sgdisk; then
-    local DEV_PREFIX="/dev/$DISK_NODEV"
-    # FIXME: Not sure if this is correct:
-    if echo "$DEV_PREFIX" |grep -q '[0-9]$'; then
-      DEV_PREFIX="${DEV_PREFIX}p"
-    fi
-
-    sgdisk -p "/dev/$DISK_NODEV" 2>/dev/null |grep -E "^[[:blank:]]+[0-9]+" |awk '{ print DISK$1 }' DISK=$DEV_PREFIX
-  else
-    local SFDISK_OUTPUT="$(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/')"
-    echo "$SFDISK_OUTPUT" |grep -E -v -i '[[:blank:]]Id= ?0' |awk '{ print $1 }'
-  fi
+  get_disk_partitions_with_type "$1" |awk '{print $1 }'
 }
 
 
