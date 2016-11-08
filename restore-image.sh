@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.17a"
+MY_VERSION="3.17b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 4, 2016
+# Last update: November 8, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -917,7 +917,7 @@ set_image_source_dir()
       # Ask user for IMAGE_NAME
       IMAGE_DEFAULT="$IMAGE_RESTORE_DEFAULT"
       while true; do
-        echo "* Showing contents of the image root directory ($IMAGE_DIR):"
+        echo "* Showing contents of the current directory ($IMAGE_DIR):"
         IFS=$EOL
         find "$IMAGE_DIR" -mindepth 1 -maxdepth 1 -type d |sort |while read ITEM; do
           printf "$(stat -c "%y" "$ITEM" |sed s/'\..*'//)\t$(basename $ITEM)\n"
@@ -925,6 +925,11 @@ set_image_source_dir()
 
         printf "\nImage (directory) to use ($IMAGE_DEFAULT): "
         read IMAGE_NAME
+
+        DIR_SELECT=0
+        if echo "$IMAGE_NAME" |grep -q "/$"; then
+          DIR_SELECT=1
+        fi
 
         TEMP_IMAGE_DIR="$IMAGE_DIR"
         while echo "$IMAGE_NAME" |grep -q '^../'; do
@@ -935,12 +940,9 @@ set_image_source_dir()
         # Get rid of ./ prefix
         IMAGE_NAME="$(echo "$IMAGE_NAME" |sed s:'^\./'::)"
 
-        DIR_SELECT=0
+        # Sub-folder handling (=trailing /)
         if echo "$IMAGE_NAME" |grep -q "/$"; then
-          # Sub-folder handling (trailing /)
-
           TEMP_IMAGE_DIR="$TEMP_IMAGE_DIR/$(echo "$IMAGE_NAME" |sed s:'/*$'::)"
-          DIR_SELECT=1
         fi
 
         if [ ! -d "$TEMP_IMAGE_DIR" ]; then
