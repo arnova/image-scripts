@@ -5,9 +5,10 @@
 ####################
 # Globals sourced from main script: CLEAN, TARGET_DEVICES
 
-# The primary partition number to use for the user partition (with Win7, 1 and 2 are used by the OS)
+# The primary partition number to use for the user partition (with Win7, 1 and 2 are used by the OS). FIXME: Should be auto-detected
 USER_PART_ID="3"
 
+# Reset some globals
 USER_DISK_NODEV=""
 USER_DISK_WIPE=0
 
@@ -210,6 +211,7 @@ mkud_select_disk()
           continue; # Try next
         fi
       fi
+      USER_PART_ID=1 # Overrule partition ID
       USER_DISK_WIPE=1
       USER_DISK_NODEV="$DISK_NODEV"
       break; # We're done
