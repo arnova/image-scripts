@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.17b"
+MY_VERSION="3.17c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 8, 2016
+# Last update: November 16, 2016
 # (C) Copyright 2004-2016 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -2081,16 +2081,10 @@ fi
 # Check target disks
 check_disks;
 
-if [ $NO_IMAGE -eq 0 ]; then
-  check_image_files;
-else
-  echo "* NOTE: Skipping partition image restoration"
-fi
+check_image_files;
 
-if [ $NO_IMAGE -eq 0 ]; then
-  # Check target partitions
-  check_partitions;
-fi
+# Check target partitions
+check_partitions;
 
 # Show info about target devices to be used
 show_target_devices;
@@ -2130,12 +2124,14 @@ if [ $ONLY_SH -eq 0 ]; then
   restore_disks;
 fi
 
-if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
+if [ $ONLY_SH -eq 0 ]; then
   # Make sure the target is sane
   test_target_partitions;
 
-  # Restore images to partitions
-  restore_partitions;
+  if [ $NO_IMAGE -eq 0 ]; then
+    # Restore images to partitions
+    restore_partitions;
+  fi
 fi
 
 if [ $CLEAN -eq 1 -a $ONLY_SH -eq 0 ]; then

@@ -3,13 +3,13 @@
 ####################
 # Global variables #
 ####################
-# Globals sourced from main script: CLEAN, TARGET_NODEV, TARGET_DEVICES
+# Globals sourced from main script: CLEAN, TARGET_DEVICES
 
 # The primary partition number to use for the user partition (with Win7, 1 and 2 are used by the OS)
 USER_PART_ID="3"
 
 USER_DISK_NODEV=""
-EXTRA_DISKS_NODEV=""
+USER_DISK_WIPE=0
 
 #############
 # Functions #
@@ -191,13 +191,30 @@ mkud_select_disk()
     fi
   done
 
-  # With more than one disk assume user partition will be on another disk than the OS
+  # Check all disks
   IFS=' '
-  for DISK in $FIND_DISKS; do
-    if [ "$DISK" = "$TARGET_NODEV" ]; then
-      USER_DISK_NODEV="$DISK"
-    elif ! echo "$TARGET_DEVICES" |grep -q -E "(^| )$DISK( |$)"; then
-      EXTRA_DISKS_NODEV="${EXTRA_DISKS_NODEV}${EXTRA_DISKS_NODEV:+ }$DISK"
+  for DISK_NODEV in $FIND_DISKS; do
+    # With more than one disk assume user partition will be on the (first) other disk than the OS
+    if ! echo "$TARGET_DEVICES" |grep -q -E "(^| |/)$DISK_NODEV( |$)"; then
+      USER_DISK_NODEV="" # Reset, in case it was set below
+      # Check for partitions on disk
+      PARTITIONS_FOUND="$(get_partitions /dev/$DISK_NODEV)"
+      if [ -n "$PARTITIONS_FOUND" ]; then
+        if [ $CLEAN -eq 1 ]; then
+          printf "\033[40m\033[1;31m* WARNING: Disk /dev/$DISK_NODEV already contains partitions!\n\033[0m" >&2
+          if ! get_user_yn "  Wipe (repartition + format) and format as (additional) user disk"; then
+            continue; # Try next
+          fi
+        else
+          echo "* NOTE: Extra disk /dev/$DISK_NODEV already contains partitions, ignoring it"
+          continue; # Try next
+        fi
+      fi
+      USER_DISK_WIPE=1
+      USER_DISK_NODEV="$DISK_NODEV"
+      break; # We're done
+    elif [ -z "$USER_DISK_NODEV" ]; then
+      USER_DISK_NODEV="$DISK_NODEV" # Default to the first disk in the list
     fi
   done
 
@@ -219,40 +236,10 @@ if [ -z "$USER_DISK_NODEV" ]; then
 else
   # In principle we should never have to wipe + repartition(0) the OS disk
   # as this should already be done while restoring the images
-  mkud_create_user_filesystem "$USER_DISK_NODEV" "$USER_PART_ID" "USER" 0
+  mkud_create_user_filesystem "$USER_DISK_NODEV" "$USER_PART_ID" "USER" $USER_DISK_WIPE
 
   # Add the disk to restore-image script's target list so its partitions get listed when done
   if ! echo "$TARGET_DEVICES" |grep -q -E "(^| )/dev/$USER_DISK_NODEV( |$)"; then
     TARGET_DEVICES="$TARGET_DEVICES /dev/$USER_DISK_NODEV"
   fi
-
-  # Check for extra disk:
-  USER_COUNT=1
-  IFS=' ,'
-  for EXTRA_DISK_NODEV in $EXTRA_DISKS_NODEV; do
-    PARTITIONS_FOUND="$(get_partitions /dev/$EXTRA_DISK_NODEV)"
-    EXTRA_DISK_WIPE=0
-    if [ -n "$PARTITIONS_FOUND" ]; then
-      if [ $CLEAN -eq 1 ]; then
-        printf "\033[40m\033[1;31m* WARNING: Extra disk /dev/$EXTRA_DISK_NODEV already contains partitions!\n\033[0m" >&2
-        if get_user_yn "  Wipe (repartition + format) and format as (additional) user disk"; then
-          EXTRA_DISK_WIPE=1
-        fi
-      else
-        echo "* NOTE: Extra disk /dev/$EXTRA_DISK_NODEV already contains partitions, ignoring it"
-      fi
-    else
-      EXTRA_DISK_WIPE=1
-    fi
-
-    USER_COUNT=$((USER_COUNT + 1))
-
-    if [ $EXTRA_DISK_WIPE -eq 1 ]; then
-      mkud_create_user_filesystem "$EXTRA_DISK_NODEV" "$USER_PART_ID" "USER${USER_COUNT}" 1;
-      # Add the disk to restore-image script's target list so its partitions get listed when done
-      if ! echo "$TARGET_DEVICES" |grep -q -E "(^| )/dev/$EXTRA_DISK_NODEV( |$)"; then
-        TARGET_DEVICES="$TARGET_DEVICES /dev/$EXTRA_DISK_NODEV"
-      fi
-    fi
-  done
 fi
