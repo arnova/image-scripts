@@ -204,11 +204,12 @@ mkud_select_disk()
         if [ $CLEAN -eq 1 ]; then
           printf "\033[40m\033[1;31m* WARNING: Disk /dev/$DISK_NODEV already contains partitions!\n\033[0m" >&2
           if ! get_user_yn "  Wipe (repartition + format) and format as (additional) user disk"; then
-            continue; # Try next
+            echo "* Skipping user disk wipe/format"
+            break; # We're done
           fi
         else
-          echo "* NOTE: Extra disk /dev/$DISK_NODEV already contains partitions, ignoring it"
-          continue; # Try next
+          echo "* NOTE: Disk /dev/$DISK_NODEV already contains partitions, skipping user disk wipe/format"
+          break; # We're done
         fi
       fi
       USER_PART_ID=1 # Overrule partition ID
@@ -234,7 +235,7 @@ mkud_select_disk()
 mkud_select_disk;
 
 if [ -z "$USER_DISK_NODEV" ]; then
-  echo "WARNING: No (suitable) disk found for user partition!" >&2
+  echo "WARNING: No user partition created!" >&2
 else
   # In principle we should never have to wipe + repartition(0) the OS disk
   # as this should already be done while restoring the images
