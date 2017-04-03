@@ -160,7 +160,7 @@ mkud_create_user_filesystem()
     echo "* Creating user NTFS filesystem on $TARGET_PART with label \"$TARGET_PART_LABEL\""
     if mkntfs -L $TARGET_PART_LABEL -Q $TARGET_PART; then
       if mkdir -p /mnt/windows && ntfs-3g "$TARGET_PART" /mnt/windows; then
-        mkdir "/mnt/windows/My Documents"
+        mkdir "/mnt/windows/Documents"
         mkdir "/mnt/windows/Downloads"
         mkdir "/mnt/windows/temp"
 #        mkdir "/mnt/windows/Program Files"
