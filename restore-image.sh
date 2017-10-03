@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.17c"
+MY_VERSION="3.17d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 16, 2016
-# (C) Copyright 2004-2016 by Arno van Amersfoort
+# Last update: October 3, 2017
+# (C) Copyright 2004-2017 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -2147,12 +2147,10 @@ USER_TARGET_NODEV="$TARGET_NODEV"
 if [ $NO_CUSTOM_SH -eq 0 ] && ls *.sh >/dev/null 2>&1; then
   echo "--------------------------------------------------------------------------------"
   unset IFS
-  for script in *.sh; do
-    if [ -e "$script" ]; then
-      # Source script:
-      echo "* Executing custom script \"$script\""
-      . ./"$script"
-    fi
+  for script in $(find . -maxdepth 1 -type f -iname "*.sh"); do
+    # Source script:
+    echo "* Executing custom script \"$script\""
+    . ./"$script"
   done
 fi
 
