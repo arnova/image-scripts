@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.17d"
+MY_VERSION="3.18"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 3, 2017
-# (C) Copyright 2004-2017 by Arno van Amersfoort
+# Last update: February 10, 2019
+# (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -526,7 +526,7 @@ parse_gdisk_output()
 {
   IFS=$EOL
   while read LINE; do
-    if ! "/dev/${TARGET_NODEV}" |grep -q -E '^[[:blank:]]+[0-9]'; then
+    if ! echo "$LINE" |grep -q -E '^[[:blank:]]+[0-9]'; then
       continue;
     fi
 
@@ -1246,19 +1246,23 @@ check_disks()
       if [ ! -b "/dev/$TARGET_NODEV" ]; then
         echo ""
         printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist!\n\n\033[0m" >&2
-        continue;
+        continue
       fi
 
       local DEVICE_TYPE="$(lsblk -d -n -o TYPE /dev/$TARGET_NODEV)"
       # Make sure it's a real disk
       if [ "$DEVICE_TYPE" = "disk" ]; then
         # Make sure kernel doesn't use old partition table
-        if ! partprobe "/dev/$TARGET_NODEV" && [ $FORCE -ne 1 ]; then
+        if ! partprobe "/dev/$TARGET_NODEV"; then
           echo ""
-          printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override.\n\n\033[0m" >&2
-          continue;
+          if [ $FORCE -ne 1 ]; then
+            printf "\033[40m\033[1;31mWARNING: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions?\n\n\033[0m" >&2
+            ENTER=1
+          else
+            printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override.\n\n\033[0m" >&2
+            continue
+          fi
         fi
-
 
         # Check if DMA is enabled for device
         check_dma "/dev/$TARGET_NODEV"
@@ -1269,7 +1273,7 @@ check_disks()
       if [ "$IMAGE_SOURCE_NODEV" != "$TARGET_NODEV" ]; then
         update_source_to_target_device_remap "$IMAGE_SOURCE_NODEV" "/dev/$TARGET_NODEV"
       fi
-      break;
+      break
     done
 
     # Check whether device already contains partitions
@@ -1397,9 +1401,14 @@ check_disks()
         # Simulate DOS partition table restore
         result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_safe_with_legacy_fallback --force -n "/dev/${TARGET_NODEV}" 2>&1)"
         if [ $? -ne 0 ]; then
-          echo "$result" >&2
-          printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting...\n\033[0m" >&2
-          do_exit 5
+          if [ $FORCE -eq 1 ]; then
+            printf "\033[40m\033[1;31m\nWARNING: Invalid DOS partition table (disk too small?)!\n\033[0m" >&2
+            ENTER=1
+          else
+            echo "$result" >&2
+            printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+            do_exit 5
+          fi
         fi
       fi
 
@@ -1409,8 +1418,13 @@ check_disks()
 
         if [ $? -ne 0 ]; then
           echo "$result" >&2
-          printf "\033[40m\033[1;31m\nERROR: Invalid GPT partition table (disk too small?)! Quitting...\n\033[0m" >&2
-          do_exit 5
+          if [ $FORCE -eq 1 ]; then
+            printf "\033[40m\033[1;31mWARNING: Invalid GPT partition table (disk too small?)!\n\033[0m" >&2
+            ENTER=1
+          else
+            printf "\033[40m\033[1;31mERROR: Invalid GPT partition table (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+            do_exit 5
+          fi
         fi
       fi
     fi
