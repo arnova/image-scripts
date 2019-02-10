@@ -325,7 +325,7 @@ configure_network()
       MAC_ADDR=`echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }'`
       if [ -z "$MAC_ADDR" ]; then
         echo "* Skipped auto config for interface: $CUR_IF"
-        continue;
+        continue
       fi
       IP_TEST=`echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g'`
     fi
@@ -351,7 +351,7 @@ configure_network()
       if echo "$NETWORK" |grep -q -e 'static'; then
         echo ""
         if ! get_user_yn "* Setup interface $CUR_IF statically"; then
-          continue;
+          continue
         fi
 
         printf "  IP address ($IPADDRESS)? : "
@@ -628,7 +628,7 @@ set_image_target_dir()
         if [ -z "$IMAGE_NAME" ]; then
           echo ""
           printf "\033[40m\033[1;31mERROR: You must specify the image target directory to be used!\n\033[0m" >&2
-          continue;
+          continue
         fi
 
         IMAGE_DIR="$IMAGE_NAME"
@@ -642,7 +642,7 @@ set_image_target_dir()
         fi
 
         if ! mkdir_safe "$IMAGE_DIR"; then
-          continue;
+          continue
         fi
 
         echo ""
@@ -660,7 +660,7 @@ set_image_target_dir()
       fi
 
       if ! mkdir_safe "$IMAGE_DIR"; then
-        do_exit 7;
+        do_exit 7
       fi
     fi
   fi
@@ -726,27 +726,27 @@ detect_partitions()
       local PART_NODEV=`echo "$LINE" |awk -F: '{ print $1 }'`
 
       if echo "$LINE" |grep -q -e '^loop[0-9]' -e '^sr[0-9]' -e '^fd[0-9]' -e '^ram[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
-        continue;
+        continue
       fi
 
       if echo "$LINE" |grep -q -E "([[:blank:]]|^)SIZE=\"?0"; then
-        continue; # Ignore device
+        continue # Ignore device
       fi
 
 
       # Make sure it's a real partition
       if ! echo "$BLKID_LIST" |grep -q "^/dev/${PART_NODEV}:"; then
-        continue;
+        continue
       fi
 
       # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
       if echo "$LINE" |grep -q -i -E -e "([[:blank:]]|^)TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member)" -e "([[:blank:]]|^)PTTYPE="; then
-        continue; # Ignore swap, lvm (dm), raid (md), etc. partitions
+        continue # Ignore swap, lvm (dm), raid (md), etc. partitions
       fi
 
       # Extra strict regex for making sure it's really a filesystem
 #      if ! echo "$LINE" |grep -q -i ' TYPE=' && ! echo "$LINE" |grep -q -i -E -e ' LABEL=' -e '; then
-#        continue;
+#        continue
 #      fi
 
       SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART_NODEV}"
@@ -853,7 +853,7 @@ select_partitions()
         fi
 
         echo ""
-        show_backup_disks_info $BACKUP_DISKS;
+        show_backup_disks_info $BACKUP_DISKS
       fi
 
       if [ $USER_SELECT -eq 1 ]; then
@@ -863,14 +863,14 @@ select_partitions()
         IGNORE_PARTITIONS="" # Don't confuse user by showing ignored partitions
 
         if [ -z "$USER_DEVICES" ]; then
-          break;
+          break
         else
           SELECT_DEVICES="$USER_DEVICES"
           USER_SELECT=0
-          continue; # Redo loop
+          continue # Redo loop
         fi
        else
-         break;
+         break
       fi
     else
       if [ -z "$SELECT_DEVICES" -o -z "$SELECT_PARTITIONS" ]; then
@@ -1126,14 +1126,14 @@ load_config()
 echo "Image BACKUP Script v$MY_VERSION - Written by Arno van Amersfoort"
 
 # Load configuration from file/commandline
-load_config $*;
+load_config $*
 
 # Sanity check environment
 sanity_check;
 
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET -ne 1 ]; then
   # Setup network (interface)
-  configure_network;
+  configure_network
 
   # Try to sync time against the server used, if ntpdate is available
   if [ -n "$SERVER" ] && check_command ntpdate; then
@@ -1144,7 +1144,7 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-set_image_target_dir;
+set_image_target_dir
 
 echo "--------------------------------------------------------------------------------"
 echo "* Using image name: $IMAGE_DIR"
@@ -1167,7 +1167,7 @@ if [ -n "$(find . -maxdepth 1 -type f)" ]; then
 fi
 
 # Determine which partitions to backup, else determines disks they're on
-select_partitions;
+select_partitions
 
 if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
   if [ -n "$BACKUP_PARTITIONS" ]; then
@@ -1211,12 +1211,12 @@ fi
 
 # Backup disk partitions/MBR's etc. :
 if [ $NO_TRACK0 -ne 1 -a $ONLY_SH -eq 0 ]; then
-  backup_disks;
+  backup_disks
 fi
 
 # Backup selected partitions to images
 if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
-  backup_partitions;
+  backup_partitions
 fi
 
 # Reset terminal

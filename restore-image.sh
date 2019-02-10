@@ -512,7 +512,7 @@ parse_sfdisk_output()
   IFS=$EOL
   while read LINE; do
     if ! echo "$LINE" |grep -i -q ': start=.*size=' || echo "$LINE" |grep -E -i -q '(Id|type)= ?0$'; then
-      continue;
+      continue
     fi
 
     #SFDISK_SOURCE_PART="$(grep -E "^/dev/${IMAGE_PARTITION_NODEV}[[:blank:]]" "partitions.${SOURCE_DISK_NODEV}" |sed -E -e s,'[[:blank:]]+',' ',g -e s,'^ +',,)"
@@ -527,7 +527,7 @@ parse_gdisk_output()
   IFS=$EOL
   while read LINE; do
     if ! echo "$LINE" |grep -q -E '^[[:blank:]]+[0-9]'; then
-      continue;
+      continue
     fi
 
     echo "$LINE" |awk '{ print $1 " "  $2 " " $3 " " $4 " " $5 " " $6 }'
@@ -558,7 +558,7 @@ partprobe()
 
     # If blockdev returned success, we're done
     if [ $retval -eq 0 -a -z "$result" ]; then
-      break;
+      break
     fi
   done
 
@@ -587,7 +587,7 @@ configure_network()
       MAC_ADDR=`echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }'`
       if [ -z "$MAC_ADDR" ]; then
         echo "* Skipped auto config for interface: $CUR_IF"
-        continue;
+        continue
       fi
       IP_TEST=`echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g'`
     fi
@@ -613,7 +613,7 @@ configure_network()
       if echo "$NETWORK" |grep -q -e 'static'; then
         echo ""
         if ! get_user_yn "* Setup interface $CUR_IF statically"; then
-          continue;
+          continue
         fi
 
         printf "  IP address ($IPADDRESS)? : "
@@ -953,7 +953,7 @@ set_image_source_dir()
         if [ $DIR_SELECT -eq 1 ]; then
           IMAGE_DIR="$TEMP_IMAGE_DIR"
           IMAGE_DEFAULT="."
-          continue;
+          continue
         fi
 
         if [ -z "$IMAGE_NAME" ]; then
@@ -967,13 +967,13 @@ set_image_source_dir()
         LOOKUP="$(find "$TEMP_IMAGE_DIR/" -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" 2>/dev/null)"
         if [ -z "$LOOKUP" ]; then
           printf "\033[40m\033[1;31m\nERROR: No valid image (directory) specified ($TEMP_IMAGE_DIR)!\n\n\033[0m" >&2
-          continue;
+          continue
         fi
 
         # Try to cd to the image directory
         if ! chdir_safe "$TEMP_IMAGE_DIR"; then
           printf "\033[40m\033[1;31mERROR: Failed to change directory to $TEMP_IMAGE_DIR!\n\033[0m" >&2
-          continue;
+          continue
         fi
 
         IMAGE_DIR="$TEMP_IMAGE_DIR"
@@ -1028,12 +1028,12 @@ source_to_target_remap()
       # Argument is a partition
       if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+"; then
         TARGET_DEVICE=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
-        break;
+        break
       fi
     else
       # Argument is a disk
       TARGET_DEVICE="/dev/${TARGET_DEVICE_MAP_NODEV}"
-      break;
+      break
     fi
   done
 
@@ -1045,7 +1045,7 @@ source_to_target_remap()
 
     if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "$TARGET_PARTITION_MAP" ]; then
       TARGET_DEVICE="$TARGET_PARTITION_MAP"
-      break;
+      break
     fi
   done
 
@@ -1202,7 +1202,7 @@ get_auto_target_device()
       # Checked for mounted partitions
       if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
-        break;
+        break
       fi
       #FIXME: Skip check above when --clean is not specified?
     done
@@ -1215,7 +1215,7 @@ get_auto_target_device()
 check_disks()
 {
   # Show disks/devices available for restoration
-  show_available_disks;
+  show_available_disks
 
   # Restore MBR/track0/partitions:
   IFS=' '
@@ -1239,7 +1239,7 @@ check_disks()
       TARGET_NODEV="$USER_TARGET_NODEV"
 
       if [ -z "$TARGET_NODEV" ]; then
-        continue;
+        continue
       fi
 
       # Check if target device exists
@@ -1314,7 +1314,7 @@ check_disks()
           # Check entry on source
           if ! cat "gdisk.${IMAGE_SOURCE_NODEV}" |parse_gdisk_output |grep -q -x "${PART_ENTRY}"; then
             MISMATCH=1
-            break;
+            break
           fi
         done
 
@@ -1344,7 +1344,7 @@ check_disks()
         for PART_ENTRY in $SFDISK_TARGET; do
           if ! cat "sfdisk.${IMAGE_SOURCE_NODEV}" |parse_sfdisk_output |grep -q -x "${PART_ENTRY}"; then
             MISMATCH=1
-            break;
+            break
           fi
         done
 
@@ -1611,7 +1611,7 @@ restore_disks()
         : # No-op
       elif [ $FORCE -ne 1 ]; then
         printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed! Use --force to override.\n\033[0m" >&2
-        do_exit 5;
+        do_exit 5
       fi
     fi
   done
@@ -1859,7 +1859,7 @@ test_target_partitions()
           printf "\033[40m\033[1;31m\nWARNING: GPT partition /dev/$IMAGE_PARTITION_NODEV can not be found in partition source files!\n\033[0m" >&2
           echo ""
           MISMATCH=1
-          continue;
+          continue
         fi
 
         if ! compare_gpt_partition "$GDISK_SOURCE_PART" "$GDISK_TARGET_PART"; then
@@ -1891,7 +1891,7 @@ test_target_partitions()
           printf "\033[40m\033[1;31m\nWARNING: DOS partition /dev/$IMAGE_PARTITION_NODEV can not be found in the partition source files!\n\033[0m" >&2
           echo ""
           MISMATCH=1
-          continue;
+          continue
         fi
 
         # Check geometry/type of partition
@@ -1908,7 +1908,7 @@ test_target_partitions()
     printf "\033[40m\033[1;31mWARNING: Target partition mismatches with source!\n\033[0m" >&2
     if ! get_user_yn "Continue anyway"; then
       echo "Aborted by user..."
-      do_exit 5;
+      do_exit 5
     fi
     return 1
   fi
@@ -2051,14 +2051,14 @@ load_config()
 echo "Image RESTORE Script v$MY_VERSION - Written by Arno van Amersfoort"
 
 # Load configuration from file/commandline
-load_config $*;
+load_config $*
 
 # Sanity check environment
-sanity_check;
+sanity_check
 
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET != 1 ]; then
   # Setup network (interface)
-  configure_network;
+  configure_network
 
   # Try to sync time against the server used, if ntpdate is available
   if [ -n "$SERVER" ] && check_command ntpdate; then
@@ -2069,7 +2069,7 @@ fi
 # Setup CTRL-C handler
 trap 'ctrlc_handler' 2
 
-set_image_source_dir;
+set_image_source_dir
 
 echo "--------------------------------------------------------------------------------"
 echo "* Image name: $(basename $IMAGE_DIR)"
@@ -2093,15 +2093,15 @@ if ! sfdisk --label dos -v >/dev/null 2>&1; then
 fi
 
 # Check target disks
-check_disks;
+check_disks
 
-check_image_files;
+check_image_files
 
 # Check target partitions
-check_partitions;
+check_partitions
 
 # Show info about target devices to be used
-show_target_devices;
+show_target_devices
 
 if [ -e "description.txt" ]; then
   echo "--------------------------------------------------------------------------------"
@@ -2128,28 +2128,28 @@ echo ""
 
 if ! get_user_yn "Continue with restore"; then
   echo "Aborted by user..."
-  do_exit 1;
+  do_exit 1
 else
   echo ""
 fi
 
 # Restore MBR/partition tables
 if [ $ONLY_SH -eq 0 ]; then
-  restore_disks;
+  restore_disks
 fi
 
 if [ $ONLY_SH -eq 0 ]; then
   # Make sure the target is sane
-  test_target_partitions;
+  test_target_partitions
 
   if [ $NO_IMAGE -eq 0 ]; then
     # Restore images to partitions
-    restore_partitions;
+    restore_partitions
   fi
 fi
 
 if [ $CLEAN -eq 1 -a $ONLY_SH -eq 0 ]; then
-  create_swaps;
+  create_swaps
 fi
 
 # Set this for legacy scripts:
