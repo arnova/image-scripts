@@ -476,7 +476,7 @@ part_check()
   IFS=' '
   local TRY=10
   while [ $TRY -gt 0 ]; do
-    TRY=$(($TRY - 1))
+    TRY=$((TRY - 1))
 
     # First make sure all partitions reported by the disk exist according to the kernel in /dev/
     DISK_PARTITIONS="$(get_disk_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
@@ -547,7 +547,7 @@ partprobe()
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
   local TRY=10
   while [ $TRY -gt 0 ]; do
-    TRY=$(($TRY - 1))
+    TRY=$((TRY - 1))
 
     # Somehow using the partprobe binary itself doesn't always work properly, so use blockdev instead
     result="$(blockdev --rereadpt "$DEVICE" 2>&1)"
@@ -1931,7 +1931,7 @@ create_swaps()
       if ! mkswap -L "swap${SWAP_COUNT}" "$PART"; then
         printf "\033[40m\033[1;31mWARNING: mkswap failed for $PART\n\033[0m" >&2
       fi
-      SWAP_COUNT=$(($SWAP_COUNT + 1))
+      SWAP_COUNT=$((SWAP_COUNT + 1))
     done
   done
 }
@@ -2158,7 +2158,7 @@ TARGET_NODEV=`echo "$TARGET_DEVICE" |sed s,'^/dev/',,`
 USER_TARGET_NODEV="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):
-if [ $NO_CUSTOM_SH -eq 0 ] && ls *.sh >/dev/null 2>&1; then
+if [ $NO_CUSTOM_SH -eq 0 ] && ls ./*.sh >/dev/null 2>&1; then
   echo "--------------------------------------------------------------------------------"
   unset IFS
   for script in $(find . -maxdepth 1 -type f -iname "*.sh"); do
