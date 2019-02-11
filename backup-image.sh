@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.17"
+MY_VERSION="3.20"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 1, 2016
-# (C) Copyright 2004-2016 by Arno van Amersfoort
+# Last update: February 11, 2019
+# (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -456,28 +456,99 @@ check_command_warning()
 }
 
 
-# Wrapper for partclone to autodetect filesystem and select the proper partclone.*
-partclone_detect()
+# Get proper partclone command for provided hint
+get_partclone_cmd()
 {
-  local PART="$1"
-  local PARTCLONE_BIN=""
+  local PC_HINT="$1"
 
-  local TYPE=`blkid -s TYPE -o value "$PART"` # May try `file -s -b "$PART"` instead but blkid seems to work better
-  case $TYPE in
-    ntfs)                           check_command_error "partclone.ntfs" && PARTCLONE_BIN="partclone.ntfs -c"
+  case $PC_HINT in
+    pc.ntfs)                        check_command_error "partclone.ntfs" && echo "partclone.ntfs -c"
                                     ;;
-    vfat|msdos|fat*)                check_command_error "partclone.fat" && PARTCLONE_BIN="partclone.fat -c"
+    pc.fat12)                       if check_command "partclone.vfat"; then
+                                      echo "partclone.vfat -c"
+                                    else
+                                      check_command_error "partclone.fat12" && echo "partclone.fat12 -c"
+                                    fi
                                     ;;
-    ext2|ext3|ext4)                 check_command_error "partclone.extfs" && PARTCLONE_BIN="partclone.extfs -c"
+    pc.fat16)                       if check_command "partclone.vfat"; then
+                                      echo "partclone.vfat -c"
+                                    else
+                                      check_command_error "partclone.fat16" && echo "partclone.fat16 -c"
+                                    fi
                                     ;;
-    btrfs)                          check_command_error "partclone.btrfs" && PARTCLONE_BIN="partclone.btrfs -c"
+    pc.fat32)                       if check_command "partclone.vfat"; then
+                                      echo "partclone.vfat -c"
+                                    else
+                                      check_command_error "partclone.fat32" && echo "partclone.fat32 -c"
+                                    fi
                                     ;;
-    *)                              check_command_error "partclone.dd" && PARTCLONE_BIN="partclone.dd"
+    pc.exfat)                       if check_command "partclone.vfat"; then
+                                      echo "partclone.vfat -c"
+                                    else
+                                      check_command_error "partclone.exfat" && echo "partclone.exfat -c"
+                                    fi
+                                    ;;
+    pc.ext2)                        if check_command "partclone.extfs"; then
+                                      echo "partclone.extfs -c"
+                                    else
+                                      check_command_error "partclone.ext2" && echo "partclone.ext2 -c"
+                                    fi
+                                    ;;
+    pc.ext3)                        if check_command "partclone.extfs"; then
+                                      echo "partclone.extfs -c"
+                                    else
+                                      check_command_error "partclone.ext3" && echo "partclone.ext3 -c"
+                                    fi
+                                    ;;
+    pc.ext4)                        if check_command "partclone.extfs"; then
+                                      echo "partclone.extfs -c"
+                                    else
+                                      check_command_error "partclone.ext4" && echo "partclone.ext4 -c"
+                                    fi
+                                    ;;
+    pc.xfs)                         check_command_error "partclone.xfs" && echo "partclone.xfs -c"
+                                    ;;
+    pc.btrfs)                       check_command_error "partclone.btrfs" && echo "partclone.btrfs -c"
                                     ;;
   esac
+}
 
-  echo "$PARTCLONE_BIN"
-  return 0
+
+get_imager_for_device()
+{
+  local DEVICE="$1"
+  
+  if [ "$IMAGE_PROGRAM" = "ddgz" ]; then
+    echo "ddgz"
+  else
+    local TYPE=`blkid -s TYPE -o value "$DEVICE"` # May try `file -s -b "$PART"` instead but blkid seems to work better
+
+    if [ "$IMAGE_PROGRAM" = "pc" ]; then
+      case $TYPE in
+        ntfs)             echo "pc.ntfs";;
+        fat12)            echo "pc.fat12";;
+        fat16|msdos)      echo "pc.fat16";;
+        fat32|vfat)       echo "pc.fat32";;
+        exfat)            echo "pc.exfat";;
+        ext2)             echo "pc.ext2";;
+        ext3)             echo "pc.ext3";;
+        ext4)             echo "pc.ext4";;
+        xfs)              echo "pc.xfs";;
+        btrfs)            echo "pc.btrfs";;
+        *)                echo "ddgz";;
+        esac
+    elif [ "$IMAGE_PROGRAM" = "fsa" ]; then
+      case $TYPE in
+        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|btrfs|xfs)  echo "fsa";;
+        *)                                                     echo "ddgz";;
+      esac
+    elif [ "$IMAGE_PROGRAM" = "pi" ]; then
+      case $TYPE in
+        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|xfs) echo "pi";;
+        *)                                              echo "ddgz";;
+      esac
+    fi
+  fi
 }
 
 
@@ -804,7 +875,8 @@ select_partitions()
     unset IFS
     for PART_NODEV in $SELECT_PARTITIONS; do
       if grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /etc/mtab; then
-        if [ "$IMAGE_PROGRAM" = "fsa" ]; then
+        imager="$(get_imager_for_device /dev/$PART_NODEV)"
+        if [ "$imager" = "fsa" ]; then
           # FSArchiver can backup live (mounted) partitions, the others cannot
           # so if user specified partition generate warning and proceed
           if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
@@ -834,7 +906,7 @@ select_partitions()
     done
 
     if [ -n "$BACKUP_PARTITIONS" ]; then
-      select_disks; # Determine which disks the partitions are on
+      select_disks # Determine which disks the partitions are on
 
       # Check whether we already displayed this disk
       NEW_FOUND=0
@@ -895,7 +967,13 @@ backup_partitions()
     local retval=1
     local TARGET_FILE=""
     local OUTPUT_PREFIX="$(echo "$PART" |sed s,'/','_',g)"
-    case "$IMAGE_PROGRAM" in
+    local IMAGER="$(get_imager_for_device /dev/$PART)"
+    
+    if [ "$IMAGER" = "ddgz" -a "$IMAGE_PROGRAM" != "ddgz" ]; then
+      printf "\033[40m\033[1;31mWARNING: Filesystem on /dev/$PART not supported, falling back to ddgz-backup\n\033[0m" >&2
+    fi
+
+    case "$IMAGER" in
       fsa)  TARGET_FILE="${OUTPUT_PREFIX}.fsa"
             printf "** Using fsarchiver to backup /dev/$PART to $TARGET_FILE **\n\n"
             fsarchiver -a -A -v --exclude="/.snapshots" savefs "$TARGET_FILE" "/dev/$PART"
@@ -906,8 +984,9 @@ backup_partitions()
             partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
             retval=$?
             ;;
-      pc)   TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
-            PARTCLONE_CMD=`partclone_detect "/dev/$PART"`
+      pc.*) TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
+            PARTCLONE_CMD="$(get_partclone_cmd "$IMAGER")"
+
             if [ -n "$PARTCLONE_CMD" ]; then
               if [ $RESCUE -eq 1 ]; then
                 PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
