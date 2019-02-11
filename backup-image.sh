@@ -979,16 +979,16 @@ get_imager_for_device()
         esac
     elif [ "$IMAGE_PROGRAM" = "fsa" ]; then
       case $TYPE in
-        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|btrfs|xfs)  echo "fsarchiver"
+        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|xfs|btrfs)  echo "fsarchiver"
         ;;
         *)                                                     echo "dd" # Fallback for unsupported filesystems
         ;;
       esac
     elif [ "$IMAGE_PROGRAM" = "pi" ]; then
       case $TYPE in
-        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|xfs) echo "partimage"
+        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|xfs)  echo "partimage"
         ;;
-        *)                                              echo "dd" # Fallback for unsupported filesystems
+        *)                                          echo "dd" # Fallback for unsupported filesystems
         ;;
       esac
     fi
