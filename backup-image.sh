@@ -758,6 +758,7 @@ select_partitions()
   local LAST_BACKUP_DISKS=""
   local USER_SELECT=0
   local SELECT_PARTITIONS=""
+  local FS_TYPE IMAGER
 
   # User select loop:
   while true; do
@@ -794,8 +795,10 @@ select_partitions()
     unset IFS
     for PART_NODEV in $SELECT_PARTITIONS; do
       if grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /etc/mtab; then
-        imager="$(get_imager_for_device /dev/$PART_NODEV)"
-        if [ "$imager" = "fsarchiver" ]; then
+        FS_TYPE="$(get_filesystem_type /dev/$PART_NODEV)"
+        IMAGER="$(get_imager_for_fs_type "$FS_TYPE")"
+
+        if [ "$IMAGER" = "fsarchiver" ]; then
           # FSArchiver can backup live (mounted) partitions, the others cannot
           # so if user specified partition generate warning and proceed
           if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
@@ -941,16 +944,14 @@ get_filesystem_type()
 }
 
 
-# Get proper archiver command for partition type
-get_imager_for_device()
+# Get proper archiver command for specified filesystem type
+get_imager_for_fs_type()
 {
-  local DEVICE="$1"
+  local FS_TYPE="$1"
 
   if [ "$IMAGE_PROGRAM" = "ddgz" ]; then
     echo "dd"
   else
-    FS_TYPE="$(get_filesystem_type "$DEVICE")"
-
     if [ "$IMAGE_PROGRAM" = "pc" ]; then
       case $FS_TYPE in
         ntfs)             echo "$PARTCLONE_NTFS"
@@ -1003,7 +1004,10 @@ backup_partitions()
     local retval=1
     local TARGET_FILE=""
     local OUTPUT_PREFIX="$(echo "$PART" |sed s,'/','_',g)"
-    local IMAGER="$(get_imager_for_device /dev/$PART)"
+
+    # Determine filesystem type
+    local FS_TYPE="$(get_filesystem_type /dev/$PART)"
+    local IMAGER="$(get_imager_for_fs_type "$FS_TYPE")"
     
     if [ "$IMAGER" = "dd" -a "$IMAGE_PROGRAM" != "ddgz" ]; then
       printf "\033[40m\033[1;31mWARNING: Filesystem \"$FS_TYPE\" on /dev/$PART not supported, falling back to ddgz-backup!\n\033[0m" >&2
