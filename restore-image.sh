@@ -1386,8 +1386,8 @@ check_disks()
     fi
 
     if [ $CLEAN -eq 1 -o $MBR_WRITE -eq 1 ] &&
-       [ ! -e "track0.${IMAGE_SOURCE_NODEV}" -a -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-      printf "\033[40m\033[1;31mWARNING: track0.${IMAGE_SOURCE_NODEV} does NOT exist! Won't be able to update MBR boot loader\n\033[0m" >&2
+       [ ! -e "track0.${IMAGE_SOURCE_NODEV}" ]; then
+      printf "\033[40m\033[1;31mWARNING: track0.${IMAGE_SOURCE_NODEV} does NOT exist! Won't be able to update MBR boot loader!\n\033[0m" >&2
       ENTER=1
     fi
 
@@ -1510,9 +1510,7 @@ restore_disks()
     DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
     # Check for MBR restore:
     if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
-      if [ ! -e "$DD_SOURCE" ]; then
-        echo "* NOTE: Requested MBR update but $DD_SOURCE is not available"
-      else
+      if [ -e "$DD_SOURCE" ]; then
         if [ $GPT_FOUND -eq 1 ]; then
           echo "* Updating GPT protective MBR on /dev/$TARGET_NODEV from $DD_SOURCE:"
 
