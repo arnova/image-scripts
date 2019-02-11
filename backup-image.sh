@@ -456,102 +456,6 @@ check_command_warning()
 }
 
 
-# Get proper partclone command for provided hint
-get_partclone_cmd()
-{
-  local PC_HINT="$1"
-
-  case $PC_HINT in
-    pc.ntfs)                        check_command_error "partclone.ntfs" && echo "partclone.ntfs -c"
-                                    ;;
-    pc.fat12)                       if check_command "partclone.vfat"; then
-                                      echo "partclone.vfat -c"
-                                    else
-                                      check_command_error "partclone.fat12" && echo "partclone.fat12 -c"
-                                    fi
-                                    ;;
-    pc.fat16)                       if check_command "partclone.vfat"; then
-                                      echo "partclone.vfat -c"
-                                    else
-                                      check_command_error "partclone.fat16" && echo "partclone.fat16 -c"
-                                    fi
-                                    ;;
-    pc.fat32)                       if check_command "partclone.vfat"; then
-                                      echo "partclone.vfat -c"
-                                    else
-                                      check_command_error "partclone.fat32" && echo "partclone.fat32 -c"
-                                    fi
-                                    ;;
-    pc.exfat)                       if check_command "partclone.vfat"; then
-                                      echo "partclone.vfat -c"
-                                    else
-                                      check_command_error "partclone.exfat" && echo "partclone.exfat -c"
-                                    fi
-                                    ;;
-    pc.ext2)                        if check_command "partclone.extfs"; then
-                                      echo "partclone.extfs -c"
-                                    else
-                                      check_command_error "partclone.ext2" && echo "partclone.ext2 -c"
-                                    fi
-                                    ;;
-    pc.ext3)                        if check_command "partclone.extfs"; then
-                                      echo "partclone.extfs -c"
-                                    else
-                                      check_command_error "partclone.ext3" && echo "partclone.ext3 -c"
-                                    fi
-                                    ;;
-    pc.ext4)                        if check_command "partclone.extfs"; then
-                                      echo "partclone.extfs -c"
-                                    else
-                                      check_command_error "partclone.ext4" && echo "partclone.ext4 -c"
-                                    fi
-                                    ;;
-    pc.xfs)                         check_command_error "partclone.xfs" && echo "partclone.xfs -c"
-                                    ;;
-    pc.btrfs)                       check_command_error "partclone.btrfs" && echo "partclone.btrfs -c"
-                                    ;;
-  esac
-}
-
-
-get_imager_for_device()
-{
-  local DEVICE="$1"
-  
-  if [ "$IMAGE_PROGRAM" = "ddgz" ]; then
-    echo "ddgz"
-  else
-    local TYPE=`blkid -s TYPE -o value "$DEVICE"` # May try `file -s -b "$PART"` instead but blkid seems to work better
-
-    if [ "$IMAGE_PROGRAM" = "pc" ]; then
-      case $TYPE in
-        ntfs)             echo "pc.ntfs";;
-        fat12)            echo "pc.fat12";;
-        fat16|msdos)      echo "pc.fat16";;
-        fat32|vfat)       echo "pc.fat32";;
-        exfat)            echo "pc.exfat";;
-        ext2)             echo "pc.ext2";;
-        ext3)             echo "pc.ext3";;
-        ext4)             echo "pc.ext4";;
-        xfs)              echo "pc.xfs";;
-        btrfs)            echo "pc.btrfs";;
-        *)                echo "ddgz";;
-        esac
-    elif [ "$IMAGE_PROGRAM" = "fsa" ]; then
-      case $TYPE in
-        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|btrfs|xfs)  echo "fsa";;
-        *)                                                     echo "ddgz";;
-      esac
-    elif [ "$IMAGE_PROGRAM" = "pi" ]; then
-      case $TYPE in
-        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|xfs) echo "pi";;
-        *)                                              echo "ddgz";;
-      esac
-    fi
-  fi
-}
-
-
 sanity_check()
 {
   # root check
@@ -876,7 +780,7 @@ select_partitions()
     for PART_NODEV in $SELECT_PARTITIONS; do
       if grep -E -q "^/dev/${PART_NODEV}[[:blank:]]" /etc/mtab; then
         imager="$(get_imager_for_device /dev/$PART_NODEV)"
-        if [ "$imager" = "fsa" ]; then
+        if [ "$imager" = "fsarchiver" ]; then
           # FSArchiver can backup live (mounted) partitions, the others cannot
           # so if user specified partition generate warning and proceed
           if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
@@ -959,6 +863,85 @@ select_partitions()
 }
 
 
+# Get proper archiver command for partition type
+get_imager_for_device()
+{
+  local DEVICE="$1"
+  local TYPE
+  
+  if [ "$IMAGE_PROGRAM" = "ddgz" ]; then
+    echo "dd"
+  else
+    TYPE=`blkid -s TYPE -o value "$DEVICE"` # May try `file -s -b "$PART"` instead but blkid seems to work better
+
+    if [ "$IMAGE_PROGRAM" = "pc" ]; then
+      case $TYPE in
+        ntfs)             check_command_error "partclone.ntfs" && echo "partclone.ntfs"
+                          ;;
+        fat12)            if check_command "partclone.vfat"; then
+                            echo "partclone.vfat"
+                          else
+                            check_command_error "partclone.fat12" && echo "partclone.fat12"
+                          fi
+                          ;;
+        fat16|msdos)      if check_command "partclone.vfat"; then
+                            echo "partclone.vfat"
+                          else
+                            check_command_error "partclone.fat16" && echo "partclone.fat16"
+                          fi
+                          ;;
+        fat32|vfat)       if check_command "partclone.vfat"; then
+                            echo "partclone.vfat"
+                          else
+                            check_command_error "partclone.fat32" && echo "partclone.fat32"
+                          fi
+                          ;;
+        exfat)            check_command_error "partclone.exfat" && echo "partclone.exfat"
+                          ;;
+        ext2)             if check_command "partclone.extfs"; then
+                            echo "partclone.extfs"
+                          else
+                             check_command_error "partclone.ext2" && echo "partclone.ext2"
+                          fi
+                          ;;
+        ext3)             if check_command "partclone.extfs"; then
+                            echo "partclone.extfs"
+                          else
+                            check_command_error "partclone.ext3" && echo "partclone.ext3"
+                          fi
+                          ;;
+        ext4)             if check_command "partclone.extfs"; then
+                            echo "partclone.extfs"
+                          else
+                            check_command_error "partclone.ext4" && echo "partclone.ext4"
+                          fi
+                          ;;
+        xfs)              check_command_error "partclone.xfs" && echo "partclone.xfs"
+                          ;;
+        btrfs)            check_command_error "partclone.btrfs" && echo "partclone.btrfs"
+                          ;;
+        *)                echo "dd" # Fallback
+                          ;;
+        esac
+    elif [ "$IMAGE_PROGRAM" = "fsa" ]; then
+      case $TYPE in
+        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|btrfs|xfs)  echo "fsarchiver"
+        ;;
+        *)                                                     echo "dd" # Fallback
+        ;;
+      esac
+    elif [ "$IMAGE_PROGRAM" = "pi" ]; then
+      case $TYPE in
+        ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|xfs) echo "partimage"
+        ;;
+        *)                                              echo "dd" # Fallback
+        ;;
+      esac
+    fi
+  fi
+}
+
+
 backup_partitions()
 {
   # Backup all specified partitions:
@@ -970,47 +953,44 @@ backup_partitions()
     local IMAGER="$(get_imager_for_device /dev/$PART)"
     
     if [ "$IMAGER" = "ddgz" -a "$IMAGE_PROGRAM" != "ddgz" ]; then
-      printf "\033[40m\033[1;31mWARNING: Filesystem on /dev/$PART not supported, falling back to ddgz-backup\n\033[0m" >&2
+      printf "\033[40m\033[1;31mWARNING: Filesystem on /dev/$PART not supported, falling back to ddgz-backup!\n\033[0m" >&2
     fi
 
     case "$IMAGER" in
-      fsa)  TARGET_FILE="${OUTPUT_PREFIX}.fsa"
-            printf "** Using fsarchiver to backup /dev/$PART to $TARGET_FILE **\n\n"
-            fsarchiver -a -A -v --exclude="/.snapshots" savefs "$TARGET_FILE" "/dev/$PART"
-            retval=$?
-            ;;
-      pi)   TARGET_FILE="${OUTPUT_PREFIX}.img.gz"
-            printf "** Using partimage to backup /dev/$PART to $TARGET_FILE **\n\n"
-            partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
-            retval=$?
-            ;;
-      pc.*) TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
-            PARTCLONE_CMD="$(get_partclone_cmd "$IMAGER")"
-
-            if [ -n "$PARTCLONE_CMD" ]; then
-              if [ $RESCUE -eq 1 ]; then
-                PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
-              fi
-              printf "** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE **\n\n"
-              { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
-              retval=$?
-              if [ $retval -eq 0 ]; then
-                retval=`cat /tmp/.partclone.exitcode`
-              fi
-            fi
-            ;;
-      ddgz) TARGET_FILE="${OUTPUT_PREFIX}.dd.gz"
-            DD_CMD="dd if=/dev/$PART bs=4096"
-            if [ $RESCUE -eq 1 ]; then
-              DD_CMD="$DD_CMD noerror"
-            fi
-            printf "** Using $DD_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE **\n\n"
-            { $DD_CMD; echo $? >/tmp/.dd.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
-            retval=$?
-            if [ $retval -eq 0 ]; then
-              retval=`cat /tmp/.dd.exitcode`
-            fi
-            ;;
+      fsarchiver)   TARGET_FILE="${OUTPUT_PREFIX}.fsa"
+                    printf "** Using fsarchiver to backup /dev/$PART to $TARGET_FILE **\n\n"
+                    fsarchiver -a -A -v --exclude="/.snapshots" savefs "$TARGET_FILE" "/dev/$PART"
+                    retval=$?
+                    ;;
+      partimage)    TARGET_FILE="${OUTPUT_PREFIX}.img.gz"
+                    printf "** Using partimage to backup /dev/$PART to $TARGET_FILE **\n\n"
+                    partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
+                    retval=$?
+                    ;;
+      partclone.*)  TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
+                    PARTCLONE_CMD="$IMAGER -c"
+                    if [ $RESCUE -eq 1 ]; then
+                      PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
+                    fi
+                    printf "** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE **\n\n"
+                    { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+                    retval=$?
+                    if [ $retval -eq 0 ]; then
+                      retval=`cat /tmp/.partclone.exitcode`
+                    fi
+                    ;;
+      dd)           TARGET_FILE="${OUTPUT_PREFIX}.dd.gz"
+                    DD_CMD="dd if=/dev/$PART bs=4096"
+                    if [ $RESCUE -eq 1 ]; then
+                      DD_CMD="$DD_CMD noerror"
+                    fi
+                    printf "** Using $DD_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE **\n\n"
+                    { $DD_CMD; echo $? >/tmp/.dd.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+                    retval=$?
+                    if [ $retval -eq 0 ]; then
+                      retval=`cat /tmp/.dd.exitcode`
+                    fi
+                    ;;
     esac
 
     echo ""
