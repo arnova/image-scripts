@@ -35,6 +35,18 @@ BACKUP_DISKS=""
 SUCCESS=""
 FAILED=""
 
+# Preinit partclone binaries
+PARTCLONE_FAT12="partclone.none"
+PARTCLONE_FAT16="partclone.none"
+PARTCLONE_FAT32="partclone.none"
+PARTCLONE_EXT2="partclone.none"
+PARTCLONE_EXT3="partclone.none"
+PARTCLONE_EXT4="partclone.none"
+PARTCLONE_NTFS="partclone.none"
+PARTCLONE_EXFAT="partclone.none"
+PARTCLONE_XFS="partclone.none"
+PARTCLONE_BTRFS="partclone.none"
+
 EOL='
 '
 
@@ -492,8 +504,12 @@ sanity_check()
   fi
 
   if [ "$IMAGE_PROGRAM" = "pc" ]; then
-    # This is a dummy test for partclone, the actual binary test is in the wrapper
+    # This is a dummy test for partclone just to make sure it's installed
+    # The actual per-filesystem backup-binaries are tested while imaging
     check_command_error partclone.restore 
+
+    # Check which partclone binaries are available
+    detect_partclone_binaries
   fi
 
   if [ "$RESCUE" = "1" ] && [ "$IMAGE_PROGRAM" = "fsa" -o "$IMAGE_PROGRAM" = "pi" ]; then
@@ -863,78 +879,116 @@ select_partitions()
 }
 
 
+detect_partclone_binaries()
+{
+  if check_command "partclone.vfat"; then
+    PARTCLONE_FAT12="partclone.vfat"
+    PARTCLONE_FAT16="partclone.vfat"
+    PARTCLONE_FAT32="partclone.vfat"
+  else
+    if check_command "partclone.fat12"; then
+      PARTCLONE_FAT12="partclone.fat12"
+    fi
+
+    if check_command "partclone.fat16"; then
+      PARTCLONE_FAT16="partclone.fat16"
+    fi
+
+    if check_command "partclone.fat32"; then
+      PARTCLONE_FAT32="partclone.fat32"
+    fi
+  fi
+
+  if check_command "partclone.extfs"; then
+    PARTCLONE_EXT2="partclone.extfs"
+    PARTCLONE_EXT3="partclone.extfs"
+    PARTCLONE_EXT4="partclone.extfs"
+  else
+    if check_command "partclone.ext2"; then
+      PARTCLONE_EXT2="partclone.ext2"
+    fi
+
+    if check_command "partclone.ext3"; then
+      PARTCLONE_EXT3="partclone.ext3"
+    fi
+
+    if check_command "partclone.ext4"; then
+      PARTCLONE_EXT4="partclone.ext4"
+    fi
+  fi
+
+  if check_command "partclone.ntfs"; then
+    PARTCLONE_NTFS="partclone.ntfs"
+  fi
+
+  if check_command "partclone.exfat"; then
+    PARTCLONE_EXFAT="partclone.exfat"
+  fi
+
+  if check_command "partclone.xfs"; then
+    PARTCLONE_XFS="partclone.xfs"
+  fi
+
+  if check_command "partclone.btrfs"; then
+    PARTCLONE_BTRFS="partclone.btrfs"
+  fi
+}
+
+
+get_filesystem_type()
+{
+  # May try `file -s -b "$PART"` instead but blkid seems to work better:
+  blkid -s TYPE -o value "$1"
+}
+
+
 # Get proper archiver command for partition type
 get_imager_for_device()
 {
   local DEVICE="$1"
-  local TYPE
-  
+
   if [ "$IMAGE_PROGRAM" = "ddgz" ]; then
     echo "dd"
   else
-    TYPE=`blkid -s TYPE -o value "$DEVICE"` # May try `file -s -b "$PART"` instead but blkid seems to work better
+    FS_TYPE="$(get_filesystem_type "$DEVICE")"
 
     if [ "$IMAGE_PROGRAM" = "pc" ]; then
-      case $TYPE in
-        ntfs)             check_command_error "partclone.ntfs" && echo "partclone.ntfs"
+      case $FS_TYPE in
+        ntfs)             echo "$PARTCLONE_NTFS"
                           ;;
-        fat12)            if check_command "partclone.vfat"; then
-                            echo "partclone.vfat"
-                          else
-                            check_command_error "partclone.fat12" && echo "partclone.fat12"
-                          fi
+        fat12)            echo "$PARTCLONE_FAT12"
                           ;;
-        fat16|msdos)      if check_command "partclone.vfat"; then
-                            echo "partclone.vfat"
-                          else
-                            check_command_error "partclone.fat16" && echo "partclone.fat16"
-                          fi
+        fat16|msdos)      echo "$PARTCLONE_FAT16"
                           ;;
-        fat32|vfat)       if check_command "partclone.vfat"; then
-                            echo "partclone.vfat"
-                          else
-                            check_command_error "partclone.fat32" && echo "partclone.fat32"
-                          fi
+        fat32|vfat)       echo "$PARTCLONE_FAT32"
                           ;;
-        exfat)            check_command_error "partclone.exfat" && echo "partclone.exfat"
+        exfat)            echo "$PARTCLONE_EXFAT"
                           ;;
-        ext2)             if check_command "partclone.extfs"; then
-                            echo "partclone.extfs"
-                          else
-                             check_command_error "partclone.ext2" && echo "partclone.ext2"
-                          fi
+        ext2)             echo "$PARTCLONE_EXT2"
                           ;;
-        ext3)             if check_command "partclone.extfs"; then
-                            echo "partclone.extfs"
-                          else
-                            check_command_error "partclone.ext3" && echo "partclone.ext3"
-                          fi
+        ext3)             echo "$PARTCLONE_EXT3"
                           ;;
-        ext4)             if check_command "partclone.extfs"; then
-                            echo "partclone.extfs"
-                          else
-                            check_command_error "partclone.ext4" && echo "partclone.ext4"
-                          fi
+        ext4)             echo "$PARTCLONE_EXT4"
                           ;;
-        xfs)              check_command_error "partclone.xfs" && echo "partclone.xfs"
+        xfs)              echo "$PARTCLONE_XFS"
                           ;;
-        btrfs)            check_command_error "partclone.btrfs" && echo "partclone.btrfs"
+        btrfs)            echo "$PARTCLONE_BTRFS"
                           ;;
-        *)                echo "dd" # Fallback
+        *)                echo "dd" # Fallback for unsupported filesystems
                           ;;
         esac
     elif [ "$IMAGE_PROGRAM" = "fsa" ]; then
       case $TYPE in
         ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|btrfs|xfs)  echo "fsarchiver"
         ;;
-        *)                                                     echo "dd" # Fallback
+        *)                                                     echo "dd" # Fallback for unsupported filesystems
         ;;
       esac
     elif [ "$IMAGE_PROGRAM" = "pi" ]; then
       case $TYPE in
         ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|xfs) echo "partimage"
         ;;
-        *)                                              echo "dd" # Fallback
+        *)                                              echo "dd" # Fallback for unsupported filesystems
         ;;
       esac
     fi
@@ -952,8 +1006,8 @@ backup_partitions()
     local OUTPUT_PREFIX="$(echo "$PART" |sed s,'/','_',g)"
     local IMAGER="$(get_imager_for_device /dev/$PART)"
     
-    if [ "$IMAGER" = "ddgz" -a "$IMAGE_PROGRAM" != "ddgz" ]; then
-      printf "\033[40m\033[1;31mWARNING: Filesystem on /dev/$PART not supported, falling back to ddgz-backup!\n\033[0m" >&2
+    if [ "$IMAGER" = "dd" -a "$IMAGE_PROGRAM" != "ddgz" ]; then
+      printf "\033[40m\033[1;31mWARNING: Filesystem($FS_TYPE) on /dev/$PART not supported, falling back to ddgz-backup!\n\033[0m" >&2
     fi
 
     case "$IMAGER" in
@@ -968,6 +1022,11 @@ backup_partitions()
                     retval=$?
                     ;;
       partclone.*)  TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
+                    # Check whether required binary is available
+                    if [ "$IMAGER" = "partclone.none" ]; then
+                      printf "\033[40m\033[1;31mERROR: Partclone binary for filesystem($FS_TYPE) on /dev/$PART not found!\n\033[0m" >&2
+                      retval=1 # Flag error below
+                    fi
                     PARTCLONE_CMD="$IMAGER -c"
                     if [ $RESCUE -eq 1 ]; then
                       PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
