@@ -47,6 +47,9 @@ PARTCLONE_EXFAT="partclone.none"
 PARTCLONE_XFS="partclone.none"
 PARTCLONE_BTRFS="partclone.none"
 
+# Gzip program to use
+GZIP="gzip"
+
 EOL='
 '
 
@@ -480,7 +483,7 @@ sanity_check()
   check_command_error find
   check_command_error sed
   check_command_error grep
-  check_command_error gzip
+  check_command_error "$GZIP"
   check_command_error sfdisk
   check_command_error fdisk
   check_command_error dd
@@ -498,10 +501,6 @@ sanity_check()
 
   [ "$IMAGE_PROGRAM" = "fsa" ] && check_command_error fsarchiver
   [ "$IMAGE_PROGRAM" = "pi" ] && check_command_error partimage
-
-  if [ "$IMAGE_PROGRAM" = "pc" -o "$IMAGE_PROGRAM" = "ddgz" ]; then
-    GZIP="gzip"
-  fi
 
   if [ "$IMAGE_PROGRAM" = "pc" ]; then
     # This is a dummy test for partclone just to make sure it's installed
@@ -978,14 +977,14 @@ get_imager_for_device()
                           ;;
         esac
     elif [ "$IMAGE_PROGRAM" = "fsa" ]; then
-      case $TYPE in
+      case $FS_TYPE in
         ntfs|msdos|fat16|fat32|vfat|ext2|ext3|ext4|xfs|btrfs)  echo "fsarchiver"
         ;;
         *)                                                     echo "dd" # Fallback for unsupported filesystems
         ;;
       esac
     elif [ "$IMAGE_PROGRAM" = "pi" ]; then
-      case $TYPE in
+      case $FS_TYPE in
         ntfs|msdos|fat16|fat32|vfat|ext2|ext3|xfs)  echo "partimage"
         ;;
         *)                                          echo "dd" # Fallback for unsupported filesystems
@@ -1007,31 +1006,31 @@ backup_partitions()
     local IMAGER="$(get_imager_for_device /dev/$PART)"
     
     if [ "$IMAGER" = "dd" -a "$IMAGE_PROGRAM" != "ddgz" ]; then
-      printf "\033[40m\033[1;31mWARNING: Filesystem($FS_TYPE) on /dev/$PART not supported, falling back to ddgz-backup!\n\033[0m" >&2
+      printf "\033[40m\033[1;31mWARNING: Filesystem \"$FS_TYPE\" on /dev/$PART not supported, falling back to ddgz-backup!\n\033[0m" >&2
     fi
 
     case "$IMAGER" in
       fsarchiver)   TARGET_FILE="${OUTPUT_PREFIX}.fsa"
-                    printf "** Using fsarchiver to backup /dev/$PART to $TARGET_FILE **\n\n"
+                    printf "** Using fsarchiver to backup filesystem \"$FS_TYPE\" on /dev/$PART to $TARGET_FILE **\n\n"
                     fsarchiver -a -A -v --exclude="/.snapshots" savefs "$TARGET_FILE" "/dev/$PART"
                     retval=$?
                     ;;
       partimage)    TARGET_FILE="${OUTPUT_PREFIX}.img.gz"
-                    printf "** Using partimage to backup /dev/$PART to $TARGET_FILE **\n\n"
+                    printf "** Using partimage to backup filesystem \"$FS_TYPE\" on /dev/$PART to $TARGET_FILE **\n\n"
                     partimage -z1 -b -d save "/dev/$PART" "$TARGET_FILE"
                     retval=$?
                     ;;
-      partclone.*)  TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
-                    # Check whether required binary is available
+      partclone.*)  # Check whether required binary is available
                     if [ "$IMAGER" = "partclone.none" ]; then
-                      printf "\033[40m\033[1;31mERROR: Partclone binary for filesystem($FS_TYPE) on /dev/$PART not found!\n\033[0m" >&2
+                      printf "\033[40m\033[1;31mERROR: Partclone of filesystem \"$FS_TYPE\" on /dev/$PART not supported!\n\033[0m" >&2
                       retval=1 # Flag error below
                     fi
+                    TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
                     PARTCLONE_CMD="$IMAGER -c"
                     if [ $RESCUE -eq 1 ]; then
                       PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
                     fi
-                    printf "** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE **\n\n"
+                    printf "** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup filesystem \"$FS_TYPE\" on /dev/$PART to $TARGET_FILE **\n\n"
                     { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
                     retval=$?
                     if [ $retval -eq 0 ]; then
@@ -1043,7 +1042,7 @@ backup_partitions()
                     if [ $RESCUE -eq 1 ]; then
                       DD_CMD="$DD_CMD noerror"
                     fi
-                    printf "** Using $DD_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup /dev/$PART to $TARGET_FILE **\n\n"
+                    printf "** Using $DD_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup filesystem \"$FS_TYPE\" on /dev/$PART to $TARGET_FILE **\n\n"
                     { $DD_CMD; echo $? >/tmp/.dd.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
                     retval=$?
                     if [ $retval -eq 0 ]; then
@@ -1364,7 +1363,7 @@ if [ -n "$BACKUP_IMAGES" ] && [ "$IMAGE_PROGRAM" = "ddgz" -o "$IMAGE_PROGRAM" = 
   IFS=' '
   for BACKUP_IMAGE in $BACKUP_IMAGES; do
     if ! echo "$BACKUP_IMAGE" |grep -q '\.gz$'; then
-      continue; # Can only verify .gz
+      continue # Can only verify .gz
     fi
     # Note that pigz seems to hang on broken archives, therefor use gzip
     gzip -tv "$BACKUP_IMAGE"*
