@@ -1139,7 +1139,7 @@ show_help()
   echo "--notrack0                  - Don't backup any track0(MBR)/partition-tables" >&2
   echo "--noconf                    - Don't read the config file" >&2
   echo "--fsa                       - Use fsarchiver for imaging" >&2
-  echo "--pi                        - Use partimage for imaging" >&2
+  echo "--pi                        - Use partimage for imaging (obsolete, not recommended)" >&2
   echo "--pc                        - Use partclone + gzip for imaging" >&2
   echo "--ddgz                      - Use dd + gzip for imaging" >&2
   echo "--nonet|-n                  - Don't try to setup networking" >&2
