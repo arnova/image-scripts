@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.20"
+MY_VERSION="3.20a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: February 11, 2019
@@ -1103,22 +1103,22 @@ backup_disks()
         fdisk -l "/dev/${HDD_NODEV}" >"fdisk.${OUTPUT_SUFFIX}"
 
         echo ""
-
-        echo "* Storing track0 for /dev/$HDD_NODEV in track0.${OUTPUT_SUFFIX}..."
-        # Dump hdd info for all disks in the current system
-        result="$(dd if=/dev/$HDD_NODEV of="track0.${OUTPUT_SUFFIX}" bs=512 count=2048 2>&1)" # NOTE: Dump 1MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
-        retval=$?
-        if [ $retval -ne 0 ]; then
-          echo "$result" >&2
-          printf "\033[40m\033[1;31mERROR: Track0(MBR) backup of /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
-          do_exit 8
-        fi
-        echo ""
       else
         printf "\033[40m\033[1;31mERROR: Unable to detect any GPT or DOS partitions on /dev/$HDD_NODEV! Quitting...\n\033[0m" >&2
         do_exit 9
       fi
     fi
+
+    echo "* Storing track0 for /dev/$HDD_NODEV in track0.${OUTPUT_SUFFIX}..."
+    # NOTE: Dump 1 MiB instead of 63*512 (track0) = 32256 bytes due to GRUB2 using more on disks with partition one starting at cylinder 2048 (4KB disks)
+    result="$(dd if=/dev/$HDD_NODEV of="track0.${OUTPUT_SUFFIX}" bs=512 count=2048 2>&1)"
+    retval=$?
+    if [ $retval -ne 0 ]; then
+      echo "$result" >&2
+      printf "\033[40m\033[1;31mERROR: Track0(MBR) backup of /dev/$HDD_NODEV failed($retval)! Quitting...\n\033[0m" >&2
+      do_exit 8
+    fi
+    echo ""
 
     # Dump device partition layout in "fancified" format
     get_device_layout "$HDD_NODEV" >"device_layout.${OUTPUT_SUFFIX}"

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18"
+MY_VERSION="3.18a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: February 10, 2019
+# Last update: February 11, 2019
 # (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -437,12 +437,12 @@ get_available_disks()
   for BLK_DEVICE in /sys/block/*; do
     DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
     if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" ]; then
-      continue; # Ignore device
+      continue # Ignore device
     fi
 
     local SIZE="$(blockdev --getsize64 "$DEVICE" 2>/dev/null)"
     if [ -z "$SIZE" -o "$SIZE" = "0" ]; then
-      continue; # Ignore device
+      continue # Ignore device
     fi
 
     DEV_FOUND="${DEV_FOUND}${DEVICE} "
@@ -872,7 +872,7 @@ set_image_source_dir()
             printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT!\n\033[0m" >&2
             echo ""
           else
-            break; # All done: break
+            break # All done: break
           fi
         done
       else
@@ -947,7 +947,7 @@ set_image_source_dir()
 
         if [ ! -d "$TEMP_IMAGE_DIR" ]; then
           printf "\033[40m\033[1;31mERROR: Unable to access directory $TEMP_IMAGE_DIR!\n\033[0m" >&2
-          continue; # Let user re-select
+          continue # Let user re-select
         fi
 
         if [ $DIR_SELECT -eq 1 ]; then
@@ -977,7 +977,7 @@ set_image_source_dir()
         fi
 
         IMAGE_DIR="$TEMP_IMAGE_DIR"
-        break; # All done: break
+        break # All done: break
       done
     fi
   fi
@@ -1092,7 +1092,7 @@ restore_partitions()
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
     TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
-    echo "* Selected partition: $TARGET_PARTITION. Using image file: $IMAGE_FILE"
+    echo "* Selected partition $TARGET_PARTITION : Using image file \"$IMAGE_FILE\""
     local retval=1
     case $(image_type_detect "$IMAGE_FILE") in
       fsarchiver) fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="$TARGET_PARTITION"
@@ -1170,7 +1170,7 @@ get_source_disks()
     IMAGE_SOURCE_NODEV="$(get_partition_disk "$(basename "$ITEM" |sed -e s,'\..*',, -e s,'_','/',g)")"
 
     if [ -n "$PARTITIONS" ] && ! echo "$PARTITIONS" |grep -q -e "^${IMAGE_SOURCE_NODEV}$" -e " ${IMAGE_SOURCE_NODEV}$" -e "^${IMAGE_SOURCE_NODEV}[ :]" -e " ${IMAGE_SOURCE_NODEV}[ :]"; then
-      continue; # Not specified in --partitions, skip
+      continue # Not specified in --partitions, skip
     fi
 
     # Skip duplicates
@@ -1332,7 +1332,7 @@ check_disks()
           do_exit 5
         fi
       elif [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        # DOS/MBR:
+        # DOS:
         SFDISK_TARGET="$(sfdisk -d "/dev/${TARGET_NODEV}" |parse_sfdisk_output)"
         if [ -z "$SFDISK_TARGET" ]; then
           printf "\033[40m\033[1;31mERROR: Unable to get DOS partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
@@ -1508,9 +1508,11 @@ restore_disks()
     fi
 
     DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
-    if [ -e "$DD_SOURCE" ]; then
-      # Check for MBR restore:
-      if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
+    # Check for MBR restore:
+    if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
+      if [ ! -e "$DD_SOURCE" ]; then
+        echo "* NOTE: Requested MBR update but $DD_SOURCE is not available"
+      else
         if [ $GPT_FOUND -eq 1 ]; then
           echo "* Updating GPT protective MBR on /dev/$TARGET_NODEV from $DD_SOURCE:"
 
@@ -1843,7 +1845,7 @@ test_target_partitions()
 
     # FIXME: What to do if one translates to a disk?
     if [ -z "$SOURCE_DISK_NODEV" -o -z "$TARGET_DISK" ]; then
-      continue; # No partitions on this device
+      continue # No partitions on this device
     fi
 
     if [ -e "gdisk.${SOURCE_DISK_NODEV}" ]; then
