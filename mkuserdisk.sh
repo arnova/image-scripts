@@ -205,17 +205,17 @@ mkud_select_disk()
           printf "\033[40m\033[1;31m* WARNING: Disk /dev/$DISK_NODEV already contains partitions!\n\033[0m" >&2
           if ! get_user_yn "  Wipe (repartition + format) and format as (additional) user disk"; then
             echo "* Skipping user disk wipe/format"
-            break; # We're done
+            break # We're done
           fi
         else
           echo "* NOTE: Disk /dev/$DISK_NODEV already contains partitions, skipping user disk wipe/format"
-          break; # We're done
+          break # We're done
         fi
       fi
       USER_PART_ID=1 # Overrule partition ID
       USER_DISK_WIPE=1
       USER_DISK_NODEV="$DISK_NODEV"
-      break; # We're done
+      break # We're done
     elif [ -z "$USER_DISK_NODEV" ]; then
       USER_DISK_NODEV="$DISK_NODEV" # Default to the first disk in the list
     fi

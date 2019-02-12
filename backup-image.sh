@@ -590,7 +590,7 @@ set_image_target_dir()
             printf "\033[40m\033[1;31mERROR: Error mounting $MOUNT_DEVICE on $IMAGE_ROOT!\n\033[0m" >&2
             echo ""
           else
-            break; # All done: break
+            break # All done: break
           fi
         done
       else
@@ -670,7 +670,7 @@ select_disks()
     for HDD_NODEV in $DISKS_NODEV; do
       # Make sure it exists
       if [ ! -b "/dev/$HDD_NODEV" ]; then
-        continue; # Ignore this one
+        continue # Ignore this one
       fi
 
       # Only add, if it's not included already:
