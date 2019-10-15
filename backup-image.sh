@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.20b"
+MY_VERSION="3.20c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: September 30, 2019
+# Last update: October 15, 2019
 # (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1010,7 +1010,11 @@ backup_partitions()
     local IMAGER="$(get_imager_for_fs_type "$FS_TYPE")"
     
     if [ "$IMAGER" = "dd" -a "$IMAGE_PROGRAM" != "ddgz" ]; then
-      echo "NOTE: Filesystem \"$FS_TYPE\" on /dev/$PART not supported, falling back to ddgz-backup!" >&2
+      if [ -z "$FS_TYPE" ]; then
+        echo "NOTE: No filesystem detected on /dev/$PART, falling back to ddgz-backup!" >&2
+      else
+        echo "NOTE: Filesystem \"$FS_TYPE\" on /dev/$PART not supported, falling back to ddgz-backup!" >&2
+      fi
     fi
 
     case "$IMAGER" in
