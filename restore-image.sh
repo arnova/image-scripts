@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18a"
+MY_VERSION="3.18b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: February 11, 2019
+# Last update: October 17, 2019
 # (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1397,21 +1397,6 @@ check_disks()
         ENTER=1
       fi
 
-      if [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        # Simulate DOS partition table restore
-        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_safe_with_legacy_fallback --force -n "/dev/${TARGET_NODEV}" 2>&1)"
-        if [ $? -ne 0 ]; then
-          if [ $FORCE -eq 1 ]; then
-            printf "\033[40m\033[1;31m\nWARNING: Invalid DOS partition table (disk too small?)!\n\033[0m" >&2
-            ENTER=1
-          else
-            echo "$result" >&2
-            printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
-            do_exit 5
-          fi
-        fi
-      fi
-
       if [ -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # Simulate GPT partition table restore
         result="$(sgdisk --pretend --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" "/dev/${TARGET_NODEV}" >/dev/null 2>&1)"
@@ -1423,6 +1408,19 @@ check_disks()
             ENTER=1
           else
             printf "\033[40m\033[1;31mERROR: Invalid GPT partition table (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+            do_exit 5
+          fi
+        fi
+      elif [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+        # Simulate DOS partition table restore
+        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_safe_with_legacy_fallback --force -n "/dev/${TARGET_NODEV}" 2>&1)"
+        if [ $? -ne 0 ]; then
+          if [ $FORCE -eq 1 ]; then
+            printf "\033[40m\033[1;31m\nWARNING: Invalid DOS partition table (disk too small?)!\n\033[0m" >&2
+            ENTER=1
+          else
+            echo "$result" >&2
+            printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
             do_exit 5
           fi
         fi
@@ -1500,18 +1498,12 @@ restore_disks()
       TRACK0_CLEAN=1
     fi
 
-    # Assume when sgdisk file exists, GPT is used
-    SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
-    GPT_FOUND=0
-    if [ -f "$SGDISK_FILE" ]; then
-      GPT_FOUND=1
-    fi
-
     DD_SOURCE="track0.${IMAGE_SOURCE_NODEV}"
     # Check for MBR restore:
     if [ $MBR_WRITE -eq 1 -o $TRACK0_CLEAN -eq 1 ]; then
       if [ -e "$DD_SOURCE" ]; then
-        if [ $GPT_FOUND -eq 1 ]; then
+        GDISK_FILE="gdisk.${IMAGE_SOURCE_NODEV}"
+        if grep -qi 'GPT: present' "$GDISK_FILE" 2>/dev/null; then
           echo "* Updating GPT protective MBR on /dev/$TARGET_NODEV from $DD_SOURCE:"
 
           if [ $CLEAN -eq 1 -o -z "$PARTITIONS_FOUND" ]; then
@@ -1548,14 +1540,14 @@ restore_disks()
 
     # Check for partition restore
     if [ $TRACK0_CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ]; then
-      if [ $GPT_FOUND -eq 1 ]; then
-        echo "* Updating GPT partition-table on /dev/$TARGET_NODEV:"
+      if [ -e "$SGDISK_FILE" ]; then
+        echo "* Updating partition-table on /dev/$TARGET_NODEV:"
         result="$(sgdisk_safe --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV 2>&1)"
         retval=$?
 
         if [ $retval -ne 0 ]; then
           echo "$result" >&2
-          printf "\033[40m\033[1;31mGPT partition-table restore failed($retval). Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mPartition-table restore failed($retval). Quitting...\n\033[0m" >&2
           do_exit 5
         else
           echo "$result"
@@ -1572,7 +1564,7 @@ restore_disks()
         fi
 
         if [ -n "$SFDISK_FILE" ]; then
-          echo "* Updating DOS partition-table on /dev/$TARGET_NODEV:"
+          echo "* Updating partition-table on /dev/$TARGET_NODEV:"
           result="$(cat "$SFDISK_FILE" |sfdisk_safe_with_legacy_fallback --force --no-reread /dev/$TARGET_NODEV 2>&1)"
           retval=$?
 
@@ -1581,7 +1573,7 @@ restore_disks()
             echo "$result" >&2
             echo "" >&2
 
-            printf "\033[40m\033[1;31mDOS partition-table restore failed($retval). Quitting...\n\033[0m" >&2
+            printf "\033[40m\033[1;31mPartition-table restore failed($retval). Quitting...\n\033[0m" >&2
             do_exit 5
           fi
 
