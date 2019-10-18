@@ -1764,13 +1764,13 @@ compare_dos_partition()
 
   # Target is smaller?
   if [ $SOURCE_SIZE -gt $TARGET_SIZE ]; then
-    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM is smaller than source partition $SOURCE_NUM!\n\033[0m" >&2
+    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM(size=$TARGET_SIZE) is smaller than source partition $SOURCE_NUM(size=$SOURCE_SIZE)!\n\033[0m" >&2
     retval=1
   fi
 
   # Target is bigger?
   if [ $SOURCE_SIZE -lt $TARGET_SIZE ]; then
-    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM is bigger than source partition $SOURCE_NUM!\n\033[0m" >&2
+    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM(size=$TARGET_SIZE) is bigger than source partition $SOURCE_NUM(size=$SOURCE_SIZE)!\n\033[0m" >&2
     retval=1
   fi
 
@@ -1801,13 +1801,13 @@ compare_gpt_partition()
 
   # Target is smaller?
   if [ $SOURCE_SIZE -gt $TARGET_SIZE ]; then
-    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM is smaller than source partition $SOURCE_NUM!\n\033[0m" >&2
+    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM(size=$TARGET_SIZE) is smaller than source partition $SOURCE_NUM(size=$SOURCE_SIZE)!\n\033[0m" >&2
     retval=1
   fi
 
   # Target is bigger?
   if [ $SOURCE_SIZE -lt $TARGET_SIZE ]; then
-    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM is bigger than source partition $SOURCE_NUM!\n\033[0m" >&2
+    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM(size=$TARGET_SIZE) is bigger than source partition $SOURCE_NUM(size=$SOURCE_SIZE)!\n\033[0m" >&2
     retval=1
   fi
 
