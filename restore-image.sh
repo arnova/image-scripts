@@ -34,7 +34,7 @@ FAILED=""
 # Reset global, used by other functions later on:
 TARGET_DEVICES=""
 
-# Global used later on when restoring partition-tables etc.
+# Global used later on when restoring partition tables etc.
 DEVICE_FILES=""
 
 # Variable to indicate whether old or new sfdisk is used
@@ -542,7 +542,7 @@ partprobe()
   local DEVICE="$1"
   local result=""
 
-  echo "(Re)reading partition-table on $DEVICE..."
+  echo "(Re)reading partition table on $DEVICE..."
 
   # Retry several times since some daemons can block the re-reread for a while (like dm/lvm)
   local TRY=10
@@ -1304,7 +1304,7 @@ check_disks()
         # GPT:
         GDISK_TARGET="$(gdisk -l "/dev/${TARGET_NODEV}" |parse_gdisk_output)"
         if [ -z "$GDISK_TARGET" ]; then
-          printf "\033[40m\033[1;31mERROR: Unable to get GPT partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Unable to get gdisk partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
 
@@ -1319,14 +1319,14 @@ check_disks()
         done
 
         if [ $MISMATCH -eq 1 ]; then
-          printf "\033[40m\033[1;31mERROR: Target GPT partition(s) mismatches with source. Unable to update GPT partition table (--add)! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Target gdisk partition(s) mismatches with source. Unable to update partition table (--add)! Quitting...\n\033[0m" >&2
 
           #TODO: Show source/target?
-          echo "* Source GPT partition table (/dev/$IMAGE_SOURCE_NODEV):"
+          echo "* Source gdisk partition table (/dev/$IMAGE_SOURCE_NODEV):"
           grep -E '^[[:blank:]]+[0-9]' "gdisk.${IMAGE_SOURCE_NODEV}"
           echo ""
 
-          echo "* Target GPT partition table (/dev/$TARGET_NODEV):"
+          echo "* Target gdisk partition table (/dev/$TARGET_NODEV):"
           echo "$GDISK_TARGET"
 
           do_exit 5
@@ -1335,7 +1335,7 @@ check_disks()
         # DOS:
         SFDISK_TARGET="$(sfdisk -d "/dev/${TARGET_NODEV}" |parse_sfdisk_output)"
         if [ -z "$SFDISK_TARGET" ]; then
-          printf "\033[40m\033[1;31mERROR: Unable to get DOS partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Unable to get sfdisk partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
 
@@ -1349,13 +1349,13 @@ check_disks()
         done
 
         if [ $MISMATCH -eq 1 ]; then
-          printf "\033[40m\033[1;31mERROR: Target DOS partition(s) mismatches with source. Unable to update DOS partition table (--add)! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Target sfdisk partition(s) mismatches with source. Unable to update partition table (--add)! Quitting...\n\033[0m" >&2
 
-          echo "* Source DOS partition table (/dev/$IMAGE_SOURCE_NODEV):"
+          echo "* Source sfdisk partition table (/dev/$IMAGE_SOURCE_NODEV):"
           cat "sfdisk.${IMAGE_SOURCE_NODEV}"
           echo ""
 
-          echo "* Target DOS partition table (/dev/$TARGET_NODEV):"
+          echo "* Target sfdisk partition table (/dev/$TARGET_NODEV):"
           echo "$SFDISK_TARGET"
 
           do_exit 5
@@ -1367,18 +1367,18 @@ check_disks()
 
     if [ $CLEAN -eq 0 -a -n "$PARTITIONS_FOUND" ]; then
       if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 -a $MBR_WRITE -eq 0 ]; then
-        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table (+possible bootloader), it will NOT be updated!\n\033[0m" >&2
+        printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table (+possible bootloader), it will NOT be updated!\n\033[0m" >&2
         echo "To override this you must specify --clean or --pt --mbr..." >&2
         ENTER=1
       else
         if [ $PT_WRITE -eq 0 -a $PT_ADD -eq 0 ]; then
-          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, it will NOT be updated!\n\033[0m" >&2
+          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, it will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --pt..." >&2
           ENTER=1
         fi
 
         if [ $MBR_WRITE -eq 0 -a -e "track0.${IMAGE_SOURCE_NODEV}" ]; then
-          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition-table, its MBR will NOT be updated!\n\033[0m" >&2
+          printf "\033[40m\033[1;31mWARNING: Since target device /dev/$TARGET_NODEV already has a partition table, its MBR will NOT be updated!\n\033[0m" >&2
           echo "To override this you must specify --clean or --mbr..." >&2
           ENTER=1
         fi
@@ -1416,11 +1416,11 @@ check_disks()
         result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_safe_with_legacy_fallback --force -n "/dev/${TARGET_NODEV}" 2>&1)"
         if [ $? -ne 0 ]; then
           if [ $FORCE -eq 1 ]; then
-            printf "\033[40m\033[1;31m\nWARNING: Simulating sfdisk partition table failed (disk too small?)!\n\033[0m" >&2
+            printf "\033[40m\033[1;31m\nWARNING: Simulating sfdisk restore failed (disk too small?)!\n\033[0m" >&2
             ENTER=1
           else
             echo "$result" >&2
-            printf "\033[40m\033[1;31m\nERROR: Simulating sfdisk partition table failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+            printf "\033[40m\033[1;31m\nERROR: Simulating sfdisk restore failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
             do_exit 5
           fi
         fi
@@ -1481,7 +1481,7 @@ restore_disks()
     # Check whether device already contains partitions
     PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
 
-    # Flag in case we update the mbr/partition-table so we know we need to have the kernel to re-probe
+    # Flag in case we update the mbr/partition table so we know we need to have the kernel to re-probe
     PARTPROBE=0
 
     # Clear all (GPT) partition data on --clean:
@@ -1542,13 +1542,13 @@ restore_disks()
     if [ $TRACK0_CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ]; then
       SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
       if [ -e "$SGDISK_FILE" ]; then
-        echo "* Updating partition-table on /dev/$TARGET_NODEV:"
+        echo "* Restoring partition table from $SGDISK_FILE to /dev/$TARGET_NODEV:"
         result="$(sgdisk_safe --mbrtogpt --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV 2>&1)"
         retval=$?
 
         if [ $retval -ne 0 ]; then
           echo "$result" >&2
-          printf "\033[40m\033[1;31mPartition-table restore failed($retval). Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31msgdisk partition table restore failed($retval). Quitting...\n\033[0m" >&2
           do_exit 5
         else
           echo "$result"
@@ -1565,7 +1565,7 @@ restore_disks()
         fi
 
         if [ -n "$SFDISK_FILE" ]; then
-          echo "* Updating partition-table on /dev/$TARGET_NODEV:"
+          echo "* Restoring partition table from $SFDISK_FILE to /dev/$TARGET_NODEV:"
           result="$(cat "$SFDISK_FILE" |sfdisk_safe_with_legacy_fallback --force --no-reread /dev/$TARGET_NODEV 2>&1)"
           retval=$?
 
@@ -1574,7 +1574,7 @@ restore_disks()
             echo "$result" >&2
             echo "" >&2
 
-            printf "\033[40m\033[1;31mPartition-table restore failed($retval). Quitting...\n\033[0m" >&2
+            printf "\033[40m\033[1;31msfdisk partition table restore failed($retval). Quitting...\n\033[0m" >&2
             do_exit 5
           fi
 
@@ -1603,7 +1603,7 @@ restore_disks()
       if partprobe "/dev/$TARGET_NODEV" && part_check "/dev/$TARGET_NODEV"; then
         : # No-op
       elif [ $FORCE -ne 1 ]; then
-        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition-table failed! Use --force to override.\n\033[0m" >&2
+        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed! Use --force to override.\n\033[0m" >&2
         do_exit 5
       fi
     fi
@@ -1843,17 +1843,18 @@ test_target_partitions()
       continue # No partitions on this device
     fi
 
-    if [ -e "gdisk.${SOURCE_DISK_NODEV}" ]; then
+    GDISK_SOURCE="gdisk.${SOURCE_DISK_NODEV}"
+    if [ -e "$GDISK_SOURCE" ]; then
       GDISK_TARGET_PART="$(gdisk -l "$TARGET_DISK" |parse_gdisk_output |grep -E "^$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
       if [ -n "$GDISK_TARGET_PART" ]; then
-        GDISK_SOURCE_PART="$(cat "gdisk.${SOURCE_DISK_NODEV}" 2>/dev/null |parse_gdisk_output |grep -E "^$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" )"
+        GDISK_SOURCE_PART="$(cat "$GDISK_SOURCE" 2>/dev/null |parse_gdisk_output |grep -E "^$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" )"
 
-        echo "* Source GPT partition: $GDISK_SOURCE_PART"
-        echo "* Target GPT partition: $GDISK_TARGET_PART"
+        echo "* Source gdisk partition entry: $GDISK_SOURCE_PART"
+        echo "* Target gdisk partition entry: $GDISK_TARGET_PART"
 
         # Match partition with what we have stored in our partitions file
         if [ -z "$GDISK_SOURCE_PART" ]; then
-          printf "\033[40m\033[1;31m\nWARNING: GPT partition /dev/$IMAGE_PARTITION_NODEV can not be found in partition source files!\n\033[0m" >&2
+          printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$IMAGE_PARTITION_NODEV can not be found in source file ${GDISK_SOURCE}!\n\033[0m" >&2
           echo ""
           MISMATCH=1
           continue
@@ -1871,29 +1872,37 @@ test_target_partitions()
       if [ -n "$SFDISK_TARGET_PART" ]; then
         # DOS partition found
         SFDISK_SOURCE_PART=""
-        if [ -f "sfdisk.${SOURCE_DISK_NODEV}" ]; then
-          SFDISK_SOURCE_PART="$(cat "sfdisk.${SOURCE_DISK_NODEV}" |parse_sfdisk_output |grep -E "^$(get_partition_number ${IMAGE_PARTITION_NODEV})[ ,]")"
-        elif [ -f "partitions.${SOURCE_DISK_NODEV}" ]; then
-          # If empty, try old (legacy) file
-          if grep -q '^# partition table of' "partitions.${SOURCE_DISK_NODEV}"; then
-            SFDISK_SOURCE_PART="$(cat "partitions.${SOURCE_DISK_NODEV}" |parse_sfdisk_output |grep -E "^$(get_partition_number ${IMAGE_PARTITION_NODEV})[[:blank:]]")"
+        SFDISK_SOURCE="sfdisk.${SOURCE_DISK_NODEV}"
+        if [ -f "$SFDISK_SOURCE" ]; then
+          SFDISK_SOURCE_PART="$(cat "$SFDISK_SOURCE" |parse_sfdisk_output |grep -E "^$(get_partition_number ${IMAGE_PARTITION_NODEV})[ ,]")"
+        else
+          # Try old (legacy) file:
+          SFDISK_SOURCE="partitions.${SOURCE_DISK_NODEV}"
+          if [ -f "$SFDISK_SOURCE" ]; then
+            if grep -q '^# partition table of' "$SFDISK_SOURCE"; then
+              SFDISK_SOURCE_PART="$(cat "$SFDISK_SOURCE" |parse_sfdisk_output |grep -E "^$(get_partition_number ${IMAGE_PARTITION_NODEV})[[:blank:]]")"
+            fi
+          else
+            SFDISK_SOURCE=""
           fi
         fi
 
-        echo "* Source DOS partition: $SFDISK_SOURCE_PART"
-        echo "* Target DOS partition: $SFDISK_TARGET_PART"
+        if [ -n "$SFDISK_SOURCE" ]; then
+          echo "* Source sfdisk partition entry: $SFDISK_SOURCE_PART"
+          echo "* Target sfdisk partition entry: $SFDISK_TARGET_PART"
 
-        # Match partition with what we have stored in our partitions file
-        if [ -z "$SFDISK_SOURCE_PART" ]; then
-          printf "\033[40m\033[1;31m\nWARNING: DOS partition /dev/$IMAGE_PARTITION_NODEV can not be found in the partition source files!\n\033[0m" >&2
-          echo ""
-          MISMATCH=1
-          continue
-        fi
+          # Match partition with what we have stored in our partitions file
+          if [ -z "$SFDISK_SOURCE_PART" ]; then
+            printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$IMAGE_PARTITION_NODEV can not be found in source file ${SFDISK_SOURCE}!\n\033[0m" >&2
+            echo ""
+            MISMATCH=1
+            continue
+          fi
 
-        # Check geometry/type of partition
-        if ! compare_sfdisk_partition "$SFDISK_SOURCE_PART" "$SFDISK_TARGET_PART"; then
-          MISMATCH=1
+          # Check geometry/type of partition
+          if ! compare_sfdisk_partition "$SFDISK_SOURCE_PART" "$SFDISK_TARGET_PART"; then
+            MISMATCH=1
+          fi
         fi
       fi
     fi
@@ -1947,13 +1956,13 @@ show_help()
   echo "--conf|-c={config_file}     - Specify alternate configuration file" >&2
   echo "--noconf                    - Don't read the config file" >&2
   echo "--mbr                       - Always write a new track0(MBR) (from track0.*)" >&2
-  echo "--pt                        - Always write a new partition-table (from sfdisk/gdisk.*)" >&2
-  echo "--clean                     - Always write track0(MBR)/partition-table/swap-space, even if device is not empty (USE WITH CARE!)" >&2
+  echo "--pt                        - Always write a new partition table (from sfdisk/gdisk.*)" >&2
+  echo "--clean                     - Always write track0(MBR)/partition table/swap-space, even if device is not empty (USE WITH CARE!)" >&2
   echo "--force                     - Continue, even if there are eg. mounted partitions (USE WITH CARE!)" >&2
-  echo "--notrack0                  - Never write track0(MBR)/partition-table, even if device is empty" >&2
+  echo "--notrack0                  - Never write track0(MBR)/partition table, even if device is empty" >&2
   echo "--nonet|-n                  - Don't try to setup networking" >&2
   echo "--nomount|-m                - Don't mount anything" >&2
-  echo "--noimage                   - Don't restore any partition images, only do partition-table/MBR operations" >&2
+  echo "--noimage                   - Don't restore any partition images, only do partition table/MBR operations" >&2
   echo "--nocustomsh|--nosh         - Don't execute any custom shell script(s)" >&2
   echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
   echo "--add                       - Add partition entries (don't overwrite like with --clean)" >&2
@@ -2109,10 +2118,10 @@ echo "--------------------------------------------------------------------------
 
 if [ $ONLY_SH -eq 0 ]; then
   if [ $CLEAN -eq 1 ]; then
-    printf "\033[40m\033[1;31m* WARNING: MBR/track0 & partition-table will ALWAYS be (over)written (--clean)!\n\033[0m" >&2
+    printf "\033[40m\033[1;31m* WARNING: MBR/track0 & partition table will ALWAYS be (over)written (--clean)!\n\033[0m" >&2
   else
     if [ $PT_WRITE -eq 1 ]; then
-      echo "* WARNING: Partition-table will ALWAYS be (over)written (--pt)!" >&2
+      echo "* WARNING: Partition table will ALWAYS be (over)written (--pt)!" >&2
     fi
 
     if [ $MBR_WRITE -eq 1 ]; then

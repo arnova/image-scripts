@@ -1147,7 +1147,7 @@ show_help()
   echo "--dev|-d={dev1,dev2}        - Backup only these devices/partitions (instead of all)" >&2
   echo "--conf|-c={config_file}     - Specify alternate configuration file" >&2
   echo "--compression|-z=level      - Set gzip compression level (when used). 1=Low but fast (default), 9=High but slow" >&2
-  echo "--notrack0                  - Don't backup any track0(MBR)/partition-tables" >&2
+  echo "--notrack0                  - Don't backup any track0(MBR)/partition tables" >&2
   echo "--noconf                    - Don't read the config file" >&2
   echo "--fsa                       - Use fsarchiver for imaging" >&2
   echo "--pi                        - Use partimage for imaging (obsolete, not recommended)" >&2
@@ -1155,7 +1155,7 @@ show_help()
   echo "--ddgz                      - Use dd + gzip for imaging" >&2
   echo "--nonet|-n                  - Don't try to setup networking" >&2
   echo "--nomount|-m                - Don't mount anything" >&2
-  echo "--noimage                   - Don't create any partition images, only do partition-table/MBR operations" >&2
+  echo "--noimage                   - Don't create any partition images, only do partition table/MBR operations" >&2
   echo "--noccustomsh|--nosh        - Don't execute any custom shell script(s)" >&2
   echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
   echo "--rescue|-r                 - Rescue mode (ignore e.g. read errors) (only for partclone or dd + gz)" >&2
