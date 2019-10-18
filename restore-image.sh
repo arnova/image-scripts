@@ -286,7 +286,7 @@ get_disk_partitions_with_type()
     for LINE in $(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/'); do
       PART="$(echo "$LINE" |awk '{ print $1 }' |sed -e s,'^/dev/',,)"
       TYPE="$(echo "$LINE" |awk -F',' '{ print $3 }' |sed -r s,'.*= ?',,)"
-      if [ $TYPE -ne 0 ]; then
+      if [ "$TYPE" != "0" -a "$TYPE" != "00" ]; then
         echo "$PART $TYPE"
       fi
     done
@@ -1398,29 +1398,29 @@ check_disks()
       fi
 
       if [ -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        # Simulate GPT partition table restore
-        result="$(sgdisk --pretend --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" "/dev/${TARGET_NODEV}" >/dev/null 2>&1)"
+        # Simulate sgdisk partition table restore
+        result="$(sgdisk --pretend --mbrtogpt --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" "/dev/${TARGET_NODEV}" 2>&1)"
 
         if [ $? -ne 0 ]; then
           echo "$result" >&2
           if [ $FORCE -eq 1 ]; then
-            printf "\033[40m\033[1;31mWARNING: Invalid GPT partition table (disk too small?)!\n\033[0m" >&2
+            printf "\033[40m\033[1;31mWARNING: Simulating sgdisk restore failed (disk too small?)!\n\033[0m" >&2
             ENTER=1
           else
-            printf "\033[40m\033[1;31mERROR: Invalid GPT partition table (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+            printf "\033[40m\033[1;31mERROR: Simulating sgdisk restore failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
             do_exit 5
           fi
         fi
       elif [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        # Simulate DOS partition table restore
+        # Simulate sfdisk partition table restore
         result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_safe_with_legacy_fallback --force -n "/dev/${TARGET_NODEV}" 2>&1)"
         if [ $? -ne 0 ]; then
           if [ $FORCE -eq 1 ]; then
-            printf "\033[40m\033[1;31m\nWARNING: Invalid DOS partition table (disk too small?)!\n\033[0m" >&2
+            printf "\033[40m\033[1;31m\nWARNING: Simulating sfdisk partition table failed (disk too small?)!\n\033[0m" >&2
             ENTER=1
           else
             echo "$result" >&2
-            printf "\033[40m\033[1;31m\nERROR: Invalid DOS partition table (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+            printf "\033[40m\033[1;31m\nERROR: Simulating sfdisk partition table failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
             do_exit 5
           fi
         fi
@@ -1542,7 +1542,7 @@ restore_disks()
     if [ $TRACK0_CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ]; then
       if [ -e "$SGDISK_FILE" ]; then
         echo "* Updating partition-table on /dev/$TARGET_NODEV:"
-        result="$(sgdisk_safe --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV 2>&1)"
+        result="$(sgdisk_safe --mbrtogpt --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV 2>&1)"
         retval=$?
 
         if [ $retval -ne 0 ]; then
