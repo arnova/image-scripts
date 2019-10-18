@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.18c"
+MY_VERSION="3.18d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: October 18, 2019
@@ -1540,6 +1540,7 @@ restore_disks()
 
     # Check for partition restore
     if [ $TRACK0_CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $PT_ADD -eq 1 ]; then
+      SGDISK_FILE="sgdisk.${IMAGE_SOURCE_NODEV}"
       if [ -e "$SGDISK_FILE" ]; then
         echo "* Updating partition-table on /dev/$TARGET_NODEV:"
         result="$(sgdisk_safe --mbrtogpt --load-backup="$SGDISK_FILE" /dev/$TARGET_NODEV 2>&1)"
