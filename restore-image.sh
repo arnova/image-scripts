@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18b"
+MY_VERSION="3.18c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 17, 2019
+# Last update: October 18, 2019
 # (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1741,7 +1741,7 @@ show_target_devices()
 }
 
 
-compare_dos_partition()
+compare_sfdisk_partition()
 {
   local SOURCE_PART="$(echo "$1" |sed -r -e 's!^/dev/[a-z]+!!' -e 's!^[0-9]+p!!' -e 's!start= *[0-9]+, *!!' -e 's!size= *!!' |tr 'A-Z' 'a-z')"
   local TARGET_PART="$(echo "$2" |sed -r -e 's!^/dev/[a-z]+!!' -e 's!^[0-9]+p!!' -e 's!start= *[0-9]+, *!!' -e 's!size= *!!' |tr 'A-Z' 'a-z')"
@@ -1778,7 +1778,7 @@ compare_dos_partition()
 }
 
 
-compare_gpt_partition()
+compare_gdisk_partition()
 {
   local SOURCE_PART="$1"
   local TARGET_PART="$2"
@@ -1792,12 +1792,14 @@ compare_gpt_partition()
   local SOURCE_TYPE="$(echo "$SOURCE_PART" |awk '{ print substr($0, index($0,$6)) }')"
   local TARGET_TYPE="$(echo "$TARGET_PART" |awk '{ print substr($0, index($0,$6)) }')"
   if [ "$SOURCE_TYPE" != "$TARGET_TYPE" ]; then
-    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM has different type/flags than source partition $SOURCE_NUM!\n\033[0m" >&2
+    printf "\033[40m\033[1;31mWARNING: Target partition $TARGET_NUM has different code/name than source partition $SOURCE_NUM!\n\033[0m" >&2
     retval=1
   fi
 
-  local SOURCE_SIZE="$(echo "$SOURCE_PART" |awk '{ print $3 - $2 }')"
-  local TARGET_SIZE="$(echo "$TARGET_PART" |awk '{ print $3 - $2 }')"
+  # NOTE: gdisk report size in MiB/GiB etc. so that can't be used for exact size matching
+  #       instead calculate size from start/end sector. Assume 512 byte logical sector size
+  local SOURCE_SIZE="$(echo "$SOURCE_PART" |awk '{ print ($3 - $2) * 512 }')"
+  local TARGET_SIZE="$(echo "$TARGET_PART" |awk '{ print ($3 - $2) * 512 }')"
 
   # Target is smaller?
   if [ $SOURCE_SIZE -gt $TARGET_SIZE ]; then
@@ -1856,7 +1858,7 @@ test_target_partitions()
           continue
         fi
 
-        if ! compare_gpt_partition "$GDISK_SOURCE_PART" "$GDISK_TARGET_PART"; then
+        if ! compare_gdisk_partition "$GDISK_SOURCE_PART" "$GDISK_TARGET_PART"; then
           MISMATCH=1
         fi
       else
@@ -1889,7 +1891,7 @@ test_target_partitions()
         fi
 
         # Check geometry/type of partition
-        if ! compare_dos_partition "$SFDISK_SOURCE_PART" "$SFDISK_TARGET_PART"; then
+        if ! compare_sfdisk_partition "$SFDISK_SOURCE_PART" "$SFDISK_TARGET_PART"; then
           MISMATCH=1
         fi
       fi
