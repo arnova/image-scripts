@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.21"
+MY_VERSION="3.21a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: October 17, 2019
+# Last update: November 14, 2019
 # (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1086,13 +1086,14 @@ backup_disks()
     # For output files replace / with _
     OUTPUT_SUFFIX="$(echo "$HDD_NODEV" |sed s,'/','_',g)"
 
-    if check_command gdisk && check_command sgdisk; then
-      if gpt_detect "/dev/$HDD_NODEV"; then
-        echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
-      else
-        echo "* Storing DOS partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
+    if gpt_detect "/dev/$HDD_NODEV"; then
+      # GPT partition table found, check for binaries
+      if ! check_command gdisk || ! check_command sgdisk; then
+        printf "\033[40m\033[1;31mERROR: Unable to save GPT partition as gdisk/sgdisk binaries were not found! Quitting...\n\033[0m" >&2
+        do_exit 9
       fi
 
+      echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
       sgdisk --backup="sgdisk.${OUTPUT_SUFFIX}" "/dev/${HDD_NODEV}"
 
       echo ""
@@ -1100,11 +1101,6 @@ backup_disks()
       # Dump gdisk -l info to file
       gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${OUTPUT_SUFFIX}"
     else
-      if gpt_detect "/dev/$HDD_NODEV"; then
-        printf "\033[40m\033[1;31mERROR: Unable to save GPT partition as gdisk/sgdisk binaries were not found! Quitting...\n\033[0m" >&2
-        do_exit 9
-      fi
-
       SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
       if [ -n "$SFDISK_OUTPUT" ]; then
         # DOS partition table found
