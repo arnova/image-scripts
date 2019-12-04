@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18d"
+MY_VERSION="3.18e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 18, 2019
+# Last update: December 4, 2019
 # (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1821,7 +1821,7 @@ compare_gdisk_partition()
 test_target_partitions()
 {
   if [ -z "$IMAGE_FILES" ]; then
-    return 1 # Nothing to do
+    return # Nothing to do
   fi
 
   echo ""
@@ -1855,7 +1855,6 @@ test_target_partitions()
         # Match partition with what we have stored in our partitions file
         if [ -z "$GDISK_SOURCE_PART" ]; then
           printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$IMAGE_PARTITION_NODEV can not be found in source file ${GDISK_SOURCE}!\n\033[0m" >&2
-          echo ""
           MISMATCH=1
           continue
         fi
@@ -1894,7 +1893,6 @@ test_target_partitions()
           # Match partition with what we have stored in our partitions file
           if [ -z "$SFDISK_SOURCE_PART" ]; then
             printf "\033[40m\033[1;31m\nWARNING: Partition /dev/$IMAGE_PARTITION_NODEV can not be found in source file ${SFDISK_SOURCE}!\n\033[0m" >&2
-            echo ""
             MISMATCH=1
             continue
           fi
@@ -1908,18 +1906,15 @@ test_target_partitions()
     fi
   done
 
-  echo ""
-
   if [ $MISMATCH -ne 0 ]; then
-    printf "\033[40m\033[1;31mWARNING: One or more target partitions mismatch with source partitions!\n\033[0m" >&2
+    #printf "\033[40m\033[1;31mWARNING: One or more target partitions mismatch with source partitions!\n\033[0m" >&2
     if ! get_user_yn "Continue anyway"; then
       echo "Aborted by user..."
       do_exit 5
     fi
-    return 1
   fi
 
-  return 0
+  echo ""
 }
 
 
@@ -2135,8 +2130,6 @@ echo ""
 if ! get_user_yn "Continue with restore"; then
   echo "Aborted by user..."
   do_exit 1
-else
-  echo ""
 fi
 
 # Restore MBR/partition tables
