@@ -422,9 +422,11 @@ show_block_device_info()
 
 
 # Get partition number from argument and return to stdout
+# This needs to handle the following formats properly: /dev/sda12, /dev/sda12p3, /dev/nvm0n1p12
 get_partition_number()
 {
-  echo "$1" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',,
+  # Obtain the last number from the string and consider that the partition number
+  echo "$1" |sed -r s,'.*[a-z]+([0-9]+)$','\1',
 }
 
 
