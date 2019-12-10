@@ -5,8 +5,9 @@
 ####################
 # Globals sourced from main script: CLEAN, TARGET_DEVICES
 
-# The primary partition number to use for the user partition (with Win7, 1 and 2 are used by the OS). FIXME: Should be auto-detected
-USER_PART_ID="3"
+# The primary partition number to use for the user partition (with Win7, 1 and 2 are used by the OS)
+# For GPT it's normally 5, for MBR it's 3. FIXME: Should be auto-detected!
+USER_PART_NR=5
 
 # Reset some globals
 USER_DISK_NODEV=""
@@ -42,7 +43,7 @@ mkud_create_user_dos_partition()
   local EMPTY_PARTITION_TABLE="$3"
   local FDISK_CMD=""
 
-  # TODO?: Use parted -s and auto detect USER_PART_ID
+  # TODO?: Use parted -s and auto detect USER_PART_NR
   if [ $EMPTY_PARTITION_TABLE -eq 1 ]; then
     echo "* Creating new (empty) DOS partition"
     # Empty partition table"
@@ -126,26 +127,42 @@ y
 }
 
 
-# Arguemtns: $1 = DISK_NODEV, $2 = partition id, $3 = fileystem label, $4 = (wipe + ) repartition disk(1) or not (0)
+# Get partition device name for provided disk and partition number
+get_disk_partition()
+{
+  local DISK="$1"
+  local PART_NR="$2"
+
+  # Assume disk devices ending with a number use the p suffix for partition numbers
+  if echo "$DISK" |grep -q '[0-9]$'; then
+    echo "${DISK}p${PART_NR}"
+  else
+    echo "${DISK}${PART_NR}"
+  fi
+}
+
+
+# Arguments: $1 = DISK_NODEV, $2 = partition nr, $3 = fileystem label, $4 = (wipe + ) repartition disk(1) or not (0)
 mkud_create_user_filesystem()
 {
   local TARGET_DISK_NODEV="$1"
-  local TARGET_PART_ID="$2"
+  local TARGET_PART_NR="$2"
   local TARGET_PART_LABEL="$3"
   local REPARTITION_DISK="$4"
   local TARGET_DISK="/dev/${TARGET_DISK_NODEV}"
-  local TARGET_PART="${TARGET_DISK}${TARGET_PART_ID}"
+  local TARGET_PART_NODEV="$(get_disk_partition "$TARGET_DISK_NODEV" "$TARGET_PART_NR")"
+  local TARGET_PART="/dev/${TARGET_PART_NODEV}"
 
   # TODO: Skip the block below if our target disk already *exactly* matches?!
   local PARTITIONS_FOUND="$(get_partitions $TARGET_DISK)"
-  if ! echo "$PARTITIONS_FOUND" |grep -q "${TARGET_DISK_NODEV}${TARGET_PART_ID}$" || [ $REPARTITION_DISK -eq 1 ]; then
+  if ! echo "$PARTITIONS_FOUND" |grep -q "${TARGET_PART_NODEV}$" || [ $REPARTITION_DISK -eq 1 ]; then
     # If user partition is on the same device as the images, check that it does not exist already
-    if [ ! -e $TARGET_PART -o $REPARTITION_DISK -eq 1 ]; then
+    if [ ! -e "$TARGET_PART" -o $REPARTITION_DISK -eq 1 ]; then
       # Detect GPT. Always use GPT on an empty disk since size may be > 2TB
       if [ $REPARTITION_DISK -eq 1 ] || gpt_detect $TARGET_DISK; then
-        mkud_create_user_gpt_partition $TARGET_DISK $TARGET_PART_ID $REPARTITION_DISK
+        mkud_create_user_gpt_partition $TARGET_DISK $TARGET_PART_NR $REPARTITION_DISK
       else
-        mkud_create_user_dos_partition $TARGET_DISK $TARGET_PART_ID $REPARTITION_DISK
+        mkud_create_user_dos_partition $TARGET_DISK $TARGET_PART_NR $REPARTITION_DISK
       fi
     else
       echo "* Skipping creation of NTFS partition $TARGET_PART since it already exists"
@@ -183,11 +200,12 @@ mkud_select_disk()
   # Check which partitions we can use for the user partiton, we ignore mounted ones
   local FIND_DISKS=""
   unset IFS
-  for DISK in `cat /proc/partitions |grep -E '[sh]d[a-z]$' |awk '{ print $4 }' |sed s,'^/dev/',,`; do
+  # NOTE: Ignore eg. sr0, loop0, and include sda, hda, nvme0n1
+  for DISK in `cat /proc/partitions |grep -E -e '[sh]d[a-z]$' -e 'nvme[0-9]+n[0-9]+$' |awk '{ print $4 }' |sed s,'^/dev/',,`; do
     # Ignore disks with swap/mounted partitions
-    if grep -E -q "^/dev/${DISK}p?[0-9]+" /etc/mtab; then
+    if grep -E -q "^/dev/${DISK}p?[0-9]+[[:blank:]]" /etc/mtab; then
       echo "* NOTE: Ignoring disk with mounted partitions /dev/$DISK" >&2
-    elif ! grep -E -q "^/dev/${PART}p?[0-9]+" /proc/swaps; then
+    elif ! grep -E -q "^/dev/${DISK}p?[0-9]+[[:blank:]]" /proc/swaps; then
       FIND_DISKS="${FIND_DISKS}${FIND_DISKS:+ }$DISK"
     fi
   done
@@ -212,7 +230,7 @@ mkud_select_disk()
           break # We're done
         fi
       fi
-      USER_PART_ID=1 # Overrule partition ID
+      USER_PART_NR=1 # Overrule partition ID
       USER_DISK_WIPE=1
       USER_DISK_NODEV="$DISK_NODEV"
       break # We're done
@@ -220,6 +238,8 @@ mkud_select_disk()
       USER_DISK_NODEV="$DISK_NODEV" # Default to the first disk in the list
     fi
   done
+
+  echo "* Using disk /dev/$USER_DISK_NODEV for user partition"
 
 #    TODO: User selection
 #    echo "Multiple disks found:"
@@ -232,17 +252,20 @@ mkud_select_disk()
 ############
 
 # Get $USER_DISK_NODEV:
-mkud_select_disk;
+mkud_select_disk
 
 if [ -z "$USER_DISK_NODEV" ]; then
   echo "WARNING: No user partition created!" >&2
 else
   # In principle we should never have to wipe + repartition(0) the OS disk
   # as this should already be done while restoring the images
-  mkud_create_user_filesystem "$USER_DISK_NODEV" "$USER_PART_ID" "USER" $USER_DISK_WIPE
+  mkud_create_user_filesystem "$USER_DISK_NODEV" "$USER_PART_NR" "USER" $USER_DISK_WIPE
 
   # Add the disk to restore-image script's target list so its partitions get listed when done
   if ! echo "$TARGET_DEVICES" |grep -q -E "(^| )/dev/$USER_DISK_NODEV( |$)"; then
     TARGET_DEVICES="$TARGET_DEVICES /dev/$USER_DISK_NODEV"
   fi
+
+  # Make sure kernel info is updated
+  sleep 3
 fi
