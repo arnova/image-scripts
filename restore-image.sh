@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18e"
+MY_VERSION="3.18f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: December 4, 2019
+# Last update: December 12, 2019
 # (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -243,6 +243,18 @@ add_partition_number()
 }
 
 
+# Get partition prefix(es) for provided device
+# $1 = Device
+get_partition_prefix()
+{
+  if echo "$1" |grep -q '[0-9]$'; then
+    echo "${1}p"
+  else
+    echo "${1}"
+  fi
+}
+
+
 # $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
 # Note that size is represented in 1KiB blocks
 get_partitions_with_size()
@@ -251,7 +263,7 @@ get_partitions_with_size()
   local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
 
   if [ -n "$DISK_NODEV" ]; then
-    echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}p?[0-9]+"
+    echo "$FIND_PARTS" |grep -E "^$(get_partition_prefix $DISK_NODEV)[0-9]+[[:blank:]]"
   else
     echo "$FIND_PARTS" # Show all
   fi
@@ -1028,7 +1040,7 @@ source_to_target_remap()
     NUM=`get_partition_number "$IMAGE_PARTITION_NODEV"`
     if [ -n "$NUM" ]; then
       # Argument is a partition
-      if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "${SOURCE_DEVICE_NODEV}p?[0-9]+"; then
+      if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "$(get_partition_prefix $SOURCE_DEVICE_NODEV)[0-9]+"; then
         TARGET_DEVICE=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
         break
       fi
@@ -1198,11 +1210,11 @@ get_auto_target_device()
 
   # Check for device existence and mounted partitions, prefer non-removable devices. Also check size of target
   if [ ! -b "/dev/$SOURCE_NODEV" ] || [ "$(cat /sys/block/$SOURCE_NODEV/removable 2>/dev/null)" = "1" ] || [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -lt $MIN_SIZE ] \
-  || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/${SOURCE_NODEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+  || grep -E -q "^/dev/$(get_partition_prefix $SOURCE_NODEV)[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/$(get_partition_prefix $SOURCE_NODEV)[0-9]+[[:blank:]]" /proc/swaps; then
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
       # Checked for mounted partitions
-      if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^${DISK_DEV}p?[0-9]+[[:blank:]]" /proc/swaps; then
+      if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && ! grep -E -q "^$(get_partition_prefix $DISK_DEV)[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^$(get_partition_prefix $DISK_DEV)[0-9]+[[:blank:]]" /proc/swaps; then
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
         break
       fi

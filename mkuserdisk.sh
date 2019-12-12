@@ -34,6 +34,18 @@ gpt_detect()
 }
 
 
+# Get partition prefix(es) for provided device
+# $1 = Device
+get_partition_prefix()
+{
+  if echo "$1" |grep -q '[0-9]$'; then
+    echo "${1}p"
+  else
+    echo "${1}"
+  fi
+}
+
+
 # Arguments: $1 = DISK, $2 = Partition ID, $3 = Start with empty partition table(1)
 mkud_create_user_dos_partition()
 {
@@ -203,9 +215,9 @@ mkud_select_disk()
   # NOTE: Ignore eg. sr0, loop0, and include sda, hda, nvme0n1
   for DISK in `cat /proc/partitions |grep -E -e '[sh]d[a-z]$' -e 'nvme[0-9]+n[0-9]+$' |awk '{ print $4 }' |sed s,'^/dev/',,`; do
     # Ignore disks with swap/mounted partitions
-    if grep -E -q "^/dev/${DISK}p?[0-9]+[[:blank:]]" /etc/mtab; then
+    if grep -E -q "^/dev/$(get_partition_prefix $DISK)[0-9]+[[:blank:]]" /etc/mtab; then
       echo "* NOTE: Ignoring disk with mounted partitions /dev/$DISK" >&2
-    elif ! grep -E -q "^/dev/${DISK}p?[0-9]+[[:blank:]]" /proc/swaps; then
+    elif ! grep -E -q "^/dev/$(get_partition_prefix $DISK)[0-9]+[[:blank:]]" /proc/swaps; then
       FIND_DISKS="${FIND_DISKS}${FIND_DISKS:+ }$DISK"
     fi
   done

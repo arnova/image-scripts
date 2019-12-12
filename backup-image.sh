@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.21a"
+MY_VERSION="3.21b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: November 14, 2019
+# Last update: December 12, 2019
 # (C) Copyright 2004-2019 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -158,6 +158,18 @@ gpt_detect()
 }
 
 
+# Get partition prefix(es) for provided device
+# $1 = Device
+get_partition_prefix()
+{
+  if echo "$1" |grep -q '[0-9]$'; then
+    echo "${1}p"
+  else
+    echo "${1}"
+  fi
+}
+
+
 # $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
 # Note that size is represented in 1KiB blocks
 get_partitions_with_size()
@@ -166,7 +178,7 @@ get_partitions_with_size()
   local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
 
   if [ -n "$DISK_NODEV" ]; then
-    echo "$FIND_PARTS" |grep -E "^${DISK_NODEV}p?[0-9]+"
+    echo "$FIND_PARTS" |grep -E "^$(get_partition_prefix $DISK_NODEV)[0-9]+[[:blank:]]"
   else
     echo "$FIND_PARTS" # Show all
   fi
