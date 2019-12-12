@@ -270,32 +270,23 @@ get_device_layout()
 }
 
 
-# Figure out to which disk the specified partition ($1) belongs
-get_partition_disks()
+# Figure out to which disk the specified slave (partition, md, etc.) ($1) belongs
+get_disk_for_slave()
 {
+  local SLAVE="$1"
   local DISK=""
-  local FOUND_DISKS=""
 
   IFS=$EOL
   for LINE in `lsblk -a -i -n -o NAME,TYPE`; do
-    if echo "$LINE" |grep -q "^[a-z]"; then
-      if echo "$LINE" |grep -q "[[:blank:]]disk$"; then
-        # Master disk:
-        DISK=`echo "$LINE" |awk '{ print $1 }'`
-      else
-        DISK=""
-      fi
-    elif echo "$LINE" |grep -q -e "-${1}[[:blank:]]"; then
+    if echo "$LINE" |grep -q "[[:blank:]]disk$"; then
+      # Master disk:
+      DISK="$(echo "$LINE" |awk '{ print $1 }')"
+    elif echo "$LINE" |grep -q "-${SLAVE}[[:blank:]]"; then
       # Found slave
-      if [ -n "$DISK" ]; then
-        FOUND_DISKS="${FOUND_DISKS}${DISK} "
-      fi
+      echo "$DISK"
+      return # We're done
     fi
   done
-
-  if [ -n "$FOUND_DISKS" ]; then
-    echo "$FOUND_DISKS"
-  fi
 }
 
 
@@ -676,7 +667,7 @@ select_disks()
   IFS=' '
   for PART in $BACKUP_PARTITIONS; do
     # Get disks this partition is on, maybe multiple disks (e.g. lvm/md)!
-    local DISKS_NODEV="$(get_partition_disks "$PART")"
+    local DISKS_NODEV="$(get_disk_for_slave "$PART")"
 
     IFS=' '
     for HDD_NODEV in $DISKS_NODEV; do
