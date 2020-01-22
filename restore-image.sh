@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.18f"
+MY_VERSION="3.18g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: December 12, 2019
-# (C) Copyright 2004-2019 by Arno van Amersfoort
+# Last update: January 22, 2020
+# (C) Copyright 2004-2020 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -2004,9 +2004,9 @@ load_config()
     ARGNAME=`echo "$arg" |cut -d= -f1`
     ARGVAL=`echo "$arg" |cut -d= -f2 -s`
 
-    case "$ARGNAME" in
-      --partitions|--partition|--part|-p) PARTITIONS=`echo "$ARGVAL" |sed 's|,| |g'`;; # Make list space seperated
-             --devices|--device|--dev|-d) DEVICES=`echo "$ARGVAL" |sed 's|,| |g'`;; # Make list space seperated
+    case "$ARGNAME" in     ${TARGET_DEVICES}${TARGET_DEVICES:+ }
+      --partitions|--partition|--part|-p) PARTITIONS="${PARTITIONS}${PARTITIONS:+ }$(echo "$ARGVAL" |sed 's|,| |g')";; # Make list space seperated
+             --devices|--device|--dev|-d) DEVICES="${DEVICES}${DEVICES:+ }$(echo "$ARGVAL" |sed 's|,| |g')";; # Make list space seperated
                         --clean|--track0) CLEAN=1;;
                                  --force) FORCE=1;;
                               --notrack0) NO_TRACK0=1;;
