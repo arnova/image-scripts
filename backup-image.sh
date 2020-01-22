@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.21b"
+MY_VERSION="3.21c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: December 12, 2019
-# (C) Copyright 2004-2019 by Arno van Amersfoort
+# Last update: January 22, 2020
+# (C) Copyright 2004-2020 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -281,7 +281,7 @@ get_disk_for_slave()
     if echo "$LINE" |grep -q "[[:blank:]]disk$"; then
       # Master disk:
       DISK="$(echo "$LINE" |awk '{ print $1 }')"
-    elif echo "$LINE" |grep -q "-${SLAVE}[[:blank:]]"; then
+    elif echo "$LINE" |grep -q -- "-${SLAVE}[[:blank:]]"; then
       # Found slave
       echo "$DISK"
       return # We're done
