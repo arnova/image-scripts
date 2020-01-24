@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.21c"
+MY_VERSION="3.21d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: January 22, 2020
+# Last update: January 24, 2020
 # (C) Copyright 2004-2020 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -727,13 +727,13 @@ detect_partitions()
       fi
 
 
-      # Make sure it's a real partition
+      # Make sure it's a real filesystem-partition
       if ! echo "$BLKID_LIST" |grep -q "^/dev/${PART_NODEV}:"; then
         continue
       fi
 
       # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
-      if echo "$LINE" |grep -q -i -E -e "([[:blank:]]|^)TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member)" -e "([[:blank:]]|^)PTTYPE="; then
+      if echo "$LINE" |grep -q -i -E -e "([[:blank:]]|^)TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member|iso9660)"; then
         continue # Ignore swap, lvm (dm), raid (md), etc. partitions
       fi
 
@@ -893,15 +893,25 @@ detect_partclone_binaries()
   else
     if check_command "partclone.fat12"; then
       PARTCLONE_FAT12="partclone.fat12"
+    elif check_command "partclone.fat"; then
+      PARTCLONE_FAT12="partclone.fat"
     fi
 
     if check_command "partclone.fat16"; then
       PARTCLONE_FAT16="partclone.fat16"
+    elif check_command "partclone.fat"; then
+      PARTCLONE_FAT16="partclone.fat"
     fi
 
     if check_command "partclone.fat32"; then
       PARTCLONE_FAT32="partclone.fat32"
+    elif check_command "partclone.fat"; then
+      PARTCLONE_FAT32="partclone.fat"
     fi
+  fi
+
+  if check_command "partclone.exfat"; then
+    PARTCLONE_EXFAT="partclone.exfat"
   fi
 
   if check_command "partclone.extfs"; then
@@ -924,10 +934,6 @@ detect_partclone_binaries()
 
   if check_command "partclone.ntfs"; then
     PARTCLONE_NTFS="partclone.ntfs"
-  fi
-
-  if check_command "partclone.exfat"; then
-    PARTCLONE_EXFAT="partclone.exfat"
   fi
 
   if check_command "partclone.xfs"; then
@@ -1011,7 +1017,7 @@ backup_partitions()
     # Determine filesystem type
     local FS_TYPE="$(get_filesystem_type /dev/$PART)"
     local IMAGER="$(get_imager_for_fs_type "$FS_TYPE")"
-    
+
     if [ "$IMAGER" = "dd" -a "$IMAGE_PROGRAM" != "ddgz" ]; then
       if [ -z "$FS_TYPE" ]; then
         echo "NOTE: No filesystem detected on /dev/$PART, falling back to ddgz-backup!" >&2
@@ -1035,17 +1041,18 @@ backup_partitions()
                     if [ "$IMAGER" = "partclone.none" ]; then
                       printf "\033[40m\033[1;31mERROR: Partclone of filesystem \"$FS_TYPE\" on /dev/$PART not supported!\n\033[0m" >&2
                       retval=1 # Flag error below
-                    fi
-                    TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
-                    PARTCLONE_CMD="$IMAGER -c"
-                    if [ $RESCUE -eq 1 ]; then
-                      PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
-                    fi
-                    printf "** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup filesystem \"$FS_TYPE\" on /dev/$PART to $TARGET_FILE **\n\n"
-                    { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
-                    retval=$?
-                    if [ $retval -eq 0 ]; then
-                      retval=`cat /tmp/.partclone.exitcode`
+                    else
+                      TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
+                      PARTCLONE_CMD="$IMAGER -c"
+                      if [ $RESCUE -eq 1 ]; then
+                        PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
+                      fi
+                      printf "** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup filesystem \"$FS_TYPE\" on /dev/$PART to $TARGET_FILE **\n\n"
+                      { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
+                      retval=$?
+                      if [ $retval -eq 0 ]; then
+                        retval=`cat /tmp/.partclone.exitcode`
+                      fi
                     fi
                     ;;
       dd)           TARGET_FILE="${OUTPUT_PREFIX}.dd.gz"
