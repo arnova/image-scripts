@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.21e"
+MY_VERSION="3.21f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: February 28, 2020
@@ -1046,7 +1046,7 @@ backup_partitions()
                       TARGET_FILE="${OUTPUT_PREFIX}.pc.gz"
                       PARTCLONE_CMD="$IMAGER -c"
                       if [ $RESCUE -eq 1 ]; then
-                        PARTCLONE_CMD="$PARTCLONE_CMD --rescue"
+                        PARTCLONE_CMD="$PARTCLONE_CMD --rescue --ignore_fschk"
                       fi
                       printf "** Using $PARTCLONE_CMD (+${GZIP} -${GZIP_COMPRESSION}) to backup filesystem \"$FS_TYPE\" on /dev/$PART to $TARGET_FILE **\n\n"
                       { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
