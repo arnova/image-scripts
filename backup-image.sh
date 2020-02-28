@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.21d"
+MY_VERSION="3.21e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: January 24, 2020
+# Last update: February 28, 2020
 # (C) Copyright 2004-2020 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -726,21 +726,21 @@ detect_partitions()
         continue # Ignore device
       fi
 
-
       # Make sure it's a real filesystem-partition
       if ! echo "$BLKID_LIST" |grep -q "^/dev/${PART_NODEV}:"; then
         continue
       fi
 
       # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
-      if echo "$LINE" |grep -q -i -E -e "([[:blank:]]|^)TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member|iso9660)"; then
+      if echo "$LINE" |grep -q -i -E "([[:blank:]]|^)TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member|iso9660)"; then
         continue # Ignore swap, lvm (dm), raid (md), etc. partitions
       fi
 
       # Extra strict regex for making sure it's really a filesystem
 #      if ! echo "$LINE" |grep -q -i ' TYPE=' && ! echo "$LINE" |grep -q -i -E -e ' LABEL=' -e '; then
-#        continue
-#      fi
+      if echo "$BLKID_LIST" |grep -q -i -E "^/dev/${PART_NODEV}:.*[[:blank:]] PTUUID="; then
+        continue
+      fi
 
       SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART_NODEV}"
     done
@@ -780,6 +780,7 @@ select_partitions()
           exit 5
         else
           local FIND_PARTITIONS="$(detect_partitions /dev/$DEVICE)"
+
           # Does the device contain partitions?
           if [ -n "$FIND_PARTITIONS" ]; then
             SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${FIND_PARTITIONS}"
