@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18h"
+MY_VERSION="3.18i"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: January 24, 2020
+# Last update: August 6, 2020
 # (C) Copyright 2004-2020 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -282,10 +282,10 @@ get_disk_partitions_with_type()
 {
   local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
 
-  if gpt_detect "/dev/$DISK_NODEV" && check_command gdisk; then
+  if gpt_detect "/dev/$DISK_NODEV" && check_command sgdisk; then
     # GPT partition table found
     IFS=$EOL
-    for LINE in $(gdisk -l "/dev/$DISK_NODEV" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]'); do
+    for LINE in $(sgdisk --print "/dev/$DISK_NODEV" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]'); do
       NUM="$(echo "$LINE" |awk '{ print $1 }')"
       PART="$(add_partition_number "$DISK_NODEV" "$NUM")"
       TYPE="$(echo "$LINE" |awk '{ print $6 }')"
@@ -384,9 +384,9 @@ list_device_partitions()
 {
   local DEVICE="$1"
 
-  if gpt_detect "$DEVICE" && check_command gdisk; then
+  if gpt_detect "$DEVICE" && check_command sgdisk; then
     # GPT partition table found
-    local GDISK_OUTPUT="$(gdisk -l "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
+    local GDISK_OUTPUT="$(sgdisk --print "$DEVICE" 2>/dev/null |grep -i -E -e '^[[:blank:]]+[0-9]' -e '^Number')"
     printf "* GPT partition table:\n${GDISK_OUTPUT}\n\n"
   else
     # MBR/DOS Partitions:
@@ -1317,7 +1317,7 @@ check_disks()
       if [ -e "gdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # GPT:
         GDISK_TARGET="$(gdisk -l "/dev/${TARGET_NODEV}" |parse_gdisk_output)"
-        if [ -z "$GDISK_TARGET" ]; then
+        if [ $? -ne 0 -o -z "$GDISK_TARGET" ]; then
           printf "\033[40m\033[1;31mERROR: Unable to get gdisk partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
         fi

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.21f"
+MY_VERSION="3.21g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: February 28, 2020
+# Last update: August 6, 2020
 # (C) Copyright 2004-2020 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1105,7 +1105,10 @@ backup_disks()
       fi
 
       echo "* Storing GPT partition table for /dev/$HDD_NODEV in sgdisk.${OUTPUT_SUFFIX}..."
-      sgdisk --backup="sgdisk.${OUTPUT_SUFFIX}" "/dev/${HDD_NODEV}"
+      if ! sgdisk --backup="sgdisk.${OUTPUT_SUFFIX}" "/dev/${HDD_NODEV}"; then
+        printf "\033[40m\033[1;31mERROR: sgdisk failure! Quitting...\n\033[0m" >&2
+        do_exit 9
+      fi
 
       echo ""
 
@@ -1113,7 +1116,7 @@ backup_disks()
       gdisk -l "/dev/${HDD_NODEV}" >"gdisk.${OUTPUT_SUFFIX}"
     else
       SFDISK_OUTPUT="$(sfdisk -d "/dev/${HDD_NODEV}" 2>/dev/null)"
-      if [ -n "$SFDISK_OUTPUT" ]; then
+      if [ $? -eq 0 -a -n "$SFDISK_OUTPUT" ]; then
         # DOS partition table found
         echo "* Storing DOS partition table for /dev/$HDD_NODEV in sfdisk.${OUTPUT_SUFFIX}..."
         echo "$SFDISK_OUTPUT" > "sfdisk.${OUTPUT_SUFFIX}"
