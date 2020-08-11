@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.18j"
+MY_VERSION="3.18k"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: August 11, 2020
@@ -1377,6 +1377,13 @@ check_disks()
       fi
     fi
 
+    DEVICE_FILES="${DEVICE_FILES}${DEVICE_FILES:+ }${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV}"
+    TARGET_DEVICES="${TARGET_DEVICES}${TARGET_DEVICES:+ }/dev/${TARGET_NODEV}"
+
+    if [ $ONLY_SH -eq 1 ]; then
+      continue
+    fi
+
     local ENTER=0
 
     if [ $CLEAN -eq 0 -a -n "$PARTITIONS_FOUND" ]; then
@@ -1446,9 +1453,6 @@ check_disks()
       printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
       read dummy
     fi
-
-    DEVICE_FILES="${DEVICE_FILES}${DEVICE_FILES:+ }${IMAGE_SOURCE_NODEV}${SEP}${TARGET_NODEV}"
-    TARGET_DEVICES="${TARGET_DEVICES}${TARGET_DEVICES:+ }/dev/${TARGET_NODEV}"
 
     if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 -o $MBR_WRITE -eq 1 ]; then
       IFS=$EOL
@@ -2110,10 +2114,12 @@ fi
 # Check target disks
 check_disks
 
-check_image_files
+if [ $ONLY_SH -eq 0 ]; then
+  check_image_files
 
-# Check target partitions
-check_partitions
+  # Check target partitions
+  check_partitions
+fi
 
 # Show info about target devices to be used
 show_target_devices
@@ -2149,9 +2155,7 @@ fi
 # Restore MBR/partition tables
 if [ $ONLY_SH -eq 0 ]; then
   restore_disks
-fi
 
-if [ $ONLY_SH -eq 0 ]; then
   # Make sure the target is sane
   test_target_partitions
 

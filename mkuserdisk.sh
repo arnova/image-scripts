@@ -1,4 +1,5 @@
-# Auto create d: ntfs drive (user disk).
+# Automatically create d: ntfs drive (user disk). Works with both MBR / GPT partitioned disks
+# Last modified: August 11, 2020
 
 ####################
 # Global variables #
@@ -7,7 +8,8 @@
 
 # The primary partition number to use for the user partition (with Win7, 1 and 2 are used by the OS)
 # For GPT it's normally 5, for MBR it's 3. FIXME: Should be auto-detected!
-USER_PART_NR=5
+DOS_USER_PART_NR=3
+GPT_USER_PART_NR=5
 
 # Reset some globals
 USER_DISK_NODEV=""
@@ -25,12 +27,6 @@ gpt_detect()
   else
     return 1 # GPT not found
   fi
-
-#  if gdisk -l "$1" |grep -q 'GPT: not present'; then
-#    return 1 # GPT not found
-#  else
-#    return 0 # GPT found
-#  fi
 }
 
 
@@ -154,14 +150,19 @@ get_disk_partition()
 }
 
 
-# Arguments: $1 = DISK_NODEV, $2 = partition nr, $3 = fileystem label, $4 = (wipe + ) repartition disk(1) or not (0)
+# Arguments: $1 = DISK_NODEV, $2 = partition nr, $3 = fileystem label, $4 = (wipe +) repartition disk(1) or not (0)
 mkud_create_user_filesystem()
 {
   local TARGET_DISK_NODEV="$1"
-  local TARGET_PART_NR="$2"
-  local TARGET_PART_LABEL="$3"
-  local REPARTITION_DISK="$4"
+  local TARGET_PART_LABEL="$2"
+  local REPARTITION_DISK="$3"
   local TARGET_DISK="/dev/${TARGET_DISK_NODEV}"
+
+  local TARGET_PART_NR="$DOS_USER_PART_NR"
+  if [ $REPARTITION_DISK -eq 1 ] || gpt_detect "$TARGET_DISK"; then
+    TARGET_PART_NR="$GPT_USER_PART_NR"
+  fi
+
   local TARGET_PART_NODEV="$(get_disk_partition "$TARGET_DISK_NODEV" "$TARGET_PART_NR")"
   local TARGET_PART="/dev/${TARGET_PART_NODEV}"
 
@@ -209,7 +210,7 @@ mkud_create_user_filesystem()
 
 mkud_select_disk()
 {
-  # Check which partitions we can use for the user partiton, we ignore mounted ones
+  # Check which disks we can use for the user partiton, we ignore disks with mounted partitions
   local FIND_DISKS=""
   unset IFS
   # NOTE: Ignore eg. sr0, loop0, and include sda, hda, nvme0n1
@@ -242,7 +243,11 @@ mkud_select_disk()
           break # We're done
         fi
       fi
-      USER_PART_NR=1 # Overrule partition ID
+
+      # Overrule partition ID:
+      DOS_USER_PART_NR=1
+      GPT_USER_PART_NR=1
+
       USER_DISK_WIPE=1
       USER_DISK_NODEV="$DISK_NODEV"
       break # We're done
@@ -271,7 +276,7 @@ if [ -z "$USER_DISK_NODEV" ]; then
 else
   # In principle we should never have to wipe + repartition(0) the OS disk
   # as this should already be done while restoring the images
-  mkud_create_user_filesystem "$USER_DISK_NODEV" "$USER_PART_NR" "USER" $USER_DISK_WIPE
+  mkud_create_user_filesystem "$USER_DISK_NODEV" "USER" $USER_DISK_WIPE
 
   # Add the disk to restore-image script's target list so its partitions get listed when done
   if ! echo "$TARGET_DEVICES" |grep -q -E "(^| )/dev/$USER_DISK_NODEV( |$)"; then
