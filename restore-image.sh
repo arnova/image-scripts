@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18i"
+MY_VERSION="3.18j"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: August 6, 2020
+# Last update: August 11, 2020
 # (C) Copyright 2004-2020 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1317,7 +1317,7 @@ check_disks()
       if [ -e "gdisk.${IMAGE_SOURCE_NODEV}" ]; then
         # GPT:
         GDISK_TARGET="$(gdisk -l "/dev/${TARGET_NODEV}" |parse_gdisk_output)"
-        if [ $? -ne 0 -o -z "$GDISK_TARGET" ]; then
+        if [ -z "$GDISK_TARGET" ]; then
           printf "\033[40m\033[1;31mERROR: Unable to get gdisk partitions from device /dev/${TARGET_NODEV} ! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
@@ -1859,7 +1859,7 @@ test_target_partitions()
 
     GDISK_SOURCE="gdisk.${SOURCE_DISK_NODEV}"
     if [ -e "$GDISK_SOURCE" ]; then
-      GDISK_TARGET_PART="$(gdisk -l "$TARGET_DISK" |parse_gdisk_output |grep -E "^$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
+      GDISK_TARGET_PART="$(sgdisk --print "$TARGET_DISK" |parse_gdisk_output |grep -E "^$(get_partition_number "$TARGET_PARTITION")[[:blank:]]")"
       if [ -n "$GDISK_TARGET_PART" ]; then
         GDISK_SOURCE_PART="$(cat "$GDISK_SOURCE" 2>/dev/null |parse_gdisk_output |grep -E "^$(get_partition_number "$IMAGE_PARTITION_NODEV")[[:blank:]]" )"
 
