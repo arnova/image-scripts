@@ -1201,7 +1201,7 @@ get_source_disks()
 get_auto_target_device()
 {
   local SOURCE_NODEV="$1"
-  local MIN_SIZE="$2"
+  local MIN_SIZE="$2"       # NOTE: Currently not used/implemented
 
   #FIXME: Check disk-size with MIN_SIZE?
   if [ -z "$MIN_SIZE" ]; then
@@ -1213,8 +1213,10 @@ get_auto_target_device()
   || grep -E -q "^/dev/$(get_partition_prefix $SOURCE_NODEV)[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/$(get_partition_prefix $SOURCE_NODEV)[0-9]+[[:blank:]]" /proc/swaps; then
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
-      # Checked for mounted partitions
-      if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && ! grep -E -q "^$(get_partition_prefix $DISK_DEV)[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^$(get_partition_prefix $DISK_DEV)[0-9]+[[:blank:]]" /proc/swaps; then
+      # Checked for mounted partitions, removable disks, etc.
+      # FIXME: Prefer nvme disks, check MIN_SIZE (calculate partition sizes)?
+      if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && ! grep -E -q "^$(get_partition_prefix $DISK_DEV)[0-9]+[[:blank:]]" /etc/mtab && \
+           ! grep -E -q "^$(get_partition_prefix $DISK_DEV)[0-9]+[[:blank:]]" /proc/swaps; then
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
         break
       fi
