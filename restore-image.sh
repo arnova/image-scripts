@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.18l"
+MY_VERSION="3.18m"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: February 2, 2021
@@ -1227,12 +1227,14 @@ get_auto_target_device()
   if [ ! -b "/dev/$SOURCE_NODEV" ] || \
      [ "$(cat /sys/block/$SOURCE_NODEV/removable 2>/dev/null)" = "1" ] || \
      [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -lt $MIN_SIZE ] || \
+     ! blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1 || \
      grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" || \
      grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV"; then
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
       # Checked for mounted partitions
       if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && \
+        blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1 && \
         ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV" && \
         ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV"; then
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
