@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.18k"
+MY_VERSION="3.18l"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: August 11, 2020
-# (C) Copyright 2004-2020 by Arno van Amersfoort
+# Last update: February 2, 2021
+# (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -1197,6 +1197,21 @@ get_source_disks()
 }
 
 
+list_has_disk_partition()
+{
+  local FIND_DEV="$1"
+
+  IFS=$EOL
+  while read DEV; do
+    if [ "$DEV" = "$FIND_DEV" ] || echo "$DEV" |grep -E -q "^$(get_partition_prefix $FIND_DEV)[0-9]+$"; then
+      return 0 #Found
+    fi
+  done
+
+  return 1 # Not found
+}
+
+
 # Returns best suitable target device, prefer unmounted disks (without /dev/ prefix)
 get_auto_target_device()
 {
@@ -1205,16 +1220,21 @@ get_auto_target_device()
 
   #FIXME: Check disk-size with MIN_SIZE?
   if [ -z "$MIN_SIZE" ]; then
-    MIN_SIZE=0
+    MIN_SIZE=1 # Skip zero-size devices
   fi
 
   # Check for device existence and mounted partitions, prefer non-removable devices. Also check size of target
-  if [ ! -b "/dev/$SOURCE_NODEV" ] || [ "$(cat /sys/block/$SOURCE_NODEV/removable 2>/dev/null)" = "1" ] || [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -lt $MIN_SIZE ] \
-  || grep -E -q "^/dev/$(get_partition_prefix $SOURCE_NODEV)[0-9]+[[:blank:]]" /etc/mtab || grep -E -q "^/dev/$(get_partition_prefix $SOURCE_NODEV)[0-9]+[[:blank:]]" /proc/swaps; then
+  if [ ! -b "/dev/$SOURCE_NODEV" ] || \
+     [ "$(cat /sys/block/$SOURCE_NODEV/removable 2>/dev/null)" = "1" ] || \
+     [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -lt $MIN_SIZE ] || \
+     grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" || \
+     grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV"; then
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
       # Checked for mounted partitions
-      if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && ! grep -E -q "^$(get_partition_prefix $DISK_DEV)[0-9]+[[:blank:]]" /etc/mtab && ! grep -E -q "^$(get_partition_prefix $DISK_DEV)[0-9]+[[:blank:]]" /proc/swaps; then
+      if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && \
+        ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV" && \
+        ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV"; then
         SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
         break
       fi
