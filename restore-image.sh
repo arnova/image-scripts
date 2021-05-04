@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18m"
+MY_VERSION="3.18n"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: February 2, 2021
+# Last update: May 4, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1232,12 +1232,13 @@ get_auto_target_device()
      grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV"; then
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
+      DISK_NODEV="$(echo "$DISK_DEV" |sed s,'^/dev/',,)"
       # Checked for mounted partitions
-      if [ "$(cat /sys/block/$DISK_DEV/removable 2>/dev/null)" != "1" ] && \
-        blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1 && \
+      if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ] && \
+        blockdev --rereadpt "$DISK_DEV" >/dev/null 2>&1 && \
         ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV" && \
         ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV"; then
-        SOURCE_NODEV=`echo "$DISK_DEV" |sed s,'^/dev/',,`
+        SOURCE_NODEV="$DISK_NODEV"
         break
       fi
       #FIXME: Skip check above when --clean is not specified?
