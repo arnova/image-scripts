@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18n"
+MY_VERSION="3.18o"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 4, 2021
+# Last update: May 5, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1223,9 +1223,8 @@ get_auto_target_device()
     MIN_SIZE=1 # Skip zero-size devices
   fi
 
-  # Check for device existence and mounted partitions, prefer non-removable devices. Also check size of target
+  # Check for original source device first, and check other devices in case it's not suitable
   if [ ! -b "/dev/$SOURCE_NODEV" ] || \
-     [ "$(cat /sys/block/$SOURCE_NODEV/removable 2>/dev/null)" = "1" ] || \
      [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -lt $MIN_SIZE ] || \
      ! blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1 || \
      grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" || \
