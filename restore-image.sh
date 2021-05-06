@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.18o"
+MY_VERSION="3.19"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 5, 2021
+# Last update: May 6, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -259,7 +259,7 @@ get_partition_prefix()
 # Note that size is represented in 1KiB blocks
 get_partitions_with_size()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local DISK_NODEV="${1#/dev/}"
   local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
 
   if [ -n "$DISK_NODEV" ]; then
@@ -280,7 +280,7 @@ get_partitions()
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_disk_partitions_with_type()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local DISK_NODEV="${1#/dev/}"
 
   if gpt_detect "/dev/$DISK_NODEV" && check_command sgdisk; then
     # GPT partition table found
@@ -449,7 +449,7 @@ get_available_disks()
 
   IFS=$EOL
   for BLK_DEVICE in /sys/block/*; do
-    DEVICE="$(echo "$BLK_DEVICE" |sed s,'^/sys/block/','/dev/',)"
+    DEVICE="/dev/${BLK_DEVICE#/sys/block/}"
     if echo "$DEVICE" |grep -q -e '/loop[0-9]' -e '/sr[0-9]' -e '/fd[0-9]' -e '/ram[0-9]' || [ ! -b "$DEVICE" ]; then
       continue # Ignore device
     fi
@@ -776,7 +776,7 @@ sanity_check()
         exit 5
       fi
 
-      CHECK_DEVICE_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+      CHECK_DEVICE_NODEV="${TARGET_DEVICE_MAP#/dev/}"
     else
       if echo "$SOURCE_DEVICE_NODEV" |grep -q '^/dev/'; then
         echo ""
@@ -948,15 +948,15 @@ set_image_source_dir()
         TEMP_IMAGE_DIR="$IMAGE_DIR"
         while echo "$IMAGE_NAME" |grep -q '^../'; do
           TEMP_IMAGE_DIR="$(dirname "$TEMP_IMAGE_DIR")" # Get rid of top directory
-          IMAGE_NAME="$(echo "$IMAGE_NAME" |sed s:'^../'::)"
+          IMAGE_NAME="${IMAGE_NAME#../}"
         done
 
         # Get rid of ./ prefix
-        IMAGE_NAME="$(echo "$IMAGE_NAME" |sed s:'^\./'::)"
+        IMAGE_NAME="${IMAGE_NAME#./}"
 
         # Sub-folder handling (=trailing /)
         if echo "$IMAGE_NAME" |grep -q "/$"; then
-          TEMP_IMAGE_DIR="$TEMP_IMAGE_DIR/$(echo "$IMAGE_NAME" |sed s:'/*$'::)"
+          TEMP_IMAGE_DIR="$TEMP_IMAGE_DIR/$(echo "$IMAGE_NAME" |sed s,'/*$',,)"
         fi
 
         if [ ! -d "$TEMP_IMAGE_DIR" ]; then
@@ -1036,7 +1036,7 @@ source_to_target_remap()
       SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     fi
 
-    TARGET_DEVICE_MAP_NODEV=`echo "$TARGET_DEVICE_MAP" |sed s,'^/dev/',,`
+    TARGET_DEVICE_MAP_NODEV="${TARGET_DEVICE_MAP#/dev/}"
     NUM=`get_partition_number "$IMAGE_PARTITION_NODEV"`
     if [ -n "$NUM" ]; then
       # Argument is a partition
@@ -1154,7 +1154,7 @@ user_target_dev_select()
 
   # Auto remove /dev/ :
   if echo "$USER_TARGET_NODEV" |grep -q '^/dev/'; then
-    USER_TARGET_NODEV="$(echo "$USER_TARGET_NODEV" |sed s,'^/dev/',,)"
+    USER_TARGET_NODEV="${USER_TARGET_NODEV#/dev/}"
   fi
 }
 
@@ -1231,7 +1231,7 @@ get_auto_target_device()
      grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV"; then
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
-      DISK_NODEV="$(echo "$DISK_DEV" |sed s,'^/dev/',,)"
+      DISK_NODEV="${DISK_DEV#/dev/}"
       # Checked for mounted partitions
       if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ] && \
         blockdev --rereadpt "$DISK_DEV" >/dev/null 2>&1 && \
@@ -1874,7 +1874,7 @@ test_target_partitions()
     TARGET_PARTITION=$(echo "$ITEM" |cut -f2 -d"$SEP" -s)
 
     # Strip extension so we get the actual device name
-    IMAGE_PARTITION_NODEV=$(echo "$IMAGE_FILE" |sed 's/\..*//')
+    IMAGE_PARTITION_NODEV="${IMAGE_FILE%.*}"
     SOURCE_DISK_NODEV=$(get_partition_disk "$IMAGE_PARTITION_NODEV")
     TARGET_DISK=$(get_partition_disk "$TARGET_PARTITION")
 
@@ -2031,8 +2031,8 @@ load_config()
     ARGVAL=`echo "$arg" |cut -d= -f2 -s`
 
     case "$ARGNAME" in
-      --partitions|--partition|--part|-p) PARTITIONS="${PARTITIONS}${PARTITIONS:+ }$(echo "$ARGVAL" |sed 's|,| |g')";; # Make list space seperated
-             --devices|--device|--dev|-d) DEVICES="${DEVICES}${DEVICES:+ }$(echo "$ARGVAL" |sed 's|,| |g')";; # Make list space seperated
+      --partitions|--partition|--part|-p) PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${ARGVAL//,/ }";; # Make list space seperated
+             --devices|--device|--dev|-d) DEVICES="${DEVICES}${DEVICES:+ }${ARGVAL//, / }";; # Make list space seperated
                         --clean|--track0) CLEAN=1;;
                                  --force) FORCE=1;;
                               --notrack0) NO_TRACK0=1;;
@@ -2193,7 +2193,7 @@ fi
 
 # Set this for legacy scripts:
 TARGET_DEVICE=`echo "$TARGET_DEVICES" |cut -f1 -d' '` # Pick the first device (probably sda)
-TARGET_NODEV=`echo "$TARGET_DEVICE" |sed s,'^/dev/',,`
+TARGET_NODEV="${TARGET_DEVICE#/dev/}"
 USER_TARGET_NODEV="$TARGET_NODEV"
 
 # Run custom script(s) (should have .sh extension):

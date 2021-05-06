@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.21g"
+MY_VERSION="3.22"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: August 6, 2020
-# (C) Copyright 2004-2020 by Arno van Amersfoort
+# Last update: May 6, 2021
+# (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -174,7 +174,7 @@ get_partition_prefix()
 # Note that size is represented in 1KiB blocks
 get_partitions_with_size()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local DISK_NODEV="${1#/dev/}"
   local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
 
   if [ -n "$DISK_NODEV" ]; then
@@ -195,7 +195,7 @@ get_partitions()
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
 get_partitions_with_size_type()
 {
-  local DISK_NODEV=`echo "$1" |sed s,'^/dev/',,`
+  local DISK_NODEV="${1#/dev/}"
 
   IFS=$EOL
   get_partitions "$DISK_NODEV" |while read LINE; do
@@ -1013,7 +1013,7 @@ backup_partitions()
   for PART in $BACKUP_PARTITIONS; do
     local retval=1
     local TARGET_FILE=""
-    local OUTPUT_PREFIX="$(echo "$PART" |sed s,'/','_',g)"
+    local OUTPUT_PREFIX="${PART//\//_}"  # Replace / with _
 
     # Determine filesystem type
     local FS_TYPE="$(get_filesystem_type /dev/$PART)"
@@ -1095,7 +1095,7 @@ backup_disks()
     check_dma "/dev/$HDD_NODEV"
 
     # For output files replace / with _
-    OUTPUT_SUFFIX="$(echo "$HDD_NODEV" |sed s,'/','_',g)"
+    OUTPUT_SUFFIX="${HDD_NODEV//\//_}"
 
     if gpt_detect "/dev/$HDD_NODEV"; then
       # GPT partition table found, check for binaries
