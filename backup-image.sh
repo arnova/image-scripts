@@ -1213,19 +1213,21 @@ load_config()
                             --nocustomsh|--nosh) NO_CUSTOM_SH=1;;
                                --noimage|--noim) NO_IMAGE=1;;
                                   --onlysh|--sh) ONLY_SH=1;;
-                                      --help|-h) show_help;
+                                      --help|-h) show_help
                                                  exit 0
                                                  ;;
                                              -*) echo "ERROR: Bad argument \"$ARG\"" >&2
-                                                 show_help;
-                                                 exit 1;
+                                                 echo "" >&2
+                                                 show_help
+                                                 exit 1
                                                  ;;
                                               *) if [ -z "$IMAGE_NAME" ]; then
                                                    IMAGE_NAME="$ARG"
                                                  else
                                                    echo "ERROR: Bad command syntax with argument \"$ARG\"" >&2
-                                                   show_help;
-                                                   exit 1;
+                                                   echo "" >&2
+                                                   show_help
+                                                   exit 1
                                                  fi
                                                  ;;
     esac
