@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19"
+MY_VERSION="3.19a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 6, 2021
+# Last update: May 22, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -2026,9 +2026,11 @@ load_config()
 
   # Check arguments
   unset IFS
-  for arg in $*; do
-    ARGNAME=`echo "$arg" |cut -d= -f1`
-    ARGVAL=`echo "$arg" |cut -d= -f2 -s`
+  for ARG in $*; do
+    ARGNAME="${ARG%%=*}"
+    # Can't directly obtain value as = is optional!:
+    ARGVAL="${ARG#$ARGNAME}"
+    ARGVAL="${ARGVAL#=}"
 
     case "$ARGNAME" in
       --partitions|--partition|--part|-p) PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${ARGVAL//,/ }";; # Make list space seperated
@@ -2049,14 +2051,14 @@ load_config()
                                --help|-h) show_help;
                                           exit 0
                                           ;;
-                                      -*) echo "ERROR: Bad argument \"$arg\"" >&2
+                                      -*) echo "ERROR: Bad argument \"$ARG\"" >&2
                                           show_help;
                                           exit 1;
                                           ;;
                                        *) if [ -z "$IMAGE_NAME" ]; then
-                                            IMAGE_NAME="$arg"
+                                            IMAGE_NAME="$ARG"
                                           else
-                                            echo "ERROR: Bad command syntax with argument \"$arg\"" >&2
+                                            echo "ERROR: Bad command syntax with argument \"$ARG\"" >&2
                                             show_help;
                                             exit 1;
                                           fi
