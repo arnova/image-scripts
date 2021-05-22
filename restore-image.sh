@@ -2001,6 +2001,7 @@ show_help()
   echo "--nocustomsh|--nosh         - Don't execute any custom shell script(s)" >&2
   echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
   echo "--add                       - Add partition entries (don't overwrite like with --clean)" >&2
+  echo "" >&2
 }
 
 

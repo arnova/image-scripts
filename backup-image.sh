@@ -1169,6 +1169,7 @@ show_help()
   echo "--noccustomsh|--nosh        - Don't execute any custom shell script(s)" >&2
   echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
   echo "--rescue|-r                 - Rescue mode (ignore e.g. read errors) (only for partclone or dd + gz)" >&2
+  echo "" >&2
 }
 
 
