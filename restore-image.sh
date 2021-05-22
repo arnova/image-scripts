@@ -1980,7 +1980,7 @@ create_swaps()
 
 show_help()
 {
-  echo "Usage: restore-image.sh [options] [image-name]" >&2
+  echo "Usage: $(basename $0) [options] [image-name]" >&2
   echo "" >&2
   echo "Options:" >&2
   echo "--help|-h                   - Print this help" >&2
@@ -2093,7 +2093,7 @@ load_config()
 #######################
 # Program entry point #
 #######################
-echo "Image RESTORE Script v$MY_VERSION - Written by Arno van Amersfoort"
+echo "Image RESTORE Script v$MY_VERSION - (C) Copyright 2004-2021 by Arno van Amersfoort"
 
 # Load configuration from file/commandline
 load_config $*
