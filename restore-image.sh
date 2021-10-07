@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19b"
+MY_VERSION="3.19c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: September 27, 2021
+# Last update: October 7, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1716,6 +1716,10 @@ check_image_files()
         IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
       done
 
+      if [ -z "$PARTITIONS" ]; then
+        break
+      fi
+
       printf "* Select source partition(s) to restore (default=$PARTITIONS): "
       read USER_PARTITIONS
       if [ -n "$USER_PARTITIONS" ]; then
@@ -1726,8 +1730,8 @@ check_image_files()
   done
 
   if [ -z "$IMAGE_FILES" ]; then
-    printf "\033[40m\033[1;31m\nERROR: No (matching) image files found to restore! Quitting...\n\033[0m" >&2
-    do_exit 5
+    printf "\033[40m\033[1;31m\nWARNING: No (matching) image files found to restore!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+    read dummy
   fi
 
   # Make sure the proper binaries are available
