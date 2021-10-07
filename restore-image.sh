@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19a"
+MY_VERSION="3.19b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 22, 2021
+# Last update: September 27, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1610,7 +1610,7 @@ restore_disks()
           retval=$?
 
           # Make sure partition was properly written
-          if [ $retval -ne 0 ] || ! echo "$result" |grep -i -e "^Successfully wrote" -e "^The partition table has been altered"; then
+          if [ $retval -ne 0 ]; then
             echo "$result" >&2
             echo "" >&2
 
