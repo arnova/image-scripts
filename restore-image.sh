@@ -1223,12 +1223,26 @@ get_auto_target_device()
     MIN_SIZE=1 # Skip zero-size devices
   fi
 
-  # Check for original source device first, and check other devices in case it's not suitable
-  if [ ! -b "/dev/$SOURCE_NODEV" ] || \
-     [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -lt $MIN_SIZE ] || \
-     ! blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1 || \
-     grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" || \
-     grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV"; then
+  # Check for original source device first
+  CHECK_OTHER=1
+  if [ -b "/dev/$SOURCE_NODEV" ] &&
+    blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1; then
+
+    if [ $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
+      # Original device is suitable:
+      CHECK_OTHER=0
+    else
+      # Additional checks when --clean or --pt is specified:
+      if [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -ge $MIN_SIZE ] && \
+         ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" && \
+         ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV"; then
+        CHECK_OTHER=0
+      fi
+    fi
+  fi
+
+  if [ $CHECK_OTHER -eq 1 ]; then
+    # Original device not suitable: check other devices
     IFS=' '
     for DISK_DEV in `get_available_disks`; do
       DISK_NODEV="${DISK_DEV#/dev/}"
@@ -1240,7 +1254,6 @@ get_auto_target_device()
         SOURCE_NODEV="$DISK_NODEV"
         break
       fi
-      #FIXME: Skip check above when --clean is not specified?
     done
   fi
 
