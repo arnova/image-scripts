@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19c"
+MY_VERSION="3.19d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 7, 2021
+# Last update: October 28, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1145,11 +1145,15 @@ restore_partitions()
 user_target_dev_select()
 {
   local DEFAULT_TARGET_NODEV="$1"
-  printf "Select target device (default=/dev/$DEFAULT_TARGET_NODEV): "
+  printf "Select target device (default=/dev/$DEFAULT_TARGET_NODEV, \"none\" to skip device): "
   read USER_TARGET_NODEV
 
   if [ -z "$USER_TARGET_NODEV" ]; then
     USER_TARGET_NODEV="$DEFAULT_TARGET_NODEV"
+  fi
+
+  if [ "$USER_TARGET_NODEV" = "none" ]; then
+    USER_TARGET_NODEV=""
   fi
 
   # Auto remove /dev/ :
