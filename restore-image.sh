@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19d"
+MY_VERSION="3.19e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: October 28, 2021
+# Last update: November 1, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -442,7 +442,7 @@ get_partition_number()
 }
 
 
-# Get available devices/disks with /dev/ prefix
+# Get available devices/disks prefixed with /dev/
 get_available_disks()
 {
   local DEV_FOUND=""
@@ -474,8 +474,6 @@ show_available_disks()
   for DISK_DEV in `get_available_disks`; do
     echo "  $DISK_DEV: $(show_block_device_info $DISK_DEV)"
   done
-
-  echo ""
 }
 
 
@@ -1017,8 +1015,8 @@ image_type_detect()
 
 
 # $1 = source without /dev/
-# stdout = target with /dev/
-source_to_target_remap()
+# stdout = target device (prefixed with /dev/)
+source_to_target_device_remap()
 {
   local IMAGE_PARTITION_NODEV="$1"
 
@@ -1068,8 +1066,8 @@ source_to_target_remap()
 
 
 # $1=image-source-device
-# $2=target-device
-update_source_to_target_device_remap()
+# $2=target-device (prefixed with /dev/)
+source_to_target_device_map_update()
 {
   local IMAGE_SOURCE_NODEV="$1"
   local TARGET_DEVICE="$2"
@@ -1087,14 +1085,44 @@ update_source_to_target_device_remap()
 
     # Remove entries for specified device
     if [ "$SOURCE_DEVICE_NODEV" != "$IMAGE_SOURCE_NODEV" ]; then
-    FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
-
-    DEVICES_TEMP="${DEVICES_TEMP}${DEVICES_TEMP:+,}${ITEM}"
+      FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
+      DEVICES_TEMP="${DEVICES_TEMP}${DEVICES_TEMP:+,}${ITEM}"
     fi
   done
 
   # Update global devices (remap) variable
-  DEVICES="${DEVICES_TEMP}${DEVICES_TEMP:+,}${IMAGE_SOURCE_NODEV}:${TARGET_DEVICE}"
+  DEVICES="${DEVICES_TEMP}${DEVICES_TEMP:+,}${IMAGE_SOURCE_NODEV}${SEP}${TARGET_DEVICE}"
+}
+
+
+# $1=target (disk) device (prefixed with /dev/)
+target_device_list_contains_disk()
+{
+  local TARGET_DISK="$1"
+
+  IFS=' '
+  for ITEM in $TARGET_DEVICES; do
+    if [ "$TARGET_DISK" = "$ITEM" ]; then
+      return 0
+    fi
+  done
+
+  return 1 # Not found
+}
+
+# $1=target (partition) device (prefixed with /dev/)
+target_device_list_contains_partition()
+{
+  local TARGET_DISK="$(get_partition_disk "$1")"
+
+  IFS=' '
+  for ITEM in $TARGET_DEVICES; do
+    if [ "$TARGET_DISK" = "$ITEM" ]; then
+      return 0
+    fi
+  done
+
+  return 1 # Not found
 }
 
 
@@ -1145,7 +1173,14 @@ restore_partitions()
 user_target_dev_select()
 {
   local DEFAULT_TARGET_NODEV="$1"
-  printf "Select target device (default=/dev/$DEFAULT_TARGET_NODEV, \"none\" to skip device): "
+
+  if [ -n "$DEFAULT_TARGET_NODEV" ]; then
+    DISPLAY_DEFAULT_DEV="/dev/$DEFAULT_TARGET_NODEV"
+  else
+    DISPLAY_DEFAULT_DEV="none"
+  fi
+
+  printf "Select target device (default=$DISPLAY_DEFAULT_DEV, \"none\" to skip device): "
   read USER_TARGET_NODEV
 
   if [ -z "$USER_TARGET_NODEV" ]; then
@@ -1228,40 +1263,38 @@ get_auto_target_device()
   fi
 
   # Check for original source device first
-  CHECK_OTHER=1
-  if [ -b "/dev/$SOURCE_NODEV" ] &&
-    blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1; then
-
+  if [ -b "/dev/$SOURCE_NODEV" ]; then
     if [ $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
-      # Original device is suitable:
-      CHECK_OTHER=0
+      # Original device is suitable
+      echo "$SOURCE_NODEV"
+      return
     else
       # Additional checks when --clean or --pt is specified:
-      if [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -ge $MIN_SIZE ] && \
+      if blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1 &&
+         [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -ge $MIN_SIZE ] && \
          ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" && \
-         ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV"; then
-        CHECK_OTHER=0
+         ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" && \
+         ! target_device_list_contains_disk "/dev/$SOURCE_NODEV"; then
+        echo "$SOURCE_NODEV"
+        return
       fi
     fi
   fi
 
-  if [ $CHECK_OTHER -eq 1 ]; then
-    # Original device not suitable: check other devices
-    IFS=' '
-    for DISK_DEV in `get_available_disks`; do
-      DISK_NODEV="${DISK_DEV#/dev/}"
-      # Checked for mounted partitions
-      if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ] && \
-        blockdev --rereadpt "$DISK_DEV" >/dev/null 2>&1 && \
-        ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV" && \
-        ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV"; then
-        SOURCE_NODEV="$DISK_NODEV"
-        break
-      fi
-    done
-  fi
-
-  echo "$SOURCE_NODEV"
+  # Original device not suitable: check other devices
+  IFS=' '
+  for DISK_DEV in `get_available_disks`; do
+    DISK_NODEV="${DISK_DEV#/dev/}"
+    # Checked for mounted partitions
+    if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ] && \
+      blockdev --rereadpt "$DISK_DEV" >/dev/null 2>&1 && \
+      ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV" && \
+      ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV" && \
+      ! target_device_list_contains_disk "$DISK_DEV"; then
+      echo "$DISK_NODEV"
+      return
+    fi
+  done
 }
 
 
@@ -1270,34 +1303,40 @@ check_disks()
   # Show disks/devices available for restoration
   show_available_disks
 
-  # Restore MBR/track0/partitions:
+  # Check device (disks):
   IFS=' '
   for IMAGE_SOURCE_NODEV in `get_source_disks`; do
-    IMAGE_TARGET_NODEV=`source_to_target_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
+    IMAGE_TARGET_NODEV=`source_to_target_device_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
 
     if [ "$IMAGE_TARGET_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
       # Check whether device is available (eg. not mounted partitions and fallback to other default device if so)
       IMAGE_TARGET_NODEV=`get_auto_target_device "$IMAGE_SOURCE_NODEV"`
     fi
 
-    if [ -z "$IMAGE_TARGET_NODEV" ]; then
-      printf "\033[40m\033[1;31m\nERROR: No suitable device (disk) found for restore (too small?)! Quitting...\n\033[0m" >&2
-      do_exit 5
+    echo ""
+    if [ -n "$IMAGE_TARGET_NODEV" ]; then
+      echo "* Auto preselecting target device /dev/$IMAGE_TARGET_NODEV for image source \"$IMAGE_SOURCE_NODEV\""
+    else
+      printf "\033[40m\033[1;31m* WARNING: No suitable target device found for image source \"$IMAGE_SOURCE_NODEV\"\n\033[0m" >&2
     fi
-
-    echo "* Auto preselecting target device /dev/$IMAGE_TARGET_NODEV for image source \"$IMAGE_SOURCE_NODEV\""
 
     while true; do
       user_target_dev_select "$IMAGE_TARGET_NODEV"
       TARGET_NODEV="$USER_TARGET_NODEV"
 
       if [ -z "$TARGET_NODEV" ]; then
+        break # Skip this one
+      fi
+
+      if target_device_list_contains_disk "/dev/$TARGET_NODEV"; then
+        echo "" >&2
+        printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV is already selected!\n\n\033[0m" >&2
         continue
       fi
 
       # Check if target device exists
       if [ ! -b "/dev/$TARGET_NODEV" ]; then
-        echo ""
+        echo "" >&2
         printf "\033[40m\033[1;31mERROR: Target device /dev/$TARGET_NODEV does NOT exist!\n\n\033[0m" >&2
         continue
       fi
@@ -1323,11 +1362,14 @@ check_disks()
 
       echo ""
 
-      if [ "$IMAGE_SOURCE_NODEV" != "$TARGET_NODEV" ]; then
-        update_source_to_target_device_remap "$IMAGE_SOURCE_NODEV" "/dev/$TARGET_NODEV"
-      fi
-      break
+      source_to_target_device_map_update "$IMAGE_SOURCE_NODEV" "/dev/$TARGET_NODEV"
+      break  # We're done
     done
+
+    if [ -z "$TARGET_NODEV" ]; then
+      echo "* NOTE: Skipping image source \"${IMAGE_SOURCE_NODEV}\""
+      continue # Skip device
+    fi
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
@@ -1681,13 +1723,13 @@ check_image_files()
         LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
 
         if [ -z "$LOOKUP" ]; then
-          printf "\033[40m\033[1;31m\nERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Image file for partition $PART_NODEV could not be located! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
 
         if [ $(echo "$LOOKUP" |wc -l) -gt 1 ]; then
           echo "$LOOKUP"
-          printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Found multiple image files for partition $PART_NODEV! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
 
@@ -1695,7 +1737,7 @@ check_image_files()
 
         # Construct device name:
         SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
-        TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
+        TARGET_PARTITION=`source_to_target_device_remap "$SOURCE_NODEV"`
 
         # Add item to list
         IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
@@ -1708,13 +1750,20 @@ check_image_files()
 
         # Construct device name:
         SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
-        TARGET_PARTITION=`source_to_target_remap "$SOURCE_NODEV"`
-        PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${SOURCE_NODEV}"
+        TARGET_PARTITION=`source_to_target_device_remap "$SOURCE_NODEV"`
+
+        if ! target_device_list_contains_partition "$TARGET_PARTITION"; then
+          printf "\033[40m\033[1;31mWARNING: Not selecting image source $SOURCE_NODEV as there's no target device available for it!\n\033[0m" >&2
+          continue # Skip this one
+        fi
 
         if echo "$IMAGE_FILES" |grep -q -e "${SEP}${TARGET_PARTITION}$" -e "${SEP}${TARGET_PARTITION} "; then
-          printf "\033[40m\033[1;31m\nERROR: Found multiple image files for partition $TARGET_PARTITION! Quitting...\n\033[0m" >&2
+          printf "\033[40m\033[1;31mERROR: Found multiple image files for partition $TARGET_PARTITION! Quitting...\n\033[0m" >&2
           do_exit 5
         fi
+
+        # Include source device
+        PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${SOURCE_NODEV}"
 
         # Add item to list
         IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
@@ -1773,8 +1822,6 @@ check_partitions()
     PART_DISK="$(get_partition_disk "$TARGET_PARTITION")"
     if [ -z "$PART_DISK" ]; then
       echo "* NOTE: No parent disk found for target partition $TARGET_PARTITION" >&2
-    elif ! echo "$TARGET_DEVICES" |grep -q -e "^$PART_DISK " -e " $PART_DISK " -e " $PART_DISK$" -e "^$PART_DISK$"; then
-      TARGET_DEVICES="${TARGET_DEVICES}${TARGET_DEVICES:+ }${PART_DISK} "
     fi
 
     # Check for mounted partitions on target device
