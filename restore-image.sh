@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19e"
+MY_VERSION="3.19f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 1, 2021
+# Last update: Decenber 2, 2021
 # (C) Copyright 2004-2021 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -1499,34 +1499,34 @@ check_disks()
         ENTER=1
       fi
 
-      if [ -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        # Simulate sgdisk partition table restore
-        result="$(sgdisk --pretend --mbrtogpt --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" "/dev/${TARGET_NODEV}" 2>&1)"
+    #   if [ -e "sgdisk.${IMAGE_SOURCE_NODEV}" ]; then
+    #     # Simulate sgdisk partition table restore
+    #     result="$(sgdisk --pretend --mbrtogpt --load-backup="sgdisk.${IMAGE_SOURCE_NODEV}" "/dev/${TARGET_NODEV}" 2>&1)"
 
-        if [ $? -ne 0 ]; then
-          echo "$result" >&2
-          if [ $FORCE -eq 1 ]; then
-            printf "\033[40m\033[1;31mWARNING: Simulating sgdisk restore failed (disk too small?)!\n\033[0m" >&2
-            ENTER=1
-          else
-            printf "\033[40m\033[1;31mERROR: Simulating sgdisk restore failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
-            do_exit 5
-          fi
-        fi
-      elif [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
-        # Simulate sfdisk partition table restore
-        result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_safe_with_legacy_fallback --force -n "/dev/${TARGET_NODEV}" 2>&1)"
-        if [ $? -ne 0 ]; then
-          if [ $FORCE -eq 1 ]; then
-            printf "\033[40m\033[1;31m\nWARNING: Simulating sfdisk restore failed (disk too small?)!\n\033[0m" >&2
-            ENTER=1
-          else
-            echo "$result" >&2
-            printf "\033[40m\033[1;31m\nERROR: Simulating sfdisk restore failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
-            do_exit 5
-          fi
-        fi
-      fi
+    #     if [ $? -ne 0 ]; then
+    #       echo "$result" >&2
+    #       if [ $FORCE -eq 1 ]; then
+    #         printf "\033[40m\033[1;31mWARNING: Simulating sgdisk restore failed (disk too small?)!\n\033[0m" >&2
+    #         ENTER=1
+    #       else
+    #         printf "\033[40m\033[1;31mERROR: Simulating sgdisk restore failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+    #         do_exit 5
+    #       fi
+    #     fi
+    #   elif [ -e "sfdisk.${IMAGE_SOURCE_NODEV}" ]; then
+    #     # Simulate sfdisk partition table restore
+    #     result="$(cat "sfdisk.${IMAGE_SOURCE_NODEV}" |sfdisk_safe_with_legacy_fallback --force -n "/dev/${TARGET_NODEV}" 2>&1)"
+    #     if [ $? -ne 0 ]; then
+    #       if [ $FORCE -eq 1 ]; then
+    #         printf "\033[40m\033[1;31m\nWARNING: Simulating sfdisk restore failed (disk too small?)!\n\033[0m" >&2
+    #         ENTER=1
+    #       else
+    #         echo "$result" >&2
+    #         printf "\033[40m\033[1;31m\nERROR: Simulating sfdisk restore failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+    #         do_exit 5
+    #       fi
+    #     fi
+    #   fi
     fi
 
     if [ $ENTER -eq 1 ]; then
