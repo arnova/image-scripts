@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.22a"
+MY_VERSION="3.22b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: May 22, 2021
-# (C) Copyright 2004-2021 by Arno van Amersfoort
+# Last update: January 6, 2022
+# (C) Copyright 2004-2022 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -1013,7 +1013,7 @@ backup_partitions()
   for PART in $BACKUP_PARTITIONS; do
     local retval=1
     local TARGET_FILE=""
-    local OUTPUT_PREFIX="${PART//\//_}"  # Replace / with _
+    local OUTPUT_PREFIX="$(echo "$PART" |sed s,'/','_',g)"  # Replace / with _
 
     # Determine filesystem type
     local FS_TYPE="$(get_filesystem_type /dev/$PART)"
@@ -1095,7 +1095,7 @@ backup_disks()
     check_dma "/dev/$HDD_NODEV"
 
     # For output files replace / with _
-    OUTPUT_SUFFIX="${HDD_NODEV//\//_}"
+    OUTPUT_SUFFIX="$(echo "$HDD_NODEV" |sed s,'/','_',g)"
 
     if gpt_detect "/dev/$HDD_NODEV"; then
       # GPT partition table found, check for binaries

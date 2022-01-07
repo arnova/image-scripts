@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.19f"
+MY_VERSION="3.19g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: Decenber 2, 2021
-# (C) Copyright 2004-2021 by Arno van Amersfoort
+# Last update: January 6, 2022
+# (C) Copyright 2004-2022 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -2102,8 +2102,8 @@ load_config()
     ARGVAL="${ARGVAL#=}"
 
     case "$ARGNAME" in
-      --partitions|--partition|--part|-p) PARTITIONS="${PARTITIONS}${PARTITIONS:+ }${ARGVAL//,/ }";; # Make list space seperated
-             --devices|--device|--dev|-d) DEVICES="${DEVICES}${DEVICES:+ }${ARGVAL//, / }";; # Make list space seperated
+      --partitions|--partition|--part|-p) PARTITIONS="${PARTITIONS}${PARTITIONS:+ }$(echo "$ARGVAL" |sed 's|,| |g')";; # Make list space seperated
+             --devices|--device|--dev|-d) DEVICES="${DEVICES}${DEVICES:+ }$(echo "$ARGVAL" |sed 's|,| |g')";; # Make list space seperated
                         --clean|--track0) CLEAN=1;;
                                  --force) FORCE=1;;
                               --notrack0) NO_TRACK0=1;;
