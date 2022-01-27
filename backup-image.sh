@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.22b"
+MY_VERSION="3.22c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: January 6, 2022
+# Last update: January 27, 2022
 # (C) Copyright 2004-2022 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -87,7 +87,7 @@ get_user_yn()
 
   read answer_with_case
 
-  ANSWER=`echo "$answer_with_case" |tr A-Z a-z`
+  ANSWER="$(echo "$answer_with_case" |tr '[:upper:]' '[:lower:]')"
 
   if [ "$ANSWER" = "y" -o "$ANSWER" = "yes" ]; then
     return 0
@@ -1199,7 +1199,7 @@ load_config()
     ARGVAL="${ARGVAL#=}"
 
     case "$ARGNAME" in
-      --part|--partitions|-p|--dev|--devices|-d) DEVICES=`echo "$ARGVAL" |sed -e 's|,| |g' -e 's|^/dev/||g'`;; # Make list space seperated and remove /dev/ prefixes
+      --part|--partitions|-p|--dev|--devices|-d) DEVICES="$(echo "$ARGVAL" |sed -e 's|,| |g' -e 's|/dev/||g')";; # Make list space seperated and remove /dev/ prefixes
                                      --notrack0) NO_TRACK0=1;;
                                --compression|-z) GZIP_COMPRESSION="$ARGVAL";;
                                       --conf|-c) CONF="$ARGVAL";;

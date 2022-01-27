@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.19g"
+MY_VERSION="3.19h"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
 # Last update: January 6, 2022
@@ -78,7 +78,7 @@ get_user_yn()
 
   read answer_with_case
 
-  ANSWER=`echo "$answer_with_case" |tr A-Z a-z`
+  ANSWER="$(echo "$answer_with_case" |tr '[:upper:]' '[:lower:]')"
 
   if [ "$ANSWER" = "y" -o "$ANSWER" = "yes" ]; then
     return 0
@@ -1852,8 +1852,8 @@ show_target_devices()
 
 compare_sfdisk_partition()
 {
-  local SOURCE_PART="$(echo "$1" |sed -r -e 's!^/dev/[a-z]+!!' -e 's!^[0-9]+p!!' -e 's!start= *[0-9]+, *!!' -e 's!size= *!!' |tr 'A-Z' 'a-z')"
-  local TARGET_PART="$(echo "$2" |sed -r -e 's!^/dev/[a-z]+!!' -e 's!^[0-9]+p!!' -e 's!start= *[0-9]+, *!!' -e 's!size= *!!' |tr 'A-Z' 'a-z')"
+  local SOURCE_PART="$(echo "$1" |sed -r -e 's!^/dev/[a-z]+!!' -e 's!^[0-9]+p!!' -e 's!start= *[0-9]+, *!!' -e 's!size= *!!' |tr '[:upper:]' '[:lower:]')"
+  local TARGET_PART="$(echo "$2" |sed -r -e 's!^/dev/[a-z]+!!' -e 's!^[0-9]+p!!' -e 's!start= *[0-9]+, *!!' -e 's!size= *!!' |tr '[:upper:]' '[:lower:]')"
 
   local retval=0
 

@@ -7,7 +7,7 @@ if [ -z "$1" ] || [ -z "$2" ]; then
 fi
 
 SOURCE_FILE="$1"
-TARGET_DEVICE=`echo "$2" |sed s,'/dev/',,g`
+TARGET_DEVICE="${2#/dev/}"
 
 if [ ! -f "$SOURCE_FILE" ]; then
   echo "ERROR: Source file ($SOURCE_FILE) not found!" >&2
