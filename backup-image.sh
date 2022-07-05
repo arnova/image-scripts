@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.22c"
+MY_VERSION="3.22d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: January 27, 2022
+# Last update: July 5, 2022
 # (C) Copyright 2004-2022 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -704,9 +704,9 @@ detect_partitions()
   local BLKID_LIST=""
 
   if [ -n "$DEVICE" ]; then  
-    FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE)"
+    FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE |sort)"
   else
-    FIND_PARTITIONS="$(get_partitions_with_size_type)"
+    FIND_PARTITIONS="$(get_partitions_with_size_type |sort)"
   fi
 
   # Does the device contain partitions?
