@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.22d"
+MY_VERSION="3.22e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: July 5, 2022
@@ -230,13 +230,16 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
   if [ $? -ne 0 ]; then
-    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
     if [ $? -ne 0 ]; then
-      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL "$DISK_DEV" 2>/dev/null)"
+      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
       if [ $? -ne 0 ]; then
-        echo "WARNING: Unable to obtain lsblk info for \"$DISK_DEV\"" >&2
+        result="$(lsblk -i -b -o NAME,FSTYPE,LABEL "$DISK_DEV" 2>/dev/null)"
+        if [ $? -ne 0 ]; then
+          echo "WARNING: Unable to obtain lsblk info for \"$DISK_DEV\"" >&2
+        fi
       fi
     fi
   fi
@@ -1267,7 +1270,7 @@ load_config()
 #######################
 # Program entry point #
 #######################
-echo "Image BACKUP Script v$MY_VERSION - (C) Copyright 2004-2021 by Arno van Amersfoort"
+echo "Image BACKUP Script v$MY_VERSION - (C) Copyright 2004-2022 by Arno van Amersfoort"
 
 # Load configuration from file/commandline
 load_config $*

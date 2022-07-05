@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19h"
+MY_VERSION="3.19i"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: January 6, 2022
+# Last update: July 5, 2022
 # (C) Copyright 2004-2022 by Arno van Amersfoort
 # Homepage              : http://rocky.eld.leidenuniv.nl/
 # Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
@@ -327,13 +327,16 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
   if [ $? -ne 0 ]; then
-    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
     if [ $? -ne 0 ]; then
-      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL "$DISK_DEV" 2>/dev/null)"
+      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
       if [ $? -ne 0 ]; then
-        echo "WARNING: Unable to obtain lsblk info for \"$DISK_DEV\"" >&2
+        result="$(lsblk -i -b -o NAME,FSTYPE,LABEL "$DISK_DEV" 2>/dev/null)"
+        if [ $? -ne 0 ]; then
+          echo "WARNING: Unable to obtain lsblk info for \"$DISK_DEV\"" >&2
+        fi
       fi
     fi
   fi
@@ -347,7 +350,7 @@ get_device_layout()
   echo "$result" |while read LINE; do
     local PART_NODEV=`echo "$LINE" |sed s,'^[^a-z]*',, |awk '{ print $1 }'`
 
-    printf "$LINE\t"
+    printf "$LINE  "
 
     if [ $FIRST -eq 1 ]; then
       FIRST=0
@@ -2162,7 +2165,7 @@ load_config()
 #######################
 # Program entry point #
 #######################
-echo "Image RESTORE Script v$MY_VERSION - (C) Copyright 2004-2021 by Arno van Amersfoort"
+echo "Image RESTORE Script v$MY_VERSION - (C) Copyright 2004-2022 by Arno van Amersfoort"
 
 # Load configuration from file/commandline
 load_config $*
