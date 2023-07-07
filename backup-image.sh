@@ -5,8 +5,8 @@ MY_VERSION="3.22f"
 # Image Backup Script with (SMB) network support
 # Last update: July 7, 2023
 # (C) Copyright 2004-2023 by Arno van Amersfoort
-# Homepage              : http://rocky.eld.leidenuniv.nl/
-# Email                 : a r n o v a AT r o c k y DOT e l d DOT l e i d e n u n i v DOT n l
+# Web                   : https://github.com/arnova/image-scripts
+# Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
 # ----------------------------------------------------------------------------------------------------------------------
 # This program is free software; you can redistribute it and/or
