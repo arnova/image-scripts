@@ -1169,7 +1169,7 @@ show_help()
   echo "--nonet|-n                  - Don't try to setup networking" >&2
   echo "--nomount|-m                - Don't mount anything" >&2
   echo "--noimage                   - Don't create any partition images, only do partition table/MBR operations" >&2
-  echo "--noccustomsh|--nosh        - Don't execute any custom shell script(s)" >&2
+  echo "--nocustomsh|--nosh         - Don't execute any custom shell script(s)" >&2
   echo "--onlysh|--sh               - Only execute user (shell) script(s)" >&2
   echo "--rescue|-r                 - Rescue mode (ignore e.g. read errors) (only for partclone or dd + gz)" >&2
   echo "" >&2
