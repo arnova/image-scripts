@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.19j"
+MY_VERSION="3.19k"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: July 7, 2023
-# (C) Copyright 2004-2023 by Arno van Amersfoort
+# Last update: July 15, 2024
+# (C) Copyright 2004-2024 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -1137,7 +1137,13 @@ restore_partitions()
     IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
     TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
+    if [ ! -b "$TARGET_PARTITION" ]; then
+      echo "* NOTE: Skipping image file \"$IMAGE_FILE\" for non-existant partition \"$TARGET_PARTITION\"" >&2
+      continue
+    fi
+
     echo "* Selected partition $TARGET_PARTITION : Using image file \"$IMAGE_FILE\""
+
     local retval=1
     case $(image_type_detect "$IMAGE_FILE") in
       fsarchiver) fsarchiver -v restfs "$IMAGE_FILE" id=0,dest="$TARGET_PARTITION"
@@ -1944,6 +1950,12 @@ test_target_partitions()
     IMAGE_FILE=$(echo "$ITEM" |cut -f1 -d"$SEP" -s)
     TARGET_PARTITION=$(echo "$ITEM" |cut -f2 -d"$SEP" -s)
 
+    if [ ! -b "$TARGET_PARTITION" ]; then
+      printf "\033[40m\033[1;31m\nWARNING: Non-existant partition $TARGET_PARTITION for image file \"$IMAGE_FILE\"!\n\033[0m" >&2
+      MISMATCH=1
+      continue
+    fi
+
     # Strip extension so we get the actual device name
     IMAGE_PARTITION_NODEV="${IMAGE_FILE%.*}"
     SOURCE_DISK_NODEV=$(get_partition_disk "$IMAGE_PARTITION_NODEV")
@@ -2165,7 +2177,7 @@ load_config()
 #######################
 # Program entry point #
 #######################
-echo "Image RESTORE Script v$MY_VERSION - (C) Copyright 2004-2023 by Arno van Amersfoort"
+echo "Image RESTORE Script v$MY_VERSION - (C) Copyright 2004-2024 by Arno van Amersfoort"
 
 # Load configuration from file/commandline
 load_config $*
