@@ -182,7 +182,7 @@ mkud_create_user_filesystem()
     fi
 
     if ! partprobe $TARGET_DISK; then
-      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress enter to continue or CTRL-C to abort...\n\033[0m" >&2
+      printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed!\nPress <ENTER> to continue or CTRL-C to abort...\n\033[0m" >&2
       read
       echo ""
     fi

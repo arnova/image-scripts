@@ -1168,7 +1168,7 @@ restore_partitions()
 
     if [ $retval -ne 0 ]; then
       FAILED="${FAILED}${FAILED:+ }${TARGET_PARTITION}"
-      printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on $TARGET_PARTITION.\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+      printf "\033[40m\033[1;31mWARNING: Error($retval) occurred during image restore for $IMAGE_FILE on $TARGET_PARTITION\nPress <ENTER> to continue or CTRL-C to abort...\n\033[0m" >&2
       read dummy
     else
       SUCCESS="${SUCCESS}${SUCCESS:+ }${TARGET_PARTITION}"
@@ -1360,7 +1360,7 @@ check_disks()
             printf "\033[40m\033[1;31mWARNING: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions?\n\n\033[0m" >&2
             ENTER=1
           else
-            printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? Use --force to override.\n\n\033[0m" >&2
+            printf "\033[40m\033[1;31mERROR: Unable to obtain exclusive access on target device /dev/$TARGET_NODEV! Wrong target device specified and/or mounted partitions? (Use --force to override)\n\n\033[0m" >&2
             continue
           fi
         fi
@@ -1518,7 +1518,7 @@ check_disks()
     #         printf "\033[40m\033[1;31mWARNING: Simulating sgdisk restore failed (disk too small?)!\n\033[0m" >&2
     #         ENTER=1
     #       else
-    #         printf "\033[40m\033[1;31mERROR: Simulating sgdisk restore failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+    #         printf "\033[40m\033[1;31mERROR: Simulating sgdisk restore failed (disk too small?)! Quitting... (--force to override)\n\033[0m" >&2
     #         do_exit 5
     #       fi
     #     fi
@@ -1531,7 +1531,7 @@ check_disks()
     #         ENTER=1
     #       else
     #         echo "$result" >&2
-    #         printf "\033[40m\033[1;31m\nERROR: Simulating sfdisk restore failed (disk too small?)! Quitting (--force to override)...\n\033[0m" >&2
+    #         printf "\033[40m\033[1;31m\nERROR: Simulating sfdisk restore failed (disk too small?)! Quitting... (--force to override)\n\033[0m" >&2
     #         do_exit 5
     #       fi
     #     fi
@@ -1540,7 +1540,7 @@ check_disks()
 
     if [ $ENTER -eq 1 ]; then
       echo "" >&2
-      printf "Press <enter> to continue or CTRL-C to abort...\n" >&2
+      printf "Press <ENTER> to continue or CTRL-C to abort...\n" >&2
       read dummy
     fi
 
@@ -1553,7 +1553,7 @@ check_disks()
           if [ $FORCE -eq 1 ]; then
             printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is mounted!\n\033[0m" >&2
           else
-            printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified (Use --force to override)? Quitting...\n\033[0m" >&2
+            printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is mounted! Wrong target device specified? Quitting... (Use --force to override)\n\033[0m" >&2
             do_exit 5
           fi
         fi
@@ -1564,7 +1564,7 @@ check_disks()
           if [ $FORCE -eq 1 ]; then
             printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART on target device is used as swap!\n\033[0m" >&2
           else
-            printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified (Use --force to override)? Quitting...\n\033[0m" >&2
+            printf "\033[40m\033[1;31mERROR: Partition /dev/$PART on target device is used as swap. Wrong target device specified? Quitting... (Use --force to override)\n\033[0m" >&2
             do_exit 5
           fi
         fi
@@ -1711,7 +1711,7 @@ restore_disks()
       if partprobe "/dev/$TARGET_NODEV" && part_check "/dev/$TARGET_NODEV"; then
         : # No-op
       elif [ $FORCE -ne 1 ]; then
-        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed! Use --force to override.\n\033[0m" >&2
+        printf "\033[40m\033[1;31mWARNING: (Re)reading the partition table failed! (Use --force to override)\n\033[0m" >&2
         do_exit 5
       fi
     fi
@@ -1792,7 +1792,7 @@ check_image_files()
   done
 
   if [ -z "$IMAGE_FILES" ]; then
-    printf "\033[40m\033[1;31m\nWARNING: No (matching) image files found to restore!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+    printf "\033[40m\033[1;31m\nWARNING: No (matching) image files found to restore!\nPress <ENTER> to continue or CTRL-C to abort...\n\033[0m" >&2
     read dummy
   fi
 
@@ -2067,9 +2067,9 @@ show_help()
   echo "" >&2
   echo "Options:" >&2
   echo "--help|-h                   - Print this help" >&2
-  echo "--dev|-d={dev1,dev2}        - Restore image to target device(s) (instead of default from source)." >&2
+  echo "--dev|-d={dev1,dev2}        - Restore image to target device(s) (instead of default from source)" >&2
   echo "                              Optionally use source:/dev/target like sdb:/dev/sda to restore to a different device" >&2
-  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all." >&2
+  echo "--part|-p={dev1,dev2}       - Restore only these partitions (instead of all partitions) or \"none\" for no partitions at all" >&2
   echo "                              Optionally use source:/dev/target like sdb1:/dev/sda1 to restore to a different partition" >&2
   echo "--conf|-c={config_file}     - Specify alternate configuration file" >&2
   echo "--noconf                    - Don't read the config file" >&2

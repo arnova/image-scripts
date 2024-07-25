@@ -809,7 +809,7 @@ select_partitions()
           # FSArchiver can backup live (mounted) partitions, the others cannot
           # so if user specified partition generate warning and proceed
           if echo "$DEVICES" |grep -q -e "^${PART_NODEV}$" -e "^${PART_NODEV} " -e " ${PART_NODEV}$" -e " ${PART_NODEV} "; then
-            printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART_NODEV is mounted!\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+            printf "\033[40m\033[1;31mWARNING: Partition /dev/$PART_NODEV is mounted!\nPress <ENTER> to continue or CTRL-C to abort...\n\033[0m" >&2
             read dummy
           fi
         else
@@ -1076,7 +1076,7 @@ backup_partitions()
     echo ""
     if [ $retval -ne 0 ]; then
       FAILED="${FAILED}${FAILED:+ }$PART"
-      printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART.\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+      printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART\nPress <ENTER> to continue or CTRL-C to abort...\n\033[0m" >&2
       read dummy
     else
       SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
@@ -1324,14 +1324,14 @@ if [ $NO_IMAGE -eq 0 -a $ONLY_SH -eq 0 ]; then
   fi
 
   if [ -z "$BACKUP_PARTITIONS" ]; then
-    printf "\033[40m\033[1;31mWARNING: No partitions to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+    printf "\033[40m\033[1;31mWARNING: No partitions to backup!?\nPress <ENTER> to continue or CTRL-C to abort...\n\033[0m" >&2
     read dummy
   fi
 fi
 
 #if [ $NO_TRACK0 -ne 1 -a $ONLY_SH -eq 0 ]; then
 #  if [ -z "$BACKUP_DISKS" ]; then
-#    printf "\033[40m\033[1;31mWARNING: No disks to backup!?\nPress <enter> to continue or CTRL-C to abort...\n\033[0m" >&2
+#    printf "\033[40m\033[1;31mWARNING: No disks to backup!?\nPress <ENTER> to continue or CTRL-C to abort...\n\033[0m" >&2
 #    read dummy
 #  fi
 #fi
