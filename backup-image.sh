@@ -1078,6 +1078,9 @@ backup_partitions()
       FAILED="${FAILED}${FAILED:+ }$PART"
       printf "\033[40m\033[1;31mERROR: Image backup failed($retval) for $TARGET_FILE from /dev/$PART\nPress <ENTER> to continue or CTRL-C to abort...\n\033[0m" >&2
       read dummy
+      if [ $RESCUE -ne 1 ]; then
+        rm -f "$TARGET_FILE"
+      fi
     else
       SUCCESS="${SUCCESS}${SUCCESS:+ }$PART"
       BACKUP_IMAGES="${BACKUP_IMAGES}${BACKUP_IMAGES:+ }${TARGET_FILE}"
