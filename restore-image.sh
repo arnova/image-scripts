@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19k"
+MY_VERSION="3.19l"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: July 15, 2024
+# Last update: November 14, 2024
 # (C) Copyright 2004-2024 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
@@ -440,8 +440,15 @@ show_block_device_info()
 # This needs to handle the following formats properly: /dev/sda12, /dev/sda12p3, /dev/nvm0n1p12
 get_partition_number()
 {
-  # Obtain the last number from the string and consider that the partition number
-  echo "$1" |sed -r s,'.*[a-z]+([0-9]+)$','\1',
+  # Strip all but the last non-alpha part of the string
+  local STRIP_DEVICE="$(echo "$1" |sed -r s,'.*[a-z]+',,)"
+
+  if [ -z "$STRIP_DEVICE" ]; then
+    echo ""
+  else
+    # Obtain the last number from the string and consider that the partition number
+    echo "$STRIP_DEVICE" |grep -E '^[0-9]+$'
+  fi
 }
 
 
@@ -1017,14 +1024,14 @@ image_type_detect()
 }
 
 
-# $1 = source without /dev/
-# stdout = target device (prefixed with /dev/)
+# $1 = Source disk or partition
+# stdout = Target device (prefixed with /dev/)
 source_to_target_device_remap()
 {
-  local IMAGE_PARTITION_NODEV="$1"
+  local SOURCE_NODEV="${1#/dev/}"
 
   # Set default
-  local TARGET_DEVICE="/dev/$IMAGE_PARTITION_NODEV"
+  local TARGET_DEVICE="/dev/$SOURCE_NODEV"
 
   # We want another target device than specified in the image name?:
   IFS=' '
@@ -1038,17 +1045,19 @@ source_to_target_device_remap()
     fi
 
     TARGET_DEVICE_MAP_NODEV="${TARGET_DEVICE_MAP#/dev/}"
-    NUM=`get_partition_number "$IMAGE_PARTITION_NODEV"`
+    NUM=`get_partition_number "$SOURCE_NODEV"`
     if [ -n "$NUM" ]; then
       # Argument is a partition
-      if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$IMAGE_PARTITION_NODEV" |grep -E -x -q "$(get_partition_prefix $SOURCE_DEVICE_NODEV)[0-9]+"; then
+      if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$SOURCE_NODEV" |grep -E -x -q "$(get_partition_prefix $SOURCE_DEVICE_NODEV)[0-9]+"; then
         TARGET_DEVICE=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
         break
       fi
     else
-      # Argument is a disk
-      TARGET_DEVICE="/dev/${TARGET_DEVICE_MAP_NODEV}"
-      break
+      if [ -z "$SOURCE_DEVICE_NODEV" -o "$SOURCE_DEVICE_NODEV" = "$SOURCE_NODEV" ]; then
+        # Argument is a disk
+        TARGET_DEVICE="/dev/${TARGET_DEVICE_MAP_NODEV}"
+        break
+      fi
     fi
   done
 
@@ -1058,7 +1067,7 @@ source_to_target_device_remap()
     SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
     TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
 
-    if [ "$SOURCE_PARTITION_NODEV" = "$IMAGE_PARTITION_NODEV" -a -n "$TARGET_PARTITION_MAP" ]; then
+    if [ "$SOURCE_PARTITION_NODEV" = "$SOURCE_NODEV" -a -n "$TARGET_PARTITION_MAP" ]; then
       TARGET_DEVICE="$TARGET_PARTITION_MAP"
       break
     fi
