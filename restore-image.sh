@@ -298,9 +298,8 @@ get_disk_partitions_with_type()
     for LINE in $(sfdisk -d "/dev/$DISK_NODEV" 2>/dev/null |grep '^/dev/'); do
       PART="$(echo "$LINE" |awk '{ print $1 }' |sed -e s,'^/dev/',,)"
       TYPE="$(echo "$LINE" |awk -F',' '{ print $3 }' |sed -r s,'.*= ?',,)"
-      if [ "$TYPE" != "0" -a "$TYPE" != "00" ]; then
-        echo "$PART $TYPE"
-      fi
+
+      echo "$PART $TYPE"
     done
   fi
 }
@@ -501,13 +500,15 @@ part_check()
     TRY=$((TRY - 1))
 
     # First make sure all partitions reported by the disk exist according to the kernel in /dev/
-    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
+    DISK_PARTITIONS="$(get_disk_partitions "$DEVICE")"
+    DISK_PART_NUMBERS="$(echo "$DISK_PARTITIONS" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
 
     # Second make sure all partitions reported by the kernel in /dev/ exist according to the disk
-    KERNEL_PARTITIONS="$(get_partitions "$DEVICE" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
+    KERNEL_PARTITIONS="$(get_partitions "$DEVICE")"
+    KERNEL_PART_NUMBERS="$(echo "$KERNEL_PARTITIONS" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
 
     # Compare the partition numbers
-    if [ "$DISK_PARTITIONS" = "$KERNEL_PARTITIONS" ]; then
+    if [ "$DISK_PART_NUMBERS" = "$KERNEL_PART_NUMBERS" ]; then
       echo ""
       return 0
     fi
