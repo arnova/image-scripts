@@ -214,7 +214,7 @@ mkud_select_disk()
   local FIND_DISKS=""
   unset IFS
   # NOTE: Ignore eg. sr0, loop0, and include sda, hda, nvme0n1
-  for DISK in `cat /proc/partitions |grep -E -e '[sh]d[a-z]$' -e 'nvme[0-9]+n[0-9]+$' |awk '{ print $4 }' |sed s,'^/dev/',,`; do
+  for DISK in $(cat /proc/partitions |grep -E -e '[sh]d[a-z]$' -e 'nvme[0-9]+n[0-9]+$' |awk '{ print $4 }' |sed s,'^/dev/',,); do
     # Ignore disks with swap/mounted partitions
     if grep -E -q "^/dev/$(get_partition_prefix $DISK)[0-9]+[[:blank:]]" /etc/mtab; then
       echo "* NOTE: Ignoring disk with mounted partitions /dev/$DISK" >&2

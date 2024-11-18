@@ -347,20 +347,20 @@ get_device_layout()
   IFS=$EOL
   FIRST=1
   echo "$result" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |sed s,'^[^a-z]*',, |awk '{ print $1 }'`
+    local PART_NODEV="$(echo "$LINE" |sed "s,^[^a-z]*,," |awk '{ print $1 }')"
 
     printf "$LINE  "
 
     if [ $FIRST -eq 1 ]; then
       FIRST=0
-      printf "SIZEH\n"
+      echo "SIZEH"
     else
       SIZE_HUMAN="$(human_size $(echo "$LINE" |awk '{ print $NF }') |tr ' ' '_')"
 
       if [ -z "$SIZE_HUMAN" ]; then
-        printf "0\n"
+        echo "0"
       else
-        printf "$SIZE_HUMAN\n"
+        echo "$SIZE_HUMAN"
       fi
     fi
   done
@@ -400,7 +400,7 @@ list_device_partitions()
 
 show_block_device_info()
 {
-  local BLK_NODEV=`echo "$1" |sed -e s,'^/dev/',, -e s,'^/sys/class/block/',,`
+  local BLK_NODEV="$(echo "$1" |sed -e s,'^/dev/',, -e s,'^/sys/class/block/',,)"
   local SYS_BLK="/sys/class/block/${BLK_NODEV}"
 
   local NAME=""
@@ -480,7 +480,7 @@ show_available_disks()
   echo "* Available devices/disks:"
 
   IFS=' '
-  for DISK_DEV in `get_available_disks`; do
+  for DISK_DEV in $(get_available_disks); do
     echo "  $DISK_DEV: $(show_block_device_info $DISK_DEV)"
   done
 }
@@ -600,19 +600,19 @@ configure_network()
   IFS=$EOL
   for CUR_IF in $(ifconfig -a 2>/dev/null |grep '^[a-z]' |sed -r s/'([[:blank:]]|:).*'// |grep -v -e '^dummy' -e '^bond' -e '^lo'); do
     IF_INFO="$(ifconfig $CUR_IF)"
-    MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
+    MAC_ADDR="$(echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }')"
     IP_TEST=""
     if [ -n "$MAC_ADDR" ]; then 
       # Old style ifconfig
-      IP_TEST=`echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g'`
+      IP_TEST="$(echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g')"
     else
       # Check for new style ifconfig
-      MAC_ADDR=`echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }'`
+      MAC_ADDR="$(echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }')"
       if [ -z "$MAC_ADDR" ]; then
         echo "* Skipped auto config for interface: $CUR_IF"
         continue
       fi
-      IP_TEST=`echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g'`
+      IP_TEST="$(echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g')"
     fi
 
     if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
@@ -770,11 +770,11 @@ sanity_check()
   for ITEM in $DEVICES; do
     SOURCE_DEVICE_NODEV=""
 
-    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    TARGET_DEVICE_MAP="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
     if [ -z "$TARGET_DEVICE_MAP" ]; then
       TARGET_DEVICE_MAP="$ITEM"
     else
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      SOURCE_DEVICE_NODEV="$(cho "$ITEM" |cut -f1 -d"$SEP")"
     fi
 
     if [ -n "$TARGET_DEVICE_MAP" ]; then
@@ -808,8 +808,8 @@ sanity_check()
   # Sanity check partitions
   IFS=' '
   for ITEM in $PARTITIONS; do
-    SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-    TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    SOURCE_PARTITION_NODEV="$(echo "$ITEM" |cut -f1 -d"$SEP")"
+    TARGET_PARTITION_MAP="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
 
     if [ -n "$TARGET_PARTITION_MAP" ]; then
       if ! echo "$TARGET_PARTITION_MAP" |grep -q '^/dev/'; then
@@ -930,7 +930,7 @@ set_image_source_dir()
       IMAGE_DIR="$IMAGE_ROOT"
       if [ -z "$IMAGE_DIR" ]; then
         # Default to the cwd
-        IMAGE_DIR=`pwd`
+        IMAGE_DIR="$(pwd)"
       fi
 
       if [ -z "$IMAGE_RESTORE_DEFAULT" ]; then
@@ -1038,19 +1038,19 @@ source_to_target_device_remap()
   IFS=' '
   for ITEM in $DEVICES; do
     SOURCE_DEVICE_NODEV=""
-    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    TARGET_DEVICE_MAP="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
     if [ -z "$TARGET_DEVICE_MAP" ]; then
       TARGET_DEVICE_MAP="$ITEM"
     else
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      SOURCE_DEVICE_NODEV="$(echo "$ITEM" |cut -f1 -d"$SEP")"
     fi
 
     TARGET_DEVICE_MAP_NODEV="${TARGET_DEVICE_MAP#/dev/}"
-    NUM=`get_partition_number "$SOURCE_NODEV"`
+    NUM="$(get_partition_number "$SOURCE_NODEV")"
     if [ -n "$NUM" ]; then
       # Argument is a partition
       if [ -z "$SOURCE_DEVICE_NODEV" ] || echo "$SOURCE_NODEV" |grep -E -x -q "$(get_partition_prefix $SOURCE_DEVICE_NODEV)[0-9]+"; then
-        TARGET_DEVICE=`add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}"`
+        TARGET_DEVICE="$(add_partition_number "/dev/${TARGET_DEVICE_MAP_NODEV}" "${NUM}")"
         break
       fi
     else
@@ -1065,8 +1065,8 @@ source_to_target_device_remap()
   # We want another target partition than specified in the image name?:
   IFS=' '
   for ITEM in $PARTITIONS; do
-    SOURCE_PARTITION_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-    TARGET_PARTITION_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    SOURCE_PARTITION_NODEV="$(echo "$ITEM" |cut -f1 -d"$SEP")"
+    TARGET_PARTITION_MAP="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
 
     if [ "$SOURCE_PARTITION_NODEV" = "$SOURCE_NODEV" -a -n "$TARGET_PARTITION_MAP" ]; then
       TARGET_DEVICE="$TARGET_PARTITION_MAP"
@@ -1089,11 +1089,11 @@ source_to_target_device_map_update()
   IFS=' '
   for ITEM in $DEVICES; do
     SOURCE_DEVICE_NODEV=""
-    TARGET_DEVICE_MAP=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    TARGET_DEVICE_MAP="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
     if [ -z "$TARGET_DEVICE_MAP" ]; then
       TARGET_DEVICE_MAP="$ITEM"
     else
-      SOURCE_DEVICE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+      SOURCE_DEVICE_NODEV="$(echo "$ITEM" |cut -f1 -d"$SEP")"
     fi
 
     # Remove entries for specified device
@@ -1144,8 +1144,8 @@ restore_partitions()
   # Restore the actual image(s):
   IFS=' ,'
   for ITEM in $IMAGE_FILES; do
-    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
-    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    IMAGE_FILE="$(echo "$ITEM" |cut -f1 -d"$SEP" -s)"
+    TARGET_PARTITION="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
 
     if [ ! -b "$TARGET_PARTITION" ]; then
       echo "* NOTE: Skipping image file \"$IMAGE_FILE\" for non-existant partition \"$TARGET_PARTITION\"" >&2
@@ -1165,13 +1165,13 @@ restore_partitions()
       partclone)  { $GZIP -d -c "$IMAGE_FILE"; echo $? >/tmp/.gzip.exitcode; } |partclone.restore -s - -o "$TARGET_PARTITION"
                   retval=$?
                   if [ $retval -eq 0 ]; then
-                    retval=`cat /tmp/.gzip.exitcode`
+                    retval="$(cat /tmp/.gzip.exitcode)"
                   fi
                   ;;
       ddgz)       { $GZIP -d -c "$IMAGE_FILE"; echo $? >/tmp/.gzip.exitcode; } |dd of="$TARGET_PARTITION" bs=4096
                   retval=$?
                   if [ $retval -eq 0 ]; then
-                    retval=`cat /tmp/.gzip.exitcode`
+                    retval="$(cat /tmp/.gzip.exitcode)"
                   fi
                   ;;
     esac
@@ -1224,7 +1224,7 @@ get_source_disks()
   # Only check disk files if no partitions specified and the rule "all" applies
   if [ -z "$PARTITIONS" -o $CLEAN -eq 1 ]; then
     IFS=$EOL
-    for ITEM in `find . -maxdepth 1 -name "track0.*" -o -name "sgdisk.*" -o -name "sfdisk.*"`; do
+    for ITEM in $(find . -maxdepth 1 -name "track0.*" -o -name "sgdisk.*" -o -name "sfdisk.*"); do
       # Extract drive name from file
       IMAGE_SOURCE_NODEV="$(basename "$ITEM" |sed -e s,'.*\.',, -e s,'_','/',g)"
 
@@ -1237,7 +1237,7 @@ get_source_disks()
 
   # Check image files:
   IFS=$EOL
-  for ITEM in `find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"`; do
+  for ITEM in $(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz"); do
     # Extract drive name from file
     IMAGE_SOURCE_NODEV="$(get_partition_disk "$(basename "$ITEM" |sed -e s,'\..*',, -e s,'_','/',g)")"
 
@@ -1302,7 +1302,7 @@ get_auto_target_device()
 
   # Original device not suitable: check other devices
   IFS=' '
-  for DISK_DEV in `get_available_disks`; do
+  for DISK_DEV in $(get_available_disks); do
     DISK_NODEV="${DISK_DEV#/dev/}"
     # Checked for mounted partitions
     if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ] && \
@@ -1324,12 +1324,12 @@ check_disks()
 
   # Check device (disks):
   IFS=' '
-  for IMAGE_SOURCE_NODEV in `get_source_disks`; do
-    IMAGE_TARGET_NODEV=`source_to_target_device_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,`
+  for IMAGE_SOURCE_NODEV in $(get_source_disks); do
+    IMAGE_TARGET_NODEV="$(source_to_target_device_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,)"
 
     if [ "$IMAGE_TARGET_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
       # Check whether device is available (eg. not mounted partitions and fallback to other default device if so)
-      IMAGE_TARGET_NODEV=`get_auto_target_device "$IMAGE_SOURCE_NODEV"`
+      IMAGE_TARGET_NODEV="$(get_auto_target_device "$IMAGE_SOURCE_NODEV")"
     fi
 
     echo ""
@@ -1593,8 +1593,8 @@ restore_disks()
   unset IFS
   for ITEM in $DEVICE_FILES; do
     # Extract drive name from file
-    IMAGE_SOURCE_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
-    TARGET_NODEV=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    IMAGE_SOURCE_NODEV="$(echo "$ITEM" |cut -f1 -d"$SEP")"
+    TARGET_NODEV="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
 
     # Check whether device already contains partitions
     PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
@@ -1701,7 +1701,7 @@ restore_disks()
           # Make sure we restore the PARTUUID else e.g. Windows 10 fails to boot
           echo ""
           echo "* Updating DOS partition UUID on /dev/$TARGET_NODEV"
-          result=`dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=1 seek=440 skip=440 count=6 2>&1`
+          result="$(dd if="$DD_SOURCE" of=/dev/$TARGET_NODEV bs=1 seek=440 skip=440 count=6 2>&1)"
           retval=$?
           if [ $retval -ne 0 ]; then
             echo "$result" >&2
@@ -1736,7 +1736,7 @@ check_image_files()
     if [ -n "$PARTITIONS" ]; then
       IFS=' ,'
       for ITEM in $PARTITIONS; do
-        PART_NODEV=`echo "$ITEM" |cut -f1 -d"$SEP"`
+        PART_NODEV="$(echo "$ITEM" |cut -f1 -d"$SEP")"
 
         IFS=$EOL
         LOOKUP="$(find . -maxdepth 1 -type f -iname "${PART_NODEV}.img.gz.000" -o -iname "${PART_NODEV}.fsa" -o -iname "${PART_NODEV}.dd.gz" -o -iname "${PART_NODEV}.pc.gz")"
@@ -1752,11 +1752,11 @@ check_image_files()
           do_exit 5
         fi
 
-        IMAGE_FILE=`basename "$LOOKUP"`
+        IMAGE_FILE="$(basename "$LOOKUP")"
 
         # Construct device name:
         SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
-        TARGET_PARTITION=`source_to_target_device_remap "$SOURCE_NODEV"`
+        TARGET_PARTITION="$(source_to_target_device_remap "$SOURCE_NODEV")"
 
         # Add item to list
         IMAGE_FILES="${IMAGE_FILES}${IMAGE_FILES:+ }${IMAGE_FILE}${SEP}${TARGET_PARTITION}"
@@ -1765,11 +1765,11 @@ check_image_files()
       IFS=$EOL
       for ITEM in $(find . -maxdepth 1 -type f -iname "*.img.gz.000" -o -iname "*.fsa" -o -iname "*.dd.gz" -o -iname "*.pc.gz" |sort); do
         # FIXME: Can have multiple images here!
-        IMAGE_FILE=`basename "$ITEM"`
+        IMAGE_FILE="$(basename "$ITEM")"
 
         # Construct device name:
         SOURCE_NODEV="$(echo "$IMAGE_FILE" |sed -e s,'\..*',, -e s,'_','/',g)"
-        TARGET_PARTITION=`source_to_target_device_remap "$SOURCE_NODEV"`
+        TARGET_PARTITION="$(source_to_target_device_remap "$SOURCE_NODEV")"
 
         if ! target_device_list_contains_partition "$TARGET_PARTITION"; then
           printf "\033[40m\033[1;31mWARNING: Not selecting image source $SOURCE_NODEV as there's no target device available for it!\n\033[0m" >&2
@@ -1809,7 +1809,7 @@ check_image_files()
   # Make sure the proper binaries are available
   IFS=' ,'
   for ITEM in $IMAGE_FILES; do
-    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP"`
+    IMAGE_FILE="$(echo "$ITEM" |cut -f1 -d"$SEP")"
 
     case $(image_type_detect "$IMAGE_FILE") in
       fsarchiver) check_command_error fsarchiver
@@ -1832,8 +1832,8 @@ check_partitions()
 {
   IFS=' ,'
   for ITEM in $IMAGE_FILES; do
-    IMAGE_FILE=`echo "$ITEM" |cut -f1 -d"$SEP" -s`
-    TARGET_PARTITION=`echo "$ITEM" |cut -f2 -d"$SEP" -s`
+    IMAGE_FILE="$(echo "$ITEM" |cut -f1 -d"$SEP" -s)"
+    TARGET_PARTITION="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
 
     echo "* Using image file \"${IMAGE_FILE}\" for partition $TARGET_PARTITION"
 
@@ -2290,7 +2290,7 @@ if [ $CLEAN -eq 1 -a $ONLY_SH -eq 0 ]; then
 fi
 
 # Set this for legacy scripts:
-TARGET_DEVICE=`echo "$TARGET_DEVICES" |cut -f1 -d' '` # Pick the first device (probably sda)
+TARGET_DEVICE="$(echo "$TARGET_DEVICES" |cut -f1 -d' ')" # Pick the first device (probably sda)
 TARGET_NODEV="${TARGET_DEVICE#/dev/}"
 USER_TARGET_NODEV="$TARGET_NODEV"
 

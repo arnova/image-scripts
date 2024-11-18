@@ -199,7 +199,7 @@ get_partitions_with_size_type()
 
   IFS=$EOL
   get_partitions "$DISK_NODEV" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |awk '{ print $1 }'`
+    local PART_NODEV="$(echo "$LINE" |awk '{ print $1 }')"
 
     local SIZE="$(blockdev --getsize64 "/dev/$PART_NODEV" 2>/dev/null)"
     if [ -z "$SIZE" ]; then
@@ -251,7 +251,7 @@ get_device_layout()
   IFS=$EOL
   FIRST=1
   echo "$result" |while read LINE; do
-    local PART_NODEV=`echo "$LINE" |sed s,'^[^a-z]*',, |awk '{ print $1 }'`
+    local PART_NODEV="$(echo "$LINE" |sed s,'^[^a-z]*',, |awk '{ print $1 }')"
 
     printf "$LINE  "
 
@@ -280,7 +280,7 @@ get_disk_for_slave()
   local DISK=""
 
   IFS=$EOL
-  for LINE in `lsblk -a -i -n -o NAME,TYPE`; do
+  for LINE in $(lsblk -a -i -n -o NAME,TYPE); do
     if echo "$LINE" |grep -q "[[:blank:]]disk$"; then
       # Master disk:
       DISK="$(echo "$LINE" |awk '{ print $1 }')"
@@ -295,7 +295,7 @@ get_disk_for_slave()
 
 show_block_device_info()
 {
-  local BLK_NODEV=`echo "$1" |sed -e s,'^/dev/',, -e s,'^/sys/class/block/',,`
+  local BLK_NODEV="$(echo "$1" |sed -e s,'^/dev/',, -e s,'^/sys/class/block/',,)"
   local SYS_BLK="/sys/class/block/${BLK_NODEV}"
 
   local NAME=""
@@ -336,19 +336,19 @@ configure_network()
   IFS=$EOL
   for CUR_IF in $(ifconfig -a 2>/dev/null |grep '^[a-z]' |sed -r s/'([[:blank:]]|:).*'// |grep -v -e '^dummy' -e '^bond' -e '^lo'); do
     IF_INFO="$(ifconfig $CUR_IF)"
-    MAC_ADDR=`echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }'`
+    MAC_ADDR="$(echo "$IF_INFO" |grep -i ' hwaddr ' |awk '{ print $NF }')"
     IP_TEST=""
     if [ -n "$MAC_ADDR" ]; then 
       # Old style ifconfig
-      IP_TEST=`echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g'`
+      IP_TEST="$(echo "$IF_INFO" |grep -i 'inet addr:.*Bcast.*Mask.*' |sed 's/^ *//g')"
     else
       # Check for new style ifconfig
-      MAC_ADDR=`echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }'`
+      MAC_ADDR="$(echo "$IF_INFO" |grep -i ' ether ' |awk '{ print $2 }')"
       if [ -z "$MAC_ADDR" ]; then
         echo "* Skipped auto config for interface: $CUR_IF"
         continue
       fi
-      IP_TEST=`echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g'`
+      IP_TEST="$(echo "$IF_INFO" |grep -i 'inet .*netmask .*broadcast .*' |sed 's/^ *//g')"
     fi
 
     if [ -z "$IP_TEST" ] || ! ifconfig 2>/dev/null |grep -q -e "^${CUR_IF}[[:blank:]]" -e "^${CUR_IF}:"; then
@@ -719,7 +719,7 @@ detect_partitions()
 
     IFS=$EOL
     for LINE in $FIND_PARTITIONS; do
-      local PART_NODEV=`echo "$LINE" |awk -F: '{ print $1 }'`
+      local PART_NODEV="$(echo "$LINE" |awk -F: '{ print $1 }')"
 
       if echo "$LINE" |grep -q -e '^loop[0-9]' -e '^sr[0-9]' -e '^fd[0-9]' -e '^ram[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
         continue
@@ -1055,7 +1055,7 @@ backup_partitions()
                       { $PARTCLONE_CMD -s "/dev/$PART"; echo $? >/tmp/.partclone.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
                       retval=$?
                       if [ $retval -eq 0 ]; then
-                        retval=`cat /tmp/.partclone.exitcode`
+                        retval="$(cat /tmp/.partclone.exitcode)"
                       fi
                     fi
                     ;;
@@ -1068,7 +1068,7 @@ backup_partitions()
                     { $DD_CMD; echo $? >/tmp/.dd.exitcode; } |$GZIP -$GZIP_COMPRESSION -c >"$TARGET_FILE"
                     retval=$?
                     if [ $retval -eq 0 ]; then
-                      retval=`cat /tmp/.dd.exitcode`
+                      retval="$(cat /tmp/.dd.exitcode)"
                     fi
                     ;;
     esac
