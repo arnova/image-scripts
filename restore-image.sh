@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.19l"
+MY_VERSION="3.20"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 14, 2024
+# Last update: November 27, 2024
 # (C) Copyright 2004-2024 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
@@ -1270,6 +1270,35 @@ list_has_disk_partition()
 }
 
 
+validate_target_device()
+{
+  local TARGET_DEVICE="/dev/$1"
+  local MIN_SIZE="$2"
+
+  if ! blockdev --rereadpt "$TARGET_DEVICE" >/dev/null 2>&1; then
+    echo "* Ignoring device $TARGET_DEVICE since it's locked" >&2
+    return 1
+  fi
+
+  if [ $(blockdev --getsize64 "$TARGET_DEVICE") -lt $MIN_SIZE ]; then
+    echo "* Ignoring device $TARGET_DEVICE since it's too small" >&2
+    return 1
+  fi
+
+  if grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$TARGET_DEVICE" || \
+     grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$TARGET_DEVICE"; then
+    echo "* Ignoring device $TARGET_DEVICE since it has mounted/swap partitions" >&2
+    return 1
+  fi
+
+  if target_device_list_contains_disk "$TARGET_DEVICE"; then
+#    echo "* Ignoring device $TARGET_DEVICE since it's already used as target" >&2
+    return 1
+  fi
+
+  return 0
+}
+
 # Returns best suitable target device, prefer unmounted disks (without /dev/ prefix)
 get_auto_target_device()
 {
@@ -1289,11 +1318,7 @@ get_auto_target_device()
       return
     else
       # Additional checks when --clean or --pt is specified:
-      if blockdev --rereadpt "/dev/$SOURCE_NODEV" >/dev/null 2>&1 &&
-         [ $(blockdev --getsize64 /dev/$SOURCE_NODEV) -ge $MIN_SIZE ] && \
-         ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" && \
-         ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "/dev/$SOURCE_NODEV" && \
-         ! target_device_list_contains_disk "/dev/$SOURCE_NODEV"; then
+      if validate_target_device "$SOURCE_NODEV" "$MIN_SIZE"; then
         echo "$SOURCE_NODEV"
         return
       fi
@@ -1305,11 +1330,11 @@ get_auto_target_device()
   for DISK_DEV in $(get_available_disks); do
     DISK_NODEV="${DISK_DEV#/dev/}"
     # Checked for mounted partitions
-    if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ] && \
-      blockdev --rereadpt "$DISK_DEV" >/dev/null 2>&1 && \
-      ! grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV" && \
-      ! grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$DISK_DEV" && \
-      ! target_device_list_contains_disk "$DISK_DEV"; then
+    if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" -a "$DISK_DEV" != "$SOURCE_NODEV" ]; then
+      if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 ] && ! validate_target_device "$SOURCE_NODEV" "$MIN_SIZE"; then
+        continue  # Device not suitable: try next
+      fi
+
       echo "$DISK_NODEV"
       return
     fi
