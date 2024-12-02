@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.22f"
+MY_VERSION="3.23"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: July 7, 2023
-# (C) Copyright 2004-2023 by Arno van Amersfoort
+# Last update: December 2, 2024
+# (C) Copyright 2004-2024 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -167,52 +167,6 @@ get_partition_prefix()
   else
     echo "${1}"
   fi
-}
-
-
-# $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
-# Note that size is represented in 1KiB blocks
-get_partitions_with_size()
-{
-  local DISK_NODEV="${1#/dev/}"
-  local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
-
-  if [ -n "$DISK_NODEV" ]; then
-    echo "$FIND_PARTS" |grep -E "^$(get_partition_prefix $DISK_NODEV)[0-9]+[[:blank:]]"
-  else
-    echo "$FIND_PARTS" # Show all
-  fi
-}
-
-
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions()
-{
-  get_partitions_with_size "$1" |awk '{ print $1 }'
-}
-
-
-# $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions_with_size_type()
-{
-  local DISK_NODEV="${1#/dev/}"
-
-  IFS=$EOL
-  get_partitions "$DISK_NODEV" |while read LINE; do
-    local PART_NODEV="$(echo "$LINE" |awk '{ print $1 }')"
-
-    local SIZE="$(blockdev --getsize64 "/dev/$PART_NODEV" 2>/dev/null)"
-    if [ -z "$SIZE" ]; then
-      SIZE=0
-    fi
-    local SIZE_HUMAN="$(human_size $SIZE |tr ' ' '_')"
-
-    local BLKID_INFO="$(blkid -o full -s LABEL -s PTTYPE -s TYPE -s UUID "/dev/$PART_NODEV" 2>/dev/null |sed -e s,'^/dev/.*: ',, -e s,' *$',,)"
-    if [ -z "$BLKID_INFO" ]; then
-      BLKID_INFO="TYPE=\"unknown\""
-    fi
-    echo "$PART_NODEV: $BLKID_INFO SIZE=$SIZE SIZEH=$SIZE_HUMAN"
-  done
 }
 
 
@@ -701,57 +655,41 @@ show_backup_disks_info()
 
 detect_partitions()
 {
-  local DEVICE="$1"
-  local FIND_PARTITIONS=""
   local SELECT_PARTITIONS=""
-  local BLKID_LIST=""
-
-  if [ -n "$DEVICE" ]; then  
-    FIND_PARTITIONS="$(get_partitions_with_size_type /dev/$DEVICE |sort)"
-  else
-    FIND_PARTITIONS="$(get_partitions_with_size_type |sort)"
-  fi
+  local FIND_SLAVES="$(lsblk -b -A -i -n -l -o NAME,TYPE,FSTYPE $1)"
 
   # Does the device contain partitions?
-  if [ -n "$FIND_PARTITIONS" ]; then
-    SELECT_PARTITIONS=""
-    BLKID_LIST="$(blkid)"
+  if [ -z "$FIND_SLAVES" ]; then
+    return 1 # Nothing found
+  fi
 
-    IFS=$EOL
-    for LINE in $FIND_PARTITIONS; do
-      local PART_NODEV="$(echo "$LINE" |awk -F: '{ print $1 }')"
+  IFS=$EOL
+  for LINE in $FIND_SLAVES; do
+    local PART_NODEV="$(echo "$LINE" |awk '{ print $1 }')"
+    local PART_TYPE="$(echo "$LINE" |awk '{ print $2 }')"
+    local PART_FSTYPE="$(echo "$LINE" |awk '{ print $3 }')"
 
-      if echo "$LINE" |grep -q -e '^loop[0-9]' -e '^sr[0-9]' -e '^fd[0-9]' -e '^ram[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
-        continue
-      fi
-
-      if echo "$LINE" |grep -q -E "([[:blank:]]|^)SIZE=\"?0"; then
-        continue # Ignore device
-      fi
-
-      # Make sure it's a real filesystem-partition
-      if ! echo "$BLKID_LIST" |grep -q "^/dev/${PART_NODEV}:"; then
-        continue
-      fi
-
-      # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
-      if echo "$LINE" |grep -q -i -E "([[:blank:]]|^)TYPE=\"?(swap|squashfs|lvm2_member|linux_raid_member|iso9660)"; then
-        continue # Ignore swap, lvm (dm), raid (md), etc. partitions
-      fi
-
-      # Extra strict regex for making sure it's really a filesystem
-#      if ! echo "$LINE" |grep -q -i ' TYPE=' && ! echo "$LINE" |grep -q -i -E -e ' LABEL=' -e '; then
-      if echo "$BLKID_LIST" |grep -q -i -E "^/dev/${PART_NODEV}:.*[[:blank:]] PTUUID="; then
-        continue
-      fi
-
-      SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART_NODEV}"
-    done
-
-    if [ -n "$SELECT_PARTITIONS" ]; then
-      echo "$SELECT_PARTITIONS"
-      return 0
+    if echo "$PART_NODEV" |grep -q -e '^sr[0-9]' -e '^fd[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
+      continue
     fi
+
+    # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
+    if [ "$PART_FSTYPE" = "swap" -o "$PART_FSTYPE" = "squashfs" -o "$PART_FSTYPE" = "lvm2_member" -o \
+         "$PART_FSTYPE" = "linux_raid_member" -o "$PART_FSTYPE" = "iso9660" -o "$PART_FSTYPE" = "zfs_member" ]; then
+      continue # Ignore swap, lvm (dm), raid (md), etc. partitions
+    fi
+
+    # Skip (bare) disks without any filesystem
+    if [ "$PART_TYPE" = "disk" -a -z "$PART_FSTYPE" ]; then
+      continue
+    fi
+
+    SELECT_PARTITIONS="${SELECT_PARTITIONS}${SELECT_PARTITIONS:+ }${PART_NODEV}"
+  done
+
+  if [ -n "$SELECT_PARTITIONS" ]; then
+    echo "$SELECT_PARTITIONS"
+    return 0
   fi
 
   return 1 # Nothing found
@@ -1273,7 +1211,7 @@ load_config()
 #######################
 # Program entry point #
 #######################
-echo "Image BACKUP Script v$MY_VERSION - (C) Copyright 2004-2023 by Arno van Amersfoort"
+echo "Image BACKUP Script v$MY_VERSION - (C) Copyright 2004-2024 by Arno van Amersfoort"
 
 # Load configuration from file/commandline
 load_config $*
