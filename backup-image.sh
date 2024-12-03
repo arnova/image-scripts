@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.23a"
+MY_VERSION="3.23b"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: December 3, 2024
@@ -184,13 +184,13 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,TYPE,PARTTYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
   if [ $? -ne 0 ]; then
-    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
     if [ $? -ne 0 ]; then
-      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
       if [ $? -ne 0 ]; then
-        result="$(lsblk -i -b -o NAME,FSTYPE,LABEL "$DISK_DEV" 2>/dev/null)"
+        result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,SIZE "$DISK_DEV" 2>/dev/null)"
         if [ $? -ne 0 ]; then
           echo "WARNING: Unable to obtain lsblk info for \"$DISK_DEV\"" >&2
         fi
@@ -656,7 +656,7 @@ show_backup_disks_info()
 detect_partitions()
 {
   local SELECT_PARTITIONS=""
-  local FIND_SLAVES="$(lsblk -b -A -i -n -l -o NAME,TYPE,FSTYPE $1)"
+  local FIND_SLAVES="$(lsblk -b -i -n -l -o NAME,TYPE,FSTYPE,SIZE $1)"
 
   # Does the device contain partitions?
   if [ -z "$FIND_SLAVES" ]; then
@@ -668,9 +668,14 @@ detect_partitions()
     local PART_NODEV="$(echo "$LINE" |awk '{ print $1 }')"
     local PART_TYPE="$(echo "$LINE" |awk '{ print $2 }')"
     local PART_FSTYPE="$(echo "$LINE" |awk '{ print $3 }')"
+    local PART_SIZE="$(echo "$LINE" |awk '{ print $4 }')"
 
     if echo "$PART_NODEV" |grep -q -e '^sr[0-9]' -e '^fd[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
       continue
+    fi
+
+    if [ "$PART_SIZE" = "0" ]; then
+      continue # Skip zero-size devices
     fi
 
     # Make sure we only store real filesystems (this includes GRUB/EFI partitions)
