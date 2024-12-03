@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.23c"
+MY_VERSION="3.23d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: December 3, 2024
@@ -184,22 +184,19 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,TYPE,PARTTYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
+  local result="$(lsblk -i -b -o NAME,TYPE,SIZE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
   if [ $? -ne 0 ]; then
-    result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+    result="$(lsblk -i -b -o NAME,TYPE,SIZE,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
     if [ $? -ne 0 ]; then
-      result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,TYPE,SIZE "$DISK_DEV" 2>/dev/null)"
+      result="$(lsblk -i -b -o NAME,TYPE,SIZE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
       if [ $? -ne 0 ]; then
-        result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,SIZE "$DISK_DEV" 2>/dev/null)"
+        result="$(lsblk -i -b -o NAME,SIZE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
         if [ $? -ne 0 ]; then
           echo "WARNING: Unable to obtain lsblk info for \"$DISK_DEV\"" >&2
+          return 1
         fi
       fi
     fi
-  fi
-
-  if [ -z "$result" ]; then
-    return 1
   fi
 
   IFS=$EOL
