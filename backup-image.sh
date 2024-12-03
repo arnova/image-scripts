@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.23"
+MY_VERSION="3.23a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: December 2, 2024
+# Last update: December 3, 2024
 # (C) Copyright 2004-2024 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
@@ -184,7 +184,7 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
   if [ $? -ne 0 ]; then
     result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
     if [ $? -ne 0 ]; then

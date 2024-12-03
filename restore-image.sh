@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.20"
+MY_VERSION="3.20a"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: November 27, 2024
+# Last update: December 3, 2024
 # (C) Copyright 2004-2024 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
@@ -257,7 +257,7 @@ get_partition_prefix()
 
 # $1 = disk device to get partitions from, if not specified all available partitions are listed (without /dev/ prefix)
 # Note that size is represented in 1KiB blocks
-get_partitions_with_size()
+get_kernel_partitions_with_size()
 {
   local DISK_NODEV="${1#/dev/}"
   local FIND_PARTS="$(cat /proc/partitions |sed -r -e '1,2d' -e s,'[[blank:]]+/dev/, ,' |awk '{ print $4" "$3 }')"
@@ -271,9 +271,9 @@ get_partitions_with_size()
 
 
 # $1 = disk device to get partitions from, if not specified all available partitions are listed
-get_partitions()
+get_kernel_partitions()
 {
-  get_partitions_with_size "$1" |awk '{ print $1 }'
+  get_kernel_partitions_with_size "$1" |awk '{ print $1 }'
 }
 
 
@@ -326,7 +326,7 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
+  result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,PARTTYPENAME,SIZE "$DISK_DEV" 2>/dev/null)"
   if [ $? -ne 0 ]; then
     result="$(lsblk -i -b -o NAME,FSTYPE,LABEL,UUID,TYPE,PARTTYPE,SIZE "$DISK_DEV" 2>/dev/null)"
     if [ $? -ne 0 ]; then
@@ -504,7 +504,7 @@ part_check()
     DISK_PART_NUMBERS="$(echo "$DISK_PARTITIONS" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
 
     # Second make sure all partitions reported by the kernel in /dev/ exist according to the disk
-    KERNEL_PARTITIONS="$(get_partitions "$DEVICE")"
+    KERNEL_PARTITIONS="$(get_kernel_partitions "$DEVICE")"
     KERNEL_PART_NUMBERS="$(echo "$KERNEL_PARTITIONS" |sed -r -e s,'^[/a-z]*',, -e s,'^[0-9]+p',, |sort -n)"
 
     # Compare the partition numbers
@@ -1416,7 +1416,7 @@ check_disks()
     fi
 
     # Check whether device already contains partitions
-    PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
+    PARTITIONS_FOUND="$(get_kernel_partitions "$TARGET_NODEV")"
 
     if [ -n "$PARTITIONS_FOUND" ]; then
       echo "* NOTE: Target device /dev/$TARGET_NODEV already contains partitions:"
@@ -1622,7 +1622,7 @@ restore_disks()
     TARGET_NODEV="$(echo "$ITEM" |cut -f2 -d"$SEP" -s)"
 
     # Check whether device already contains partitions
-    PARTITIONS_FOUND="$(get_partitions "$TARGET_NODEV")"
+    PARTITIONS_FOUND="$(get_kernel_partitions "$TARGET_NODEV")"
 
     # Flag in case we update the mbr/partition table so we know we need to have the kernel to re-probe
     PARTPROBE=0
