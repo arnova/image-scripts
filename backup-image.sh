@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.23b"
+MY_VERSION="3.23c"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: December 3, 2024
@@ -656,7 +656,7 @@ show_backup_disks_info()
 detect_partitions()
 {
   local SELECT_PARTITIONS=""
-  local FIND_SLAVES="$(lsblk -b -i -n -l -o NAME,TYPE,FSTYPE,SIZE $1)"
+  local FIND_SLAVES="$(lsblk -l -n -b -o NAME,TYPE,SIZE,FSTYPE $1)"
 
   # Does the device contain partitions?
   if [ -z "$FIND_SLAVES" ]; then
@@ -667,8 +667,8 @@ detect_partitions()
   for LINE in $FIND_SLAVES; do
     local PART_NODEV="$(echo "$LINE" |awk '{ print $1 }')"
     local PART_TYPE="$(echo "$LINE" |awk '{ print $2 }')"
-    local PART_FSTYPE="$(echo "$LINE" |awk '{ print $3 }')"
-    local PART_SIZE="$(echo "$LINE" |awk '{ print $4 }')"
+    local PART_SIZE="$(echo "$LINE" |awk '{ print $3 }')"
+    local PART_FSTYPE="$(echo "$LINE" |awk '{ print $4 }')"
 
     if echo "$PART_NODEV" |grep -q -e '^sr[0-9]' -e '^fd[0-9]' || [ ! -b "/dev/$PART_NODEV" ]; then
       continue
