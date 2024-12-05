@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.20c"
+MY_VERSION="3.20d"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: December 3, 2024
+# Last update: December 5, 2024
 # (C) Copyright 2004-2024 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
@@ -326,11 +326,11 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  local result="$(lsblk -i -b -o NAME,TYPE,SIZE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
+  local result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
   if [ $? -ne 0 ]; then
-    result="$(lsblk -i -b -o NAME,TYPE,SIZE,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
+    result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
     if [ $? -ne 0 ]; then
-      result="$(lsblk -i -b -o NAME,TYPE,SIZE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
+      result="$(lsblk -i -b -o NAME,SIZE,TYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
       if [ $? -ne 0 ]; then
         result="$(lsblk -i -b -o NAME,SIZE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
         if [ $? -ne 0 ]; then
@@ -352,7 +352,7 @@ get_device_layout()
       FIRST=0
       echo "SIZEH"
     else
-      SIZE_HUMAN="$(human_size $(echo "$LINE" |awk '{ print $NF }') |tr ' ' '_')"
+      SIZE_HUMAN="$(human_size $(echo "$LINE" |awk '{ print $2 }') |tr ' ' '_')"
 
       if [ -z "$SIZE_HUMAN" ]; then
         echo "0"

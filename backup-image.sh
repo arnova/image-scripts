@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.23d"
+MY_VERSION="3.23e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: December 3, 2024
+# Last update: December 5, 2024
 # (C) Copyright 2004-2024 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
@@ -184,11 +184,11 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  local result="$(lsblk -i -b -o NAME,TYPE,SIZE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
+  local result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
   if [ $? -ne 0 ]; then
-    result="$(lsblk -i -b -o NAME,TYPE,SIZE,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
+    result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
     if [ $? -ne 0 ]; then
-      result="$(lsblk -i -b -o NAME,TYPE,SIZE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
+      result="$(lsblk -i -b -o NAME,SIZE,TYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
       if [ $? -ne 0 ]; then
         result="$(lsblk -i -b -o NAME,SIZE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
         if [ $? -ne 0 ]; then
@@ -202,20 +202,20 @@ get_device_layout()
   IFS=$EOL
   FIRST=1
   echo "$result" |while read LINE; do
-    local PART_NODEV="$(echo "$LINE" |sed s,'^[^a-z]*',, |awk '{ print $1 }')"
+    local PART_NODEV="$(echo "$LINE" |sed "s,^[^a-z]*,," |awk '{ print $1 }')"
 
     printf "$LINE  "
 
     if [ $FIRST -eq 1 ]; then
       FIRST=0
-      printf "SIZEH\n"
+      echo "SIZEH"
     else
-      SIZE_HUMAN="$(human_size $(echo "$LINE" |awk '{ print $NF }') |tr ' ' '_')"
+      SIZE_HUMAN="$(human_size $(echo "$LINE" |awk '{ print $2 }') |tr ' ' '_')"
 
       if [ -z "$SIZE_HUMAN" ]; then
-        printf "0\n"
+        echo "0"
       else
-        printf "$SIZE_HUMAN\n"
+        echo "$SIZE_HUMAN"
       fi
     fi
   done
