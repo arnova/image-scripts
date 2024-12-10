@@ -344,8 +344,6 @@ get_device_layout()
   IFS=$EOL
   FIRST=1
   echo "$result" |while read LINE; do
-    local PART_NODEV="$(echo "$LINE" |sed "s,^[^a-z]*,," |awk '{ print $1 }')"
-
     printf "$LINE  "
 
     if [ $FIRST -eq 1 ]; then
