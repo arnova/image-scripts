@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.20d"
+MY_VERSION="3.20e"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: December 5, 2024
-# (C) Copyright 2004-2024 by Arno van Amersfoort
+# Last update: April 15, 2025
+# (C) Copyright 2004-2025 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -1326,7 +1326,7 @@ get_auto_target_device()
     DISK_NODEV="${DISK_DEV#/dev/}"
     # Checked for mounted partitions
     if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" -a "$DISK_DEV" != "$SOURCE_NODEV" ]; then
-      if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 ] && ! validate_target_device "$SOURCE_NODEV" "$MIN_SIZE"; then
+      if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 ] && ! validate_target_device "$DISK_NODEV" "$MIN_SIZE"; then
         continue  # Device not suitable: try next
       fi
 
@@ -1347,6 +1347,7 @@ check_disks()
   for IMAGE_SOURCE_NODEV in $(get_source_disks); do
     IMAGE_TARGET_NODEV="$(source_to_target_device_remap "$IMAGE_SOURCE_NODEV" |sed s,'^/dev/',,)"
 
+    # Only try to get auto target device when device is NOT remapped
     if [ "$IMAGE_TARGET_NODEV" = "$IMAGE_SOURCE_NODEV" ]; then
       # Check whether device is available (eg. not mounted partitions and fallback to other default device if so)
       IMAGE_TARGET_NODEV="$(get_auto_target_device "$IMAGE_SOURCE_NODEV")"
