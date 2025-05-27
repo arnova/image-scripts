@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MY_VERSION="3.20e"
+MY_VERSION="3.20f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: April 15, 2025
+# Last update: May 27, 2025
 # (C) Copyright 2004-2025 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
@@ -1269,26 +1269,29 @@ validate_target_device()
 {
   local TARGET_DEVICE="/dev/$1"
   local MIN_SIZE="$2"
-
-  if ! blockdev --rereadpt "$TARGET_DEVICE" >/dev/null 2>&1; then
-    echo "* Ignoring device $TARGET_DEVICE since it's locked" >&2
-    return 1
-  fi
+  local LOCK_CHECK="$3"
 
   if [ $(blockdev --getsize64 "$TARGET_DEVICE") -lt $MIN_SIZE ]; then
     echo "* Ignoring device $TARGET_DEVICE since it's too small" >&2
     return 1
   fi
 
-  if grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$TARGET_DEVICE" || \
-     grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$TARGET_DEVICE"; then
-    echo "* Ignoring device $TARGET_DEVICE since it has mounted/swap partitions" >&2
-    return 1
-  fi
-
   if target_device_list_contains_disk "$TARGET_DEVICE"; then
 #    echo "* Ignoring device $TARGET_DEVICE since it's already used as target" >&2
     return 1
+  fi
+
+  if [ $LOCK_CHECK -eq 1 ]; then
+    if ! blockdev --rereadpt "$TARGET_DEVICE" >/dev/null 2>&1; then
+      echo "* Ignoring device $TARGET_DEVICE since it's locked" >&2
+      return 1
+    fi
+
+    if grep '^/' /etc/mtab |cut -f1 -d' ' |list_has_disk_partition "$TARGET_DEVICE" || \
+      grep '^/' /proc/swaps |cut -f1 -d' ' |list_has_disk_partition "$TARGET_DEVICE"; then
+      echo "* Ignoring device $TARGET_DEVICE since it has mounted/swap partitions" >&2
+      return 1
+    fi
   fi
 
   return 0
@@ -1299,25 +1302,21 @@ get_auto_target_device()
 {
   local SOURCE_NODEV="$1"
   local MIN_SIZE="$2"
+  local LOCK_CHECK=0
 
   #FIXME: Check disk-size with MIN_SIZE?
   if [ -z "$MIN_SIZE" ]; then
     MIN_SIZE=1 # Skip zero-size devices
   fi
 
-  # Check for original source device first
-  if [ -b "/dev/$SOURCE_NODEV" ]; then
-    if [ $CLEAN -eq 0 -a $PT_WRITE -eq 0 ]; then
-      # Original device is suitable
-      echo "$SOURCE_NODEV"
-      return
-    else
-      # Additional checks when --clean or --pt is specified:
-      if validate_target_device "$SOURCE_NODEV" "$MIN_SIZE"; then
-        echo "$SOURCE_NODEV"
-        return
-      fi
-    fi
+  if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 ]; then
+    LOCK_CHECK=1
+  fi
+
+  # Always check original source device first
+  if [ -b "/dev/$SOURCE_NODEV" ] && validate_target_device "$SOURCE_NODEV" "$MIN_SIZE" "$LOCK_CHECK" 2>/dev/null; then
+    echo "$SOURCE_NODEV"
+    return
   fi
 
   # Original device not suitable: check other devices
@@ -1325,8 +1324,8 @@ get_auto_target_device()
   for DISK_DEV in $(get_available_disks); do
     DISK_NODEV="${DISK_DEV#/dev/}"
     # Checked for mounted partitions
-    if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" -a "$DISK_DEV" != "$SOURCE_NODEV" ]; then
-      if [ $CLEAN -eq 1 -o $PT_WRITE -eq 1 ] && ! validate_target_device "$DISK_NODEV" "$MIN_SIZE"; then
+    if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ]; then
+      if ! validate_target_device "$DISK_NODEV" "$MIN_SIZE" "$LOCK_CHECK"; then
         continue  # Device not suitable: try next
       fi
 
