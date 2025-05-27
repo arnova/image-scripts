@@ -1324,14 +1324,14 @@ get_auto_target_device()
   for DISK_DEV in $(get_available_disks); do
     DISK_NODEV="${DISK_DEV#/dev/}"
     # Checked for mounted partitions
-    if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ]; then
+#    if [ "$(cat /sys/block/$DISK_NODEV/removable 2>/dev/null)" != "1" ]; then
       if ! validate_target_device "$DISK_NODEV" "$MIN_SIZE" "$LOCK_CHECK"; then
         continue  # Device not suitable: try next
       fi
 
       echo "$DISK_NODEV"
       return
-    fi
+#    fi
   done
 }
 
