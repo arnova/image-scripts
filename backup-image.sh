@@ -1217,7 +1217,7 @@ echo "Image BACKUP Script v$MY_VERSION - (C) Copyright 2004-2024 by Arno van Ame
 load_config $*
 
 # Sanity check environment
-sanity_check;
+sanity_check
 
 if [ "$NETWORK" != "none" -a -n "$NETWORK" -a $NO_NET -ne 1 ]; then
   # Setup network (interface)
