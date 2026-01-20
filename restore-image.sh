@@ -756,9 +756,9 @@ sanity_check()
   check_command_error lsblk
   check_command_error blockdev
 
-  [ "$NO_NET" != "0" ] && check_command_error ifconfig
-  [ "$NO_MOUNT" != "0" ] && check_command_error mount
-  [ "$NO_MOUNT" != "0" ] && check_command_error umount
+  [ "$NO_NET" != "1" ] && check_command_error ifconfig
+  [ "$NO_MOUNT" != "1" ] && check_command_error mount
+  [ "$NO_MOUNT" != "1" ] && check_command_error umount
 
   # Sanity check devices and check if target devices exist
   IFS=' '

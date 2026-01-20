@@ -450,9 +450,9 @@ sanity_check()
   check_command_warning sgdisk
   check_command_warning gdisk
 
-  [ "$NO_NET" != "0" ] && check_command_error ifconfig
-  [ "$NO_MOUNT" != "0" ] && check_command_error mount
-  [ "$NO_MOUNT" != "0" ] && check_command_error umount
+  [ "$NO_NET" != "1" ] && check_command_error ifconfig
+  [ "$NO_MOUNT" != "1" ] && check_command_error mount
+  [ "$NO_MOUNT" != "1" ] && check_command_error umount
 
   [ "$IMAGE_PROGRAM" = "fsa" ] && check_command_error fsarchiver
   [ "$IMAGE_PROGRAM" = "pi" ] && check_command_error partimage
