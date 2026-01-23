@@ -24,7 +24,7 @@ AUTO_UNMOUNT=1
 IMAGE_ROOT="/mnt/images"
 
 # The default image directory/name to use for restore. This is a subdirectory of the IMAGE_ROOT
-IMAGE_RESTORE_DEFAULT="win7-x64"
+IMAGE_RESTORE_DEFAULT="win11"
 
 # The image target directory/name to use where new image directories are created. This is a subdirectory of the IMAGE_ROOT
 IMAGE_BACKUP_DIR="temp"
