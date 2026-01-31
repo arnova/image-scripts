@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.23e"
+MY_VERSION="3.23f"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
-# Last update: December 5, 2024
-# (C) Copyright 2004-2024 by Arno van Amersfoort
+# Last update: January 31, 2026
+# (C) Copyright 2004-2026 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -174,6 +174,7 @@ get_partition_prefix()
 get_device_layout()
 {
   local DISK_DEV=""
+  local result
 
   if [ -n "$1" ]; then
     if echo "$1" |grep -q '^/dev/'; then
@@ -184,7 +185,7 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  local result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
+  result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
   if [ $? -ne 0 ]; then
     result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
     if [ $? -ne 0 ]; then

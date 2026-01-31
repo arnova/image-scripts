@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MY_VERSION="3.20f"
+MY_VERSION="3.20g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Restore Script with (SMB) network support
-# Last update: May 27, 2025
-# (C) Copyright 2004-2025 by Arno van Amersfoort
+# Last update: January 31, 2026
+# (C) Copyright 2004-2026 by Arno van Amersfoort
 # Web                   : https://github.com/arnova/image-scripts
 # Email                 : a r n o DOT v a n DOT a m e r s f o o r t AT g m a i l DOT c o m
 #                         (note: you must remove all spaces and substitute the @ and the . at the proper locations!)
@@ -143,9 +143,10 @@ sgdisk_safe()
 {
   local result=""
   local IFS=' '
-  result="$(sgdisk $@ 2>&1)"
-  local retval=$?
+  local retval
 
+  result="$(sgdisk $@ 2>&1)"
+  retval=$?
   if [ $retval -ne 0 ]; then
     echo "$result" >&2
     return $retval
@@ -165,13 +166,17 @@ sgdisk_safe()
 sfdisk_safe()
 {
   local IFS=' '
+  local result
+  local retval
+  local parse_false
+  local parse_true
 
-  local result="$(sfdisk $@ 2>&1)"
-  local retval=$?
+  result="$(sfdisk $@ 2>&1)"
+  retval=$?
 
   # Can't just check sfdisk's return code as it is not reliable
-  local parse_false="$(echo "$result" |grep -i -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max")"
-  local parse_true="$(echo "$result" |grep -i -e "^New situation:")"
+  parse_false="$(echo "$result" |grep -i -e "^Warning.*extends past end of disk" -e "^Warning.*exceeds max")"
+  parse_true="$(echo "$result" |grep -i -e "^New situation:")"
   if [ -n "$parse_false" -o -z "$parse_true" ]; then
     echo "$result" >&2
 
@@ -316,6 +321,7 @@ get_disk_partitions()
 get_device_layout()
 {
   local DISK_DEV=""
+  local result
 
   if [ -n "$1" ]; then
     if echo "$1" |grep -q '^/dev/'; then
@@ -326,7 +332,7 @@ get_device_layout()
   fi
 
   # Handle fallback for older versions of lsblk
-  local result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
+  result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPENAME,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
   if [ $? -ne 0 ]; then
     result="$(lsblk -i -b -o NAME,SIZE,TYPE,PARTTYPE,FSTYPE,LABEL "$DISK_DEV" 2>&1)"
     if [ $? -ne 0 ]; then
