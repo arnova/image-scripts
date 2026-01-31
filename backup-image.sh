@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MY_VERSION="3.23f"
+MY_VERSION="3.23g"
 # ----------------------------------------------------------------------------------------------------------------------
 # Image Backup Script with (SMB) network support
 # Last update: January 31, 2026
@@ -237,7 +237,6 @@ get_disk_for_slave()
     elif echo "$LINE" |grep -q -- "-${SLAVE}[[:blank:]]"; then
       # Found slave
       echo "$DISK"
-      return # We're done
     fi
   done
 }
